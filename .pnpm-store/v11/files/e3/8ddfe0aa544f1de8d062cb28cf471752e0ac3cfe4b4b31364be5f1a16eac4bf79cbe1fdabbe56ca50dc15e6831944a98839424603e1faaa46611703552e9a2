@@ -1,0 +1,355 @@
+import { spawn } from 'node:child_process';
+import { readFile, unlink, rm } from 'node:fs/promises';
+import { join, resolve, dirname, basename } from 'node:path';
+import fs from 'node:fs';
+import { L as LOADER_REGEX } from '../../../chunks/request-path.mjs';
+import { e as ensureSlash } from '../../../chunks/pathname.mjs';
+
+function createStaticPathsCode(staticPaths) {
+  return JSON.stringify(Array.from(new Set(staticPaths)).sort()).slice(1, -1);
+}
+const injectStatics = async (staticPathsCode, outDir) => {
+  const promises = /* @__PURE__ */ new Set();
+  const doReplace = async (path) => {
+    const code = await fs.promises.readFile(path, "utf-8");
+    let replaced = false;
+    const newCode = code.replace(/(['"])__QWIK_ROUTER_STATIC_PATHS_ARRAY__\1/g, () => {
+      replaced = true;
+      return staticPathsCode;
+    });
+    if (replaced) {
+      await fs.promises.writeFile(path, newCode);
+    }
+  };
+  const walk = async (dir) => {
+    const entries = await fs.promises.readdir(dir, {
+      withFileTypes: true
+    });
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        await walk(join(dir, entry.name));
+      } else if (entry.name.endsWith("js")) {
+        const p = doReplace(join(dir, entry.name)).finally(() => {
+          promises.delete(p);
+        });
+        promises.add(p);
+      }
+    }
+  };
+  await walk(outDir);
+  await Promise.all(promises);
+};
+async function postBuild(clientOutDir, serverOutDir, pathName, userStaticPaths, cleanStatic) {
+  if (pathName && !pathName.endsWith("/")) {
+    pathName = ensureSlash(pathName);
+  }
+  const pathNameBase = pathName || "/";
+  const ignorePathnames = /* @__PURE__ */ new Set([
+    pathNameBase + (globalThis.__QWIK_BUILD_DIR__ || "build") + "/",
+    pathNameBase + (globalThis.__QWIK_ASSETS_DIR__ || "assets") + "/"
+  ]);
+  const staticPaths = new Set(userStaticPaths.map(ensureSlash));
+  const loadItem = async (fsDir, fsName, pathname) => {
+    pathname = ensureSlash(pathname);
+    if (ignorePathnames.has(pathname)) {
+      return;
+    }
+    const fsPath = join(fsDir, fsName);
+    if (fsName === "index.html") {
+      if (!staticPaths.has(pathname) && cleanStatic) {
+        await fs.promises.unlink(fsPath);
+      }
+      return;
+    }
+    if (LOADER_REGEX.test("/" + fsName)) {
+      if (staticPaths.has(pathname)) {
+        staticPaths.add(pathname + fsName);
+      } else if (cleanStatic) {
+        await fs.promises.unlink(fsPath);
+      }
+      return;
+    }
+    const stat = await fs.promises.stat(fsPath);
+    if (stat.isDirectory()) {
+      await loadDir(fsPath, ensureSlash(pathname + fsName));
+    } else if (stat.isFile()) {
+      staticPaths.add(pathname + fsName);
+    }
+  };
+  const loadDir = async (fsDir, pathname) => {
+    const itemNames = await fs.promises.readdir(fsDir);
+    await Promise.all(itemNames.map((i) => loadItem(fsDir, i, pathname)));
+  };
+  if (fs.existsSync(clientOutDir)) {
+    await loadDir(clientOutDir, pathName);
+  }
+  const staticPathsCode = createStaticPathsCode(staticPaths);
+  await injectStatics(staticPathsCode, serverOutDir);
+}
+
+const QWIK_SSG_ENTRY_ID = "@qwik-ssg-entry";
+const QWIK_SSG_ENTRY_RESOLVED = "\0@qwik-ssg-entry";
+const QWIK_SSG_WORKER_ENTRY_ID = "@qwik-ssg-worker-entry";
+const QWIK_SSG_WORKER_ENTRY_RESOLVED = "\0@qwik-ssg-worker-entry";
+function viteAdapter(opts) {
+  let qwikRouterPlugin = null;
+  let qwikVitePlugin = null;
+  let viteCommand;
+  let buildAppRan = false;
+  const outputEntries = [];
+  const ssgOutDirFor = (root) => join(resolve(root), "node_modules", ".cache", `qwik-router-ssg-${process.pid}`);
+  const plugin = {
+    name: `vite-plugin-qwik-router-ssg-${opts.name}`,
+    enforce: "post",
+    apply: "build",
+    config(config) {
+      if (typeof opts.config === "function") {
+        config = opts.config(config);
+      }
+      config.define = {
+        "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || "production"),
+        ...config.define
+      };
+      if (opts.ssg !== null) {
+        config.builder ??= {};
+        config.environments = {
+          ...config.environments,
+          // Same server externalization as `ssr` (via the router/qwik `configEnvironment` hooks);
+          // only the build graph and outDir differ. run-ssg externalizes node_modules deps and
+          // resolves them at render time, so native/CJS packages (e.g. a database client) are not
+          // force-bundled.
+          ssg: {
+            consumer: "server",
+            build: {
+              ssr: true,
+              outDir: ssgOutDirFor(config.root ?? process.cwd()),
+              emptyOutDir: true
+            }
+          }
+        };
+      }
+      return config;
+    },
+    configResolved(config) {
+      viteCommand = config.command;
+      qwikRouterPlugin = config.plugins.find((p) => p.name === "vite-plugin-qwik-router");
+      if (!qwikRouterPlugin) {
+        throw new Error("Missing vite-plugin-qwik-router");
+      }
+      qwikRouterPlugin.api?._setSsgRoutes?.(opts.ssg?.include, opts.ssg?.exclude);
+      qwikVitePlugin = config.plugins.find((p) => p.name === "vite-plugin-qwik");
+      if (!qwikVitePlugin) {
+        throw new Error("Missing vite-plugin-qwik");
+      }
+    },
+    resolveId(id) {
+      if (id === QWIK_SSG_ENTRY_ID) {
+        return QWIK_SSG_ENTRY_RESOLVED;
+      }
+      if (id === QWIK_SSG_WORKER_ENTRY_ID) {
+        return QWIK_SSG_WORKER_ENTRY_RESOLVED;
+      }
+    },
+    load(id) {
+      if (id === QWIK_SSG_WORKER_ENTRY_RESOLVED) {
+        const { srcDir } = qwikVitePlugin.api.getOptions();
+        return [
+          `import render from '${srcDir}/entry.ssr';`,
+          `import qwikRouterConfig from '@qwik-router-config';`,
+          `import { startWorker } from '@qwik.dev/router/ssg';`,
+          // Fire-and-forget (no top-level await): avoids a Rollup inlined-dynamic-import init-order
+          // bug on the SSR target. See rollup/rollup#4166.
+          `startWorker({ render, qwikRouterConfig }).catch((err) => {`,
+          `  console.error(err);`,
+          `  process.exit(1);`,
+          `});`
+        ].join("\n");
+      }
+      if (id !== QWIK_SSG_ENTRY_RESOLVED) {
+        return;
+      }
+      const clientPublicOutDir = qwikVitePlugin.api.getClientPublicOutDir();
+      const basePathname = qwikRouterPlugin.api.getBasePathname();
+      const rootDir = qwikVitePlugin.api.getRootDir() ?? void 0;
+      let ssgOrigin = opts.ssg?.origin ?? opts.origin;
+      if (!ssgOrigin) {
+        ssgOrigin = `https://yoursite.qwik.dev`;
+      }
+      if (ssgOrigin.length > 0 && !/:\/\//.test(ssgOrigin)) {
+        ssgOrigin = `https://${ssgOrigin}`;
+      }
+      if (ssgOrigin.startsWith("//")) {
+        ssgOrigin = `https:${ssgOrigin}`;
+      }
+      try {
+        ssgOrigin = new URL(ssgOrigin).origin;
+      } catch {
+        this.warn(`Invalid "origin" option: "${ssgOrigin}". Using default origin: "https://yoursite.qwik.dev"`);
+        ssgOrigin = `https://yoursite.qwik.dev`;
+      }
+      const ssgOpts = {
+        origin: ssgOrigin,
+        outDir: clientPublicOutDir,
+        basePathname,
+        rootDir,
+        ...opts.ssg,
+        maxWorkers: opts.maxWorkers
+      };
+      for (const key of Object.keys(ssgOpts)) {
+        if (ssgOpts[key] === void 0) {
+          delete ssgOpts[key];
+        }
+      }
+      return [
+        `import qwikRouterConfig from '@qwik-router-config';`,
+        `import { runSsg } from '@qwik.dev/router/ssg';`,
+        ``,
+        `const ssgOpts = ${JSON.stringify(ssgOpts)};`,
+        ``,
+        `// Parse --quiet / --debug CLI flags`,
+        `const args = process.argv.slice(2);`,
+        `if (args.includes('--quiet')) ssgOpts.log = 'quiet';`,
+        `if (args.includes('--debug')) ssgOpts.log = 'debug';`,
+        ``,
+        // Fire-and-forget; see rollup/rollup#4166 above. The worker entry is a sibling file.
+        `runSsg({`,
+        `  qwikRouterConfig,`,
+        `  workerFilePath: new URL('./run-ssg-worker.js', import.meta.url).href,`,
+        `  ...ssgOpts,`,
+        `}).catch((err) => {`,
+        `  console.error(err);`,
+        `  process.exit(1);`,
+        `});`
+      ].join("\n");
+    },
+    buildStart() {
+      if (this.environment.name === "ssg" && viteCommand === "build") {
+        this.emitFile({
+          id: QWIK_SSG_ENTRY_ID,
+          type: "chunk",
+          fileName: "run-ssg.js"
+        });
+        this.emitFile({
+          id: QWIK_SSG_WORKER_ENTRY_ID,
+          type: "chunk",
+          fileName: "run-ssg-worker.js"
+        });
+      }
+    },
+    generateBundle(_, bundles) {
+      if (this.environment.name === "ssr") {
+        outputEntries.length = 0;
+        for (const fileName in bundles) {
+          const chunk = bundles[fileName];
+          if (chunk.type === "chunk" && chunk.isEntry) {
+            outputEntries.push(fileName);
+          }
+        }
+        if (opts.ssg !== null && viteCommand === "build" && !buildAppRan) {
+          this.warn("Qwik Router SSG was skipped: the `ssr` environment was built directly instead of through the Vite app builder, so no pages were prerendered. Build with the Qwik CLI or `createBuilder(config).buildApp()` (a plain `vite build` does this automatically).");
+        }
+      }
+    },
+    // Build the deployed server (`ssr`) and the separate `ssg` graph (run-ssg) — two graphs, so
+    // prerendered route code never reaches the `ssr` bundle — then render the pages and post-build.
+    // (The client builds in its own `vite build`.)
+    async buildApp(builder) {
+      buildAppRan = true;
+      const ssr = builder.environments.ssr;
+      if (ssr) {
+        await builder.build(ssr);
+      }
+      const serverOutDir = ssr?.config.build.outDir;
+      if (!serverOutDir || !qwikRouterPlugin?.api || !qwikVitePlugin?.api) {
+        return;
+      }
+      const log = builder.config.logger;
+      const staticPaths = opts.staticPaths || [];
+      const routes = qwikRouterPlugin.api.getRoutes();
+      const basePathname = qwikRouterPlugin.api.getBasePathname();
+      const clientOutDir = qwikVitePlugin.api.getClientOutDir();
+      const clientPublicOutDir = qwikVitePlugin.api.getClientPublicOutDir();
+      const assetsDir = qwikVitePlugin.api.getAssetsDir();
+      const ssgEnv = builder.environments.ssg;
+      const ssgOutDir = ssgOutDirFor(builder.config.root);
+      if (ssgEnv && clientOutDir && clientPublicOutDir) {
+        await builder.build(ssgEnv);
+        const runSsgPath = join(ssgOutDir, "run-ssg.js");
+        const ssgExitCode = await new Promise((res, reject) => {
+          const child = spawn(process.execPath, [
+            runSsgPath
+          ], {
+            stdio: [
+              "ignore",
+              "inherit",
+              "inherit"
+            ],
+            env: {
+              ...process.env,
+              NODE_ENV: process.env.NODE_ENV || "production"
+            }
+          });
+          child.on("close", res);
+          child.on("error", reject);
+        });
+        if (ssgExitCode !== 0) {
+          throw new Error(`Error while running SSG from "${opts.name}" adapter. At least one path failed to render.`);
+        }
+        const staticPathsFile = join(clientPublicOutDir, "_static-paths.json");
+        try {
+          staticPaths.push(...JSON.parse(await readFile(staticPathsFile, "utf-8")));
+          await unlink(staticPathsFile);
+        } catch {
+        }
+        if (process.env.QWIK_ROUTER_KEEP_SSG_BUILD) {
+          log.warn(`SSG build kept at ${ssgOutDir}`);
+        } else {
+          await rm(ssgOutDir, {
+            recursive: true,
+            force: true
+          });
+        }
+      }
+      await postBuild(clientPublicOutDir, serverOutDir, assetsDir ? join(basePathname, assetsDir) : basePathname, staticPaths, !!opts.cleanStaticGenerated);
+      if (typeof opts.generate === "function") {
+        await opts.generate({
+          outputEntries,
+          serverOutDir,
+          clientOutDir,
+          clientPublicOutDir,
+          basePathname,
+          routes,
+          assetsDir,
+          warn: (message) => log.warn(message),
+          error: (message) => {
+            throw new Error(message);
+          }
+        });
+      }
+      log.warn(`
+==============================================
+Note: Make sure that you are serving the built files with proper cache headers.
+See https://qwik.dev/docs/deployments/#cache-headers for more information.
+==============================================`);
+    }
+  };
+  return [
+    plugin
+  ];
+}
+function getParentDir(startDir, dirName) {
+  const root = resolve("/");
+  let dir = startDir;
+  for (let i = 0; i < 20; i++) {
+    dir = dirname(dir);
+    if (basename(dir) === dirName) {
+      return dir;
+    }
+    if (dir === root) {
+      break;
+    }
+  }
+  throw new Error(`Unable to find "${dirName}" directory from "${startDir}"`);
+}
+
+export { getParentDir, viteAdapter };

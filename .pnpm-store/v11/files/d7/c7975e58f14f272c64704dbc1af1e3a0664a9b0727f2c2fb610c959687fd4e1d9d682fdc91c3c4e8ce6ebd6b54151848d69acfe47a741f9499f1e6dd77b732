@@ -1,0 +1,317 @@
+import { _serialize } from '@qwik.dev/core/internal';
+import { parentPort } from 'node:worker_threads';
+import { r as runQwikRouter, a as resolveRequestHandlers, b as renderQwikMiddleware } from './user-response.mjs';
+import { b as trimInternalPathname } from './request-path.mjs';
+import { B as getRouteLoaders, E as getRouteLoaderValues, l as loadRoute } from './head.qwik.mjs';
+
+const staticWorkerThreadDeps = {
+  loadRoute,
+  renderQwikMiddleware,
+  resolveRequestHandlers,
+  trimInternalPathname,
+  runQwikRouter
+};
+const createNoopWritableStream = () => new WritableStream();
+function isRedirectMessage(value) {
+  return typeof value === "object" && value !== null && value.constructor?.name === "RedirectMessage";
+}
+async function requestHandlerForSsg(serverRequestEv, opts, deps) {
+  const { render, checkOrigin, qwikRouterConfig } = opts;
+  if (!qwikRouterConfig) {
+    throw new Error("qwikRouterConfig is required.");
+  }
+  const pathname = deps.trimInternalPathname(serverRequestEv.url.pathname);
+  if (pathname === "/.well-known" || pathname.startsWith("/.well-known/")) {
+    return null;
+  }
+  const { routes, serverPlugins, cacheModules } = qwikRouterConfig;
+  const loadedRoute = await deps.loadRoute(routes, cacheModules, pathname);
+  const requestHandlers = deps.resolveRequestHandlers(serverPlugins, loadedRoute, serverRequestEv.request.method, checkOrigin ?? true, deps.renderQwikMiddleware(render));
+  if (qwikRouterConfig.fallthrough && loadedRoute.$notFound$ && !pathname.endsWith("/404.html")) {
+    return null;
+  }
+  const rebuildRouteInfo = async (url) => {
+    const cleanPathname = deps.trimInternalPathname(url.pathname);
+    const loadedRoute2 = await deps.loadRoute(routes, cacheModules, cleanPathname);
+    const requestHandlers2 = deps.resolveRequestHandlers(serverPlugins, loadedRoute2, serverRequestEv.request.method, checkOrigin ?? true, deps.renderQwikMiddleware(render));
+    return {
+      loadedRoute: loadedRoute2,
+      requestHandlers: requestHandlers2
+    };
+  };
+  return deps.runQwikRouter(serverRequestEv, loadedRoute, requestHandlers, rebuildRouteInfo, qwikRouterConfig.basePathname);
+}
+async function workerRender(sys, opts, staticRoute, pendingPromises, callback, deps) {
+  const url = new URL(staticRoute.pathname, opts.origin);
+  const result = {
+    type: "render",
+    pathname: staticRoute.pathname,
+    url: url.href,
+    ok: false,
+    error: null,
+    filePath: null,
+    contentType: null,
+    resourceType: null
+  };
+  try {
+    let routeWriter = null;
+    let closeResolved;
+    const closePromise = new Promise((closePromiseResolve) => {
+      closeResolved = closePromiseResolve;
+    });
+    const request = new Request(url);
+    const requestCtx = {
+      mode: "static",
+      locale: void 0,
+      url,
+      request,
+      env: {
+        get(key) {
+          return sys.getEnv(key);
+        }
+      },
+      platform: sys.platform,
+      getClientConn: () => {
+        return {};
+      },
+      getWritableStream: (status, headers, _, _r, requestEv) => {
+        const isNotFoundPage = url.pathname.endsWith("/404.html");
+        result.ok = status >= 200 && status < 300 || isNotFoundPage && status === 404;
+        if (!result.ok) {
+          return createNoopWritableStream();
+        }
+        result.contentType = (headers.get("Content-Type") || "").toLowerCase();
+        const isHtml = result.contentType.includes("text/html");
+        const routeFilePath = sys.getRouteFilePath(url.pathname, isHtml);
+        if (isHtml) {
+          result.resourceType = "page";
+        }
+        const hasRouteWriter = isHtml ? opts.emitHtml !== false : true;
+        const writeLoaderDataEnabled = isHtml && opts.emitData !== false;
+        const stream = new WritableStream({
+          async start() {
+            try {
+              if (hasRouteWriter || writeLoaderDataEnabled) {
+                await sys.ensureDir(routeFilePath);
+              }
+              if (hasRouteWriter) {
+                routeWriter = sys.createWriteStream(routeFilePath);
+                routeWriter.on("error", (e) => {
+                  console.error(e);
+                  routeWriter = null;
+                  result.error = {
+                    message: e.message,
+                    stack: e.stack
+                  };
+                });
+              }
+            } catch (e) {
+              console.error("Error during stream start", staticRoute.pathname, e);
+              routeWriter = null;
+              result.error = {
+                message: String(e),
+                stack: e.stack || ""
+              };
+            }
+          },
+          write(chunk) {
+            try {
+              if (routeWriter) {
+                routeWriter.write(Buffer.from(chunk.buffer));
+              }
+            } catch (e) {
+              console.error("Error during stream write", staticRoute.pathname, e);
+              routeWriter = null;
+              result.error = {
+                message: String(e),
+                stack: e.stack || ""
+              };
+            }
+          },
+          async close() {
+            const writePromises = [];
+            try {
+              if (writeLoaderDataEnabled && !isNotFoundPage) {
+                const routeLoaders = getRouteLoaders(requestEv);
+                const loaderValues = getRouteLoaderValues(requestEv);
+                const manifestHash = opts.manifest?.manifestHash || "dev";
+                for (const loader of routeLoaders) {
+                  if (loader.__expires !== 0) {
+                    continue;
+                  }
+                  const data = loaderValues[loader.__id];
+                  if (data === void 0) {
+                    continue;
+                  }
+                  const loaderFilePath = sys.getLoaderFilePath(url.pathname, loader.__id, manifestHash);
+                  const loaderWriter = sys.createWriteStream(loaderFilePath);
+                  loaderWriter.on("error", (e) => {
+                    console.error(e);
+                    result.error = {
+                      message: e.message,
+                      stack: e.stack
+                    };
+                  });
+                  const serialized = await deps.serialize({
+                    d: data
+                  });
+                  loaderWriter.write(serialized);
+                  writePromises.push(new Promise((resolve) => {
+                    result.filePath = routeFilePath;
+                    loaderWriter.end(resolve);
+                  }));
+                }
+              }
+              if (routeWriter) {
+                writePromises.push(new Promise((resolve) => {
+                  result.filePath = routeFilePath;
+                  routeWriter.end(resolve);
+                }).finally(closeResolved));
+              }
+              if (writePromises.length > 0) {
+                await Promise.all(writePromises);
+              }
+            } catch (e) {
+              console.error("Error during stream close", staticRoute.pathname, e);
+              routeWriter = null;
+              result.error = {
+                message: String(e),
+                stack: e.stack || ""
+              };
+            }
+          }
+        });
+        return stream;
+      }
+    };
+    const promise = requestHandlerForSsg(requestCtx, opts, deps).then((rsp) => {
+      if (rsp != null) {
+        return rsp.completion.then((r) => {
+          if (routeWriter) {
+            return closePromise.then(() => r);
+          }
+          return r;
+        });
+      }
+    }).then((e) => {
+      if (e !== void 0) {
+        if (isRedirectMessage(e)) {
+          return;
+        }
+        if (e instanceof Error) {
+          result.error = {
+            message: e.message,
+            stack: e.stack
+          };
+        } else {
+          result.error = {
+            message: String(e),
+            stack: void 0
+          };
+        }
+        console.error("Error during request handling", staticRoute.pathname, e);
+      }
+    }).catch((e) => {
+      console.error("Unhandled error during request handling", staticRoute.pathname, e);
+      result.error = {
+        message: String(e),
+        stack: e.stack || ""
+      };
+    }).finally(() => {
+      pendingPromises.delete(promise);
+      callback(result);
+    });
+    pendingPromises.add(promise);
+  } catch (e) {
+    console.error("Error during render", staticRoute.pathname, e);
+    if (e instanceof Error) {
+      result.error = {
+        message: e.message,
+        stack: e.stack
+      };
+    } else {
+      result.error = {
+        message: String(e),
+        stack: void 0
+      };
+    }
+    callback(result);
+  }
+}
+async function workerThread(sys) {
+  const opts = sys.getOptions();
+  const pendingPromises = /* @__PURE__ */ new Set();
+  const deps = {
+    ...staticWorkerThreadDeps,
+    serialize: _serialize
+  };
+  process.on("uncaughtException", (e) => {
+    console.error("Worker uncaught exception (suppressed):", e.message);
+  });
+  process.on("unhandledRejection", (e) => {
+    console.error("Worker unhandled rejection (suppressed):", e instanceof Error ? e.message : e);
+  });
+  const onMessage = async (msg) => {
+    switch (msg.type) {
+      case "render": {
+        return new Promise((resolve) => {
+          workerRender(sys, opts, msg, pendingPromises, resolve, deps).catch((e) => {
+            console.error("Error during render", msg.pathname, e);
+            resolve({
+              type: "render",
+              pathname: msg.pathname,
+              url: "",
+              ok: false,
+              error: {
+                message: e instanceof Error ? e.message : String(e),
+                stack: e instanceof Error ? e.stack : void 0
+              },
+              filePath: null,
+              contentType: null,
+              resourceType: null
+            });
+          });
+        });
+      }
+      case "close": {
+        if (pendingPromises.size) {
+          const promises = Array.from(pendingPromises);
+          pendingPromises.clear();
+          await Promise.all(promises);
+        }
+        return {
+          type: "close"
+        };
+      }
+    }
+  };
+  parentPort?.on("message", async (msg) => {
+    try {
+      parentPort?.postMessage(await onMessage(msg));
+    } catch (e) {
+      if (msg.type === "render") {
+        const error = e instanceof Error ? e : new Error(String(e));
+        parentPort?.postMessage({
+          type: "render",
+          pathname: msg.pathname,
+          url: "",
+          ok: false,
+          error: {
+            message: error.message,
+            stack: error.stack
+          },
+          filePath: null,
+          contentType: null,
+          resourceType: null
+        });
+      } else {
+        console.error("Worker message handler error", e);
+      }
+    }
+    if (msg.type === "close") {
+      parentPort?.close();
+    }
+  });
+}
+
+export { workerThread };

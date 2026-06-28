@@ -1,0 +1,1125 @@
+import { ClientContainer } from '..';
+import type { ClientContainer as ClientContainer_2 } from '../internal';
+import type { CorePlatform } from '..';
+import type { _DomContainer } from '../internal';
+import type { _ElementVNode } from '../internal';
+import type { JSXNodeInternal } from '../internal';
+import { JSXOutput } from '..';
+import type { _QDocument } from '../internal';
+import { RenderResult } from '..';
+import { StreamWriter } from '..';
+import type { _Stringifiable } from '../internal';
+import type { _VirtualVNode } from '../internal';
+import type { _VNode } from '../internal';
+
+declare interface AddRootFn {
+    (obj: unknown, returnRef?: never): number;
+    (obj: unknown, returnRef: true): SeenRef;
+}
+
+declare type AllSignalFlags = ComputedSignalFlags | SerializationSignalFlags | AsyncSignalFlags;
+
+declare const enum AsyncSignalFlags {
+    EAGER_CLEANUP = 32,
+    CLIENT_ONLY = 64,
+    CLEAR_ON_INVALIDATE = 128,
+    NO_POLL = 256
+}
+
+/** Class for back reference to the EffectSubscription */
+declare abstract class BackRef {
+    [_EFFECT_BACK_REF]: Map<any, any> | undefined;
+}
+
+declare type BivariantQrlFn<ARGS extends any[], RETURN> = {
+    /**
+     * Resolve the QRL of closure and invoke it.
+     *
+     * @param args - Closure arguments.
+     * @returns A promise of the return value of the closure.
+     */
+    bivarianceHack(...args: ARGS): Promise<RETURN>;
+}['bivarianceHack'];
+
+declare const enum ChoreBits {
+    NONE = 0,
+    TASKS = 1,
+    NODE_DIFF = 2,
+    COMPONENT = 4,
+    INLINE_COMPONENT = 8,
+    NODE_PROPS = 16,
+    COMPUTE = 32,
+    CHILDREN = 64,
+    CLEANUP = 128,
+    RECONCILE = 256,
+    ERROR_WRAP = 512,
+    DIRTY_MASK = 1023
+}
+
+declare const enum ComputedSignalFlags {
+    INVALID = 1,
+    RUN_EFFECTS = 2,
+    PRESERVE_ON_SEQ_CLEANUP = 4
+}
+
+/** @internal */
+declare const _CONST_PROPS: unique symbol;
+
+/**
+ * Effect is something which needs to happen (side-effect) due to signal value change.
+ *
+ * There are three types of effects:
+ *
+ * - `Task`: `useTask`, `useVisibleTask`, `useResource`
+ * - `VNode` and `ISsrNode`: Either a component or `<Signal>`
+ * - `Signal2`: A derived signal which contains a computation function.
+ */
+declare type Consumer = Task | VNode | SignalImpl | ISsrNode;
+
+/** @internal */
+declare interface Container {
+    readonly $version$: string;
+    readonly $storeProxyMap$: ObjToProxyMap;
+    $rootContainer$: Container | null;
+    $isOutOfOrderSegment$: boolean;
+    readonly $locale$: string;
+    readonly $getObjectById$: (id: number | string) => any;
+    readonly $serverData$: Record<string, any>;
+    readonly $instanceHash$: string | null;
+    $currentUniqueId$: number;
+    $buildBase$: string | null;
+    $renderPromise$: Promise<void> | null;
+    $resolveRenderPromise$: (() => void) | null;
+    $pendingCount$: number;
+    $checkPendingCount$(): void;
+    handleError(err: any, $host$: HostElement | null): void;
+    getParentHost(host: HostElement): HostElement | null;
+    setContext<T>(host: HostElement, context: ContextId<T>, value: T): void;
+    resolveContext<T>(host: HostElement, contextId: ContextId<T>): T | undefined;
+    setHostProp<T>(host: HostElement, name: string, value: T): void;
+    getHostProp<T>(host: HostElement, name: string): T | null;
+    $appendStyle$(content: string, styleId: string, host: HostElement, scoped: boolean): void;
+    /**
+     * When component is about to be executed, it may add/remove children. This can cause problems
+     * with the projection because deleting content will prevent the projection references from
+     * looking up vnodes. Therefore before we execute the component we need to ensure that all of its
+     * references to vnode are resolved.
+     *
+     * @param renderHost - Host element to ensure projection is resolved.
+     */
+    ensureProjectionResolved(host: HostElement): void;
+    serializationCtxFactory(NodeConstructor: {
+        new (...rest: any[]): {
+            __brand__: 'SsrNode';
+        };
+    } | null, DomRefConstructor: {
+        new (...rest: any[]): {
+            __brand__: 'DomRef';
+        };
+    } | null, symbolToChunkResolver: SymbolToChunkResolver, writer?: StreamWriter_2): SerializationContext;
+}
+
+/**
+ * ContextId is a typesafe ID for your context.
+ *
+ * Context is a way to pass stores to the child components without prop-drilling.
+ *
+ * Use `createContextId()` to create a `ContextId`. A `ContextId` is just a serializable identifier
+ * for the context. It is not the context value itself. See `useContextProvider()` and
+ * `useContext()` for the values. Qwik needs a serializable ID for the context so that the it can
+ * track context providers and consumers in a way that survives resumability.
+ *
+ * ### Example
+ *
+ * ```tsx
+ * // Declare the Context type.
+ * interface TodosStore {
+ *   items: string[];
+ * }
+ * // Create a Context ID (no data is saved here.)
+ * // You will use this ID to both create and retrieve the Context.
+ * export const TodosContext = createContextId<TodosStore>('Todos');
+ *
+ * // Example of providing context to child components.
+ * export const App = component$(() => {
+ *   useContextProvider(
+ *     TodosContext,
+ *     useStore<TodosStore>({
+ *       items: ['Learn Qwik', 'Build Qwik app', 'Profit'],
+ *     })
+ *   );
+ *
+ *   return <Items />;
+ * });
+ *
+ * // Example of retrieving the context provided by a parent component.
+ * export const Items = component$(() => {
+ *   const todos = useContext(TodosContext);
+ *   return (
+ *     <ul>
+ *       {todos.items.map((item) => (
+ *         <li>{item}</li>
+ *       ))}
+ *     </ul>
+ *   );
+ * });
+ *
+ * ```
+ *
+ * @public
+ */
+declare interface ContextId<STATE> {
+    /** Design-time property to store type information for the context. */
+    readonly __brand_context_type__: STATE;
+    /** A unique ID for the context. */
+    readonly id: string;
+}
+
+/**
+ * Create emulated `Document` for server environment. Does not implement the full browser `document`
+ * and `window` API. This api may be removed in the future.
+ *
+ * @public
+ */
+export declare function createDocument(opts?: MockDocumentOptions): Document;
+
+/**
+ * CreatePlatform and CreateDocument
+ *
+ * @public
+ */
+export declare const createDOM: ({ html }?: {
+    html?: string;
+}) => Promise<{
+    render: (jsxElement: JSXOutput) => Promise<RenderResult>;
+    screen: HTMLElement;
+    userEvent: (queryOrElement: string | Element | keyof HTMLElementTagNameMap | null, eventNameCamel: string | keyof WindowEventMap, eventPayload?: any) => Promise<Event | null>;
+}>;
+
+/** @public */
+declare interface DevJSX {
+    fileName: string;
+    lineNumber: number;
+    columnNumber: number;
+    stack?: string;
+}
+
+declare type DomRef = {
+    $ssrNode$: ISsrNode;
+};
+
+/** @public */
+export declare function domRender(jsx: JSXOutput, opts?: {
+    debug?: boolean;
+}): Promise<{
+    document: Document;
+    container: ClientContainer;
+    vNode: _VNode | null;
+    getStyles: () => Record<string, string | string[]>;
+}>;
+
+/** @internal */
+declare const _EFFECT_BACK_REF: unique symbol;
+
+declare type EffectBackRef = SignalImpl | StoreTarget | PropsProxy;
+
+/** @internal */
+declare const enum EffectProperty {
+    COMPONENT = ":",
+    VNODE = "."
+}
+
+/**
+ * An effect consumer plus type of effect, back references to producers and additional data
+ *
+ * An effect can be trigger by one or more of signal inputs. The first step of re-running an effect
+ * is to clear its subscriptions so that the effect can re add new set of subscriptions. In order to
+ * clear the subscriptions we need to store them here.
+ *
+ * Imagine you have effect such as:
+ *
+ * ```
+ * function effect1() {
+ *   console.log(signalA.value ? signalB.value : 'default');
+ * }
+ * ```
+ *
+ * In the above case the `signalB` needs to be unsubscribed when `signalA` is falsy. We do this by
+ * always clearing all of the subscriptions
+ *
+ * The `EffectSubscription` stores
+ *
+ * ```
+ * subscription1 = [effectConsumer1, EffectProperty.COMPONENT, Set[(signalA, signalB)]];
+ * ```
+ *
+ * The `signal1` and `signal2` back references are needed to "clear" existing subscriptions.
+ *
+ * Both `signalA` as well as `signalB` will have a reference to `subscription` to the so that the
+ * effect can be scheduled if either `signalA` or `signalB` triggers. The `subscription1` is shared
+ * between the signals.
+ *
+ * The second position `EffectProperty|string` store the property name of the effect.
+ *
+ * - Property name of the VNode
+ * - `EffectProperty.COMPONENT` if component
+ * - `EffectProperty.VNODE` if VNode
+ */
+declare class EffectSubscription {
+    consumer: Consumer;
+    property: EffectProperty | string;
+    backRef: Set<EffectBackRef> | null;
+    data: SubscriptionData | null;
+    constructor(consumer: Consumer, property: EffectProperty | string, backRef?: Set<EffectBackRef> | null, data?: SubscriptionData | null);
+}
+
+/**
+ * Creates a simple DOM structure for testing components.
+ *
+ * By default `EntityFixture` creates:
+ *
+ * ```html
+ * <host q:view="./component_fixture.noop">
+ *   <child></child>
+ * </host>
+ * ```
+ *
+ * @public
+ */
+export declare class ElementFixture {
+    window: MockWindow;
+    document: MockDocument;
+    superParent: HTMLElement;
+    parent: HTMLElement;
+    host: HTMLElement;
+    child: HTMLElement;
+    constructor(options?: ElementFixtureOptions);
+}
+
+/** @public */
+declare interface ElementFixtureOptions {
+    tagName?: string;
+    html?: string;
+}
+
+/** @public */
+export declare function emulateExecutionOfQwikFuncs(document: Document): void;
+
+/** @public */
+export declare function expectDOM(actual: Element, expected: string): Promise<void>;
+
+/**
+ * Any function taking a props object that returns JSXOutput.
+ *
+ * The `key`, `flags` and `dev` parameters are for internal use.
+ *
+ * @public
+ */
+declare type FunctionComponent<P = unknown> = {
+    renderFn(props: P, key: string | null, flags: number, dev?: DevJSX): JSXOutput_2;
+}['renderFn'];
+
+/** @public */
+export declare function getTestPlatform(): TestPlatform;
+
+/** @internal */
+declare type HostElement = VNode | ISsrNode;
+
+/** @public */
+export declare interface InOrderAuto {
+    strategy: 'auto';
+    maximumInitialChunk?: number;
+    maximumChunk?: number;
+}
+
+/** @public */
+export declare interface InOrderDirect {
+    strategy: 'direct';
+}
+
+/** @public */
+export declare interface InOrderDisabled {
+    strategy: 'disabled';
+}
+
+/** @public */
+export declare type InOrderStreaming = InOrderAuto | InOrderDisabled | InOrderDirect;
+
+/** The shared state during an invoke() call */
+declare interface InvokeContext {
+    /** The Virtual parent component for the current component code */
+    $hostElement$: HostElement | undefined;
+    /** The event we're currently handling */
+    $event$: PossibleEvents | undefined;
+    $effectSubscriber$: EffectSubscription | undefined;
+    $locale$: string | undefined;
+    $container$: Container | undefined;
+}
+
+declare interface ISsrNode {
+    id: string;
+    flags: SsrNodeFlags;
+    dirty: ChoreBits;
+    parentComponent: ISsrNode | null;
+    children: ISsrNode[] | null;
+    vnodeData: VNodeData;
+    currentFile: string | null;
+    readonly [_EFFECT_BACK_REF]: Map<EffectProperty | string, EffectSubscription> | null;
+    setProp(name: string, value: any): void;
+    getProp(name: string): any;
+    removeProp(name: string): void;
+    addChild(child: ISsrNode): void;
+    setTreeNonUpdatable(): void;
+}
+
+/** @public */
+declare type JSXChildren = string | number | boolean | null | undefined | Function | RegExp | JSXChildren[] | Promise<JSXChildren> | Signal<JSXChildren> | JSXNode;
+
+/**
+ * A JSX Node, an internal structure. You probably want to use `JSXOutput` instead.
+ *
+ * @public
+ */
+declare interface JSXNode<T extends string | FunctionComponent | unknown = unknown> {
+    type: T;
+    props: T extends FunctionComponent<infer P> ? P : Record<any, unknown>;
+    children: JSXChildren | null;
+    key: string | null;
+    dev?: DevJSX;
+}
+
+declare const enum JSXNodeFlags {
+    None = 0,
+    StaticSubtree = 2,
+    HasCapturedProps = 4
+}
+
+declare class JSXNodeImpl<T = unknown> implements JSXNodeInternal_2<T> {
+    type: T;
+    children: JSXChildren;
+    flags: JSXNodeFlags;
+    toSort: boolean;
+    key: string | null;
+    varProps: Props;
+    constProps: Props | null;
+    dev?: DevJSX & {
+        stack: string | undefined;
+    };
+    _proxy: Props | null;
+    constructor(type: T, varProps: Props | null, constProps: Props | null, children: JSXChildren, flags: JSXNodeFlags, key: string | number | null | undefined, toSort?: boolean, dev?: DevJSX);
+    get props(): T extends FunctionComponent<infer PROPS> ? PROPS : Props;
+}
+
+/**
+ * The internal representation of a JSX Node.
+ *
+ * @internal
+ */
+declare interface JSXNodeInternal_2<T extends string | FunctionComponent | unknown = unknown> extends JSXNode<T> {
+    /** The type of node */
+    type: T;
+    /** Do the varProps need sorting */
+    toSort: boolean;
+    /** The key property */
+    key: string | null;
+    /** Flags */
+    flags: JSXNodeFlags;
+    /**
+     * Props that are not guaranteed shallow equal across runs.
+     *
+     * Any prop that is in `constProps` takes precedence over `varProps`.
+     *
+     * Does not contain `children` or `key`.
+     *
+     * `onEvent$` props are normalized to the html `q-x:event` version
+     */
+    varProps: Props;
+    /**
+     * Props that will be shallow equal across runs. Does not contain any props that are in varProps.
+     *
+     * Any prop that is in `constProps` takes precedence over `varProps`.
+     *
+     * Does not contain `children` or `key`.
+     *
+     * `onEvent$` props are normalized to the html `q-x:event` version
+     */
+    constProps: Props | null;
+    /** The children of the node */
+    children: JSXChildren;
+    /** Filename etc for debugging */
+    dev?: DevJSX & {
+        stack: string | undefined;
+    };
+}
+
+/**
+ * Any valid output for a component
+ *
+ * @public
+ */
+declare type JSXOutput_2 = JSXNode | string | number | boolean | null | undefined | JSXOutput_2[];
+
+/**
+ * Shared lazy-loading reference that holds module loading metadata. Multiple QRLs pointing to the
+ * same chunk+symbol can share a single LazyRef, differing only in their captured scope.
+ */
+declare class LazyRef<TYPE = unknown> {
+    readonly $chunk$: string | null;
+    readonly $symbol$: string;
+    readonly $symbolFn$: undefined | null | (() => Promise<Record<string, TYPE>>);
+    $ref$?: (null | ValueOrPromise<TYPE>) | undefined;
+    $container$: Container | undefined;
+    dev?: QRLDev | null | undefined;
+    qrls?: Set<any>;
+    constructor($chunk$: string | null, $symbol$: string, $symbolFn$: undefined | null | (() => Promise<Record<string, TYPE>>), $ref$?: (null | ValueOrPromise<TYPE>) | undefined, container?: Container | null);
+    /** We don't read hash very often so let's not allocate a string for every QRL */
+    get $hash$(): string;
+    $setRef$(ref: ValueOrPromise<TYPE>): void;
+    /** Load the raw module export without capture binding. */
+    $load$(): ValueOrPromise<TYPE>;
+}
+
+/** @public */
+declare interface MockDocument extends Document {
+}
+
+/**
+ * Options when creating a mock Qwik Document object.
+ *
+ * @public
+ */
+declare interface MockDocumentOptions {
+    url?: URL | string;
+    html?: string;
+}
+
+/** @public */
+declare interface MockWindow extends Window {
+    document: MockDocument;
+}
+
+declare interface NodePropData {
+    $scopedStyleIdPrefix$: string | null;
+    $isConst$: boolean;
+}
+
+declare type ObjToProxyMap = WeakMap<any, any>;
+
+/** @public */
+export declare type OutOfOrderStreaming = boolean;
+
+/** @internal */
+declare const _OWNER: unique symbol;
+
+declare type PossibleEvents = Event | SimplifiedServerRequestEvent | typeof TaskEvent | typeof RenderEvent;
+
+declare type Props = Record<string, unknown>;
+
+/** @internal */
+declare const _PROPS_HANDLER: unique symbol;
+
+declare type PropsProxy = {
+    [_VAR_PROPS]: Props;
+    [_CONST_PROPS]: Props | null;
+    [_OWNER]: JSXNodeInternal_2;
+    [_PROPS_HANDLER]: PropsProxyHandler;
+} & Record<string | symbol, unknown>;
+
+declare class PropsProxyHandler implements ProxyHandler<any> {
+    owner: JSXNodeImpl;
+    $effects$: undefined | Map<string | symbol, Set<EffectSubscription>>;
+    $container$: Container | null;
+    constructor(owner: JSXNodeImpl);
+    get(_: any, prop: string | symbol): any;
+    set(_: any, prop: string | symbol, value: any): boolean;
+    deleteProperty(_: any, prop: string | symbol): boolean;
+    has(_: any, prop: string | symbol): boolean;
+    getOwnPropertyDescriptor(_: any, p: string | symbol): PropertyDescriptor | undefined;
+    ownKeys(): string[];
+}
+
+/**
+ * The `QRL` type represents a lazy-loadable AND serializable resource.
+ *
+ * QRL stands for Qwik URL.
+ *
+ * Use `QRL` when you want to refer to a lazy-loaded resource. `QRL`s are most often used for code
+ * (functions) but can also be used for other resources such as `string`s in the case of styles.
+ *
+ * `QRL` is an opaque token that is generated by the Qwik Optimizer. (Do not rely on any properties
+ * in `QRL` as it may change between versions.)
+ *
+ * ## Creating `QRL` references
+ *
+ * Creating `QRL` is done using `$(...)` function. `$(...)` is a special marker for the Qwik
+ * Optimizer that marks that the code should be extracted into a lazy-loaded symbol.
+ *
+ * ```tsx
+ * useOnDocument(
+ *   'mousemove',
+ *   $((event) => console.log('mousemove', event))
+ * );
+ * ```
+ *
+ * In the above code, the Qwik Optimizer detects `$(...)` and transforms the code as shown below:
+ *
+ * ```tsx
+ * // FILE: <current file>
+ * useOnDocument('mousemove', qrl('./chunk-abc.js', 'onMousemove'));
+ *
+ * // FILE: chunk-abc.js
+ * export const onMousemove = () => console.log('mousemove');
+ * ```
+ *
+ * NOTE: `qrl(...)` is a result of Qwik Optimizer transformation. You should never have to invoke
+ * this function directly in your application. The `qrl(...)` function should be invoked only after
+ * the Qwik Optimizer transformation.
+ *
+ * ## Using `QRL`s
+ *
+ * Use `QRL` type in your application when you want to get a lazy-loadable reference to a resource
+ * (most likely a function).
+ *
+ * ```tsx
+ * // Example of declaring a custom functions which takes callback as QRL.
+ * export function useMyFunction(callback: QRL<() => void>) {
+ *   doExtraStuff();
+ *   // The callback passed to `onDocument` requires `QRL`.
+ *   useOnDocument('mousemove', callback);
+ * }
+ * ```
+ *
+ * In the above example, the way to think about the code is that you are not asking for a callback
+ * function but rather a reference to a lazy-loadable callback function. Specifically, the function
+ * loading should be delayed until it is actually needed. In the above example, the function would
+ * not load until after a `mousemove` event on `document` fires.
+ *
+ * ## Resolving `QRL` references
+ *
+ * At times it may be necessary to resolve a `QRL` reference to the actual value. This can be
+ * performed using `QRL.resolve(..)` function.
+ *
+ * ```tsx
+ * // Assume you have QRL reference to a greet function
+ * const lazyGreet: QRL<() => void> = $(() => console.log('Hello World!'));
+ *
+ * // Use `qrlImport` to load / resolve the reference.
+ * const greet: () => void = await lazyGreet.resolve();
+ *
+ * //  Invoke it
+ * greet();
+ * ```
+ *
+ * NOTE: `element` is needed because `QRL`s are relative and need a base location to resolve
+ * against. The base location is encoded in the HTML in the form of `<div q:base="/url">`.
+ *
+ * ## `QRL.resolved`
+ *
+ * Once `QRL.resolve()` returns, the value is stored under `QRL.resolved`. This allows the value to
+ * be used without having to await `QRL.resolve()` again.
+ *
+ * ## Question: Why not just use `import()`?
+ *
+ * At first glance, `QRL` serves the same purpose as `import()`. However, there are three subtle
+ * differences that need to be taken into account.
+ *
+ * 1. `QRL`s must be serializable into HTML.
+ * 2. `QRL`s must be resolved by framework relative to `q:base`.
+ * 3. `QRL`s must be able to capture lexically scoped variables.
+ * 4. `QRL`s encapsulate the difference between running with and without Qwik Optimizer.
+ * 5. `QRL`s allow expressing lazy-loaded boundaries without thinking about chunk and symbol names.
+ *
+ * Let's assume that you intend to write code such as this:
+ *
+ * ```tsx
+ * return <button onClick={() => (await import('./chunk-abc.js')).onClick}>
+ * ```
+ *
+ * The above code needs to be serialized into DOM such as:
+ *
+ * ```
+ * <div q:base="/build/">
+ *   <button q-e:click="./chunk-abc.js#onClick">...</button>
+ * </div>
+ * ```
+ *
+ * 1. Notice there is no easy way to extract chunk (`./chunk-abc.js`) and symbol (`onClick`) into HTML.
+ * 2. Notice that even if you could extract it, the `import('./chunk-abc.js')` would become relative to
+ *    where the `import()` file is declared. Because it is our framework doing the load, the
+ *    `./chunk-abc.js` would become relative to the framework file. This is not correct, as it
+ *    should be relative to the original file generated by the bundler.
+ * 3. Next, the framework needs to resolve the `./chunk-abc.js` and needs a base location that is
+ *    encoded in the HTML.
+ * 4. The QRL needs to be able to capture lexically scoped variables. (`import()` only allows loading
+ *    top-level symbols which don't capture variables.)
+ * 5. As a developer, you don't want to think about `import` and naming the chunks and symbols. You
+ *    just want to say: "this should be lazy."
+ *
+ * These are the main reasons why Qwik introduces its own concept of `QRL`.
+ *
+ * @public
+ * @see `$`
+ */
+declare type QRL<TYPE = unknown> = {
+    __qwik_serializable__?: any;
+    __brand__QRL__?: TYPE;
+    /** Resolve the QRL and return the actual value. */
+    resolve(): Promise<TYPE>;
+    /** The resolved value, once `resolve()` returns. */
+    resolved: undefined | TYPE;
+    getCaptured(): unknown[] | null;
+    getSymbol(): string;
+    getHash(): string;
+    dev?: QRLDev | null;
+} & BivariantQrlFn<QrlArgs<TYPE>, QrlReturn<TYPE>>;
+
+declare type QrlArgs<T> = T extends (...args: infer ARGS) => any ? ARGS : unknown[];
+
+declare type QrlCaptures = Readonly<unknown[]> | string | null;
+
+/** @public */
+declare interface QRLDev {
+    file: string;
+    lo: number;
+    hi: number;
+}
+
+/** @internal */
+declare type QRLInternal<TYPE = unknown> = QRL<TYPE> & QRLInternalMethods<TYPE>;
+
+declare type QRLInternalMethods<TYPE> = {
+    readonly $chunk$: string | null;
+    readonly $symbol$: string;
+    readonly $hash$: string;
+    /** Captures are stored lazily after deserialization. */
+    readonly $captures$?: QrlCaptures;
+    dev?: QRLDev | null;
+    resolve(container?: Container): Promise<TYPE>;
+    resolved: undefined | TYPE;
+    getSymbol(): string;
+    getHash(): string;
+    getCaptured(): unknown[] | null;
+    getFn(currentCtx?: InvokeContext, 
+    /** If this returns false, the function execution will be skipped */
+    beforeFn?: () => void | false): TYPE extends (...args: any) => any ? (...args: Parameters<TYPE>) => ValueOrPromise<ReturnType<TYPE> | undefined> : unknown;
+    $callFn$(withThis: unknown, ...args: QrlArgs<TYPE>): ValueOrPromise<QrlReturn<TYPE>>;
+    $setDev$(dev: QRLDev | null): void;
+    /**
+     * "with captures" - Get a new QRL for these captures, reusing the lazy ref. It's an internal
+     * method but we need to have a stable name because it gets called in user code by the optimizer,
+     * after the $name$ props are mangled
+     */
+    w(captures: QrlCaptures): QRLInternal<TYPE>;
+    /**
+     * "set ref" - Set the ref of the QRL. It's an internal method but we need to have a stable name
+     * because it gets called in user code by the optimizer, after the $name$ props are mangled
+     */
+    s(ref: ValueOrPromise<TYPE>): void;
+    /**
+     * Needed for deserialization and importing. We don't always have the container while creating
+     * qrls in async sections of code
+     */
+    readonly $container$?: Container | null;
+    /** The shared lazy-loading reference */
+    readonly $lazy$: LazyRef<TYPE>;
+};
+
+declare type QrlReturn<T> = T extends (...args: any) => infer R ? Awaited<R> : unknown;
+
+declare const RenderEvent = "qRender";
+
+/** Stores the location of an object. If no parent, it's a root. */
+declare type SeenRef = {
+    $index$: number;
+    $parent$?: SeenRef | null;
+};
+
+declare interface SerializationContext {
+    $serialize$: () => ValueOrPromise<void>;
+    $serializePatch$: (rootStart: number, rootIds: number[], extraRootId?: number | string | number[], streamedRootLimit?: number) => ValueOrPromise<void>;
+    $symbolToChunkResolver$: SymbolToChunkResolver;
+    /**
+     * Map from object to parent and index reference.
+     *
+     * If object is found in `objMap` will return the parent reference and index path.
+     *
+     * `objMap` return:
+     *
+     * - `{ parent, index }` - The parent object and the index within that parent.
+     * - `undefined` - Object has not been seen yet.
+     */
+    getSeenRef: (obj: unknown) => SeenRef | undefined;
+    /** Returns the root index of the object, if it is a root. Otherwise returns undefined. */
+    $hasRootId$: (obj: unknown) => number | undefined;
+    /**
+     * Root objects which need to be serialized.
+     *
+     * Roots are entry points into the object graph. Typically the roots are held by the listeners.
+     *
+     * Returns the index of the root object.
+     */
+    $addRoot$: AddRootFn;
+    $addDuplicateRoot$: (obj: unknown) => SeenRef;
+    $commitRoot$: (root: unknown, obj: unknown) => number;
+    /** Mark an object as seen during serialization. This is used to handle backreferences and cycles */
+    $markSeen$: (obj: unknown, parent: SeenRef | undefined, index: number) => SeenRef;
+    $roots$: unknown[];
+    $rootObjs$: unknown[];
+    $onAddRoot$?: (id: number, root: unknown, obj: unknown) => void;
+    $forwardRefOffset$: number;
+    $serializedRootCount$: number;
+    $serializedForwardRefCount$: number;
+    $rootStateRootCount$: number;
+    $hasRootStateForwardRefs$: boolean;
+    $promoteToRoot$: (ref: SeenRef, obj: unknown, index?: number) => void;
+    $addSyncFn$($funcStr$: string | null, argsCount: number, fn: Function): number;
+    $setSyncFnOffset$(offset: number, existingFns?: string[]): void;
+    $isSsrNode$: (obj: unknown) => obj is ISsrNode;
+    $isDomRef$: (obj: unknown) => obj is DomRef;
+    $markSsrNodeForSerialization$: (node: ISsrNode, flags: number) => void;
+    $writer$: SSRInternalStreamWriter;
+    $setWriter$(writer: SSRInternalStreamWriter): void;
+    $syncFns$: string[];
+    $eventQrls$: Set<QRL>;
+    $eventNames$: Set<string>;
+    $renderSymbols$: Set<string>;
+    $storeProxyMap$: ObjToProxyMap;
+    $eagerResume$: Set<unknown>;
+    $setProp$: (obj: any, prop: string, value: any) => void;
+}
+
+declare const enum SerializationSignalFlags {
+    SERIALIZATION_STRATEGY_NEVER = 8,
+    SERIALIZATION_STRATEGY_ALWAYS = 16,
+    SERIALIZATION_ALL_STRATEGIES = 24
+}
+
+/**
+ * A signal is a reactive value which can be read and written. When the signal is written, all tasks
+ * which are tracking the signal will be re-run and all components that read the signal will be
+ * re-rendered.
+ *
+ * Furthermore, when a signal value is passed as a prop to a component, the optimizer will
+ * automatically forward the signal. This means that `return <div title={signal.value}>hi</div>`
+ * will update the `title` attribute when the signal changes without having to re-render the
+ * component.
+ *
+ * @public
+ */
+declare interface Signal<T = any> {
+    /** Reading from this subscribes to updates; writing to this triggers updates. */
+    value: T;
+    /** Reading from this does not subscribe to updates; writing to this does not trigger updates. */
+    untrackedValue: T;
+    /**
+     * Use this to trigger running subscribers, for example when the value mutated but remained the
+     * same object.
+     */
+    trigger(): void;
+}
+
+declare class SignalImpl<T = any> implements Signal<T> {
+    $untrackedValue$: T;
+    /** Store a list of effects which are dependent on this signal. */
+    $effects$: undefined | Set<EffectSubscription>;
+    $container$: Container | null;
+    $wrappedSignal$: WrappedSignalImpl<T> | null;
+    constructor(container: Container | null | undefined, value: T);
+    /**
+     * Use this to trigger running subscribers, for example when the calculated value has mutated but
+     * remained the same object
+     */
+    trigger(): void;
+    /** @deprecated Use `trigger()` instead */
+    force(): void;
+    get untrackedValue(): T;
+    set untrackedValue(value: T);
+    get value(): T;
+    set value(value: T);
+    valueOf(): void;
+    toString(): string;
+    toJSON(): {
+        value: T;
+    };
+}
+
+declare interface SimplifiedServerRequestEvent<T = unknown> {
+    url: URL;
+    locale: string | undefined;
+    request: Request;
+}
+
+/** @internal */
+declare interface SSRInternalStreamWriter extends StreamWriter_2 {
+    writeRootRef(id: number): ValueOrPromise<void>;
+    writeRootRefPath(path: number[]): ValueOrPromise<void>;
+    writeRootRefDelta(id: number, base: number): ValueOrPromise<void>;
+    toString(remap?: number[]): string;
+}
+
+declare const enum SsrNodeFlags {
+    Updatable = 1
+}
+
+/** @public */
+export declare function ssrRenderToDom(jsx: JSXOutput, opts?: {
+    /** Print debug information to console. */
+    debug?: boolean;
+    /** Treat JSX as raw, (don't wrap in in head/body) */
+    raw?: boolean;
+    /** Include QwikLoader */
+    qwikLoader?: boolean;
+    /** Override the SSR container tag name. */
+    containerTagName?: string;
+    /** Stream rendered chunks while still collecting the final HTML. */
+    stream?: StreamWriter;
+    /** Configure SSR streaming. */
+    streaming?: StreamingOptions;
+    /** Skip client resume emulation after SSR. */
+    resume?: boolean;
+    /** Inject nodes into the document before test runs (for testing purposes) */
+    onBeforeResume?: (document: Document) => void;
+}): Promise<{
+    container: _DomContainer;
+    document: Document;
+    vNode: _VNode | null;
+    getStyles: () => Record<string, string | string[]>;
+}>;
+
+declare type StoreTarget = Record<string | symbol, any>;
+
+/** @public */
+export declare interface StreamingOptions {
+    inOrder?: InOrderStreaming;
+    outOfOrder?: OutOfOrderStreaming;
+}
+
+/** @internal */
+declare interface StreamWriter_2 {
+    write(chunk: string): ValueOrPromise<void>;
+    waitForDrain?(): ValueOrPromise<void>;
+}
+
+/** @internal */
+declare class SubscriptionData {
+    data: NodePropData;
+    constructor(data: NodePropData);
+}
+
+declare type SymbolToChunkResolver = (symbol: string) => string;
+
+/** @internal */
+declare class Task<T = unknown, B = T> extends BackRef {
+    $flags$: TaskFlags;
+    $index$: number;
+    $el$: HostElement;
+    $qrl$: QRLInternal<T>;
+    $destroy$: (() => void) | null;
+    $destroyPromise$: Promise<void> | undefined;
+    $taskPromise$: Promise<void> | null;
+    constructor($flags$: TaskFlags, $index$: number, $el$: HostElement, $qrl$: QRLInternal<T>, $destroy$: (() => void) | null);
+}
+
+declare const TaskEvent = "qTask";
+
+/** @internal */
+declare const enum TaskFlags {
+    VISIBLE_TASK = 1,
+    TASK = 2,
+    DIRTY = 4,
+    RENDER_BLOCKING = 8,
+    NEEDS_CLEANUP = 16,
+    EVENTS_REGISTERED = 32
+}
+
+/** @public */
+declare interface TestPlatform extends CorePlatform {
+    /**
+     * @deprecated No longer used, please use {@link waitForDrain} instead.
+     * @example With `ssrRenderToDom`
+     *
+     * ```ts
+     * import { waitForDrain } from '@qwik.dev/testing';
+     *
+     * const { container } = ssrRenderToDom(...);
+     * await waitForDrain(container);
+     * ```
+     *
+     * @example With `domRender`
+     *
+     * ```ts
+     * import { waitForDrain } from '@qwik.dev/testing';
+     *
+     * const { container } = domRender(...);
+     * await waitForDrain(container);
+     * ```
+     */
+    flush: () => Promise<void>;
+}
+
+/**
+ * Trigger an event in unit tests on an element. Needs to be kept in sync with the Qwik Loader event
+ * dispatching.
+ *
+ * Events can be either case sensitive element-scoped events or scoped kebab-case.
+ *
+ * Future deprecation candidate.
+ *
+ * @public
+ */
+export declare function trigger(root: Element, queryOrElement: string | Element | keyof HTMLElementTagNameMap | null, eventName: string, eventPayload?: any, options?: {
+    waitForIdle?: boolean;
+}): Promise<Event | null>;
+
+/**
+ * Type representing a value which is either resolve or a promise.
+ *
+ * @public
+ */
+declare type ValueOrPromise<T> = T | Promise<T>;
+
+/** @internal */
+declare const _VAR_PROPS: unique symbol;
+
+/** @internal */
+declare abstract class VNode implements BackRef {
+    flags: VNodeFlags;
+    parent: VNode | null;
+    previousSibling: VNode | null | undefined;
+    nextSibling: VNode | null | undefined;
+    props: Props | null;
+    [_EFFECT_BACK_REF]: Map<any, any> | undefined;
+    slotParent: VNode | null;
+    dirty: ChoreBits;
+    dirtyChildren: VNode[] | null;
+    nextDirtyChildIndex: number;
+    constructor(flags: VNodeFlags, parent: VNode | null, previousSibling: VNode | null | undefined, nextSibling: VNode | null | undefined, props: Props | null);
+    toString(): string;
+}
+
+/** @public */
+export declare function vnode_fromJSX(jsx: JSXOutput): {
+    vParent: _ElementVNode | _VirtualVNode;
+    vNode: _VNode | null;
+    document: _QDocument;
+    container: ClientContainer_2;
+};
+
+/**
+ * Array of numbers which describes virtual nodes in the tree.
+ *
+ * HTML can't account for:
+ *
+ * - Multiple text nodes in a row. (it treats it as a single text node)
+ * - Empty text nodes. (it ignores them)
+ * - And virtual nodes such as `<Fragment/>` or `<MyComponent/>`
+ *
+ * So we need to encode all of that information into the VNodeData.
+ *
+ * Encoding:
+ *
+ * - First position is special and encodes state information and stores VNodeDataFlag.
+ * - Positive numbers are text node lengths. (0 is a special case for empty text node)
+ * - Negative numbers are element counts.
+ * - `OPEN_FRAGMENT` is start of virtual node.
+ *
+ *   - If `OPEN_FRAGMENT` than the previous node is an `Array` which contains the props (see
+ *       `SsrAttrs`). NOTE: The array is never going to be the last item in the VNodeData, so we can
+ *       always assume that the last item in `vNodeData` is a number.
+ * - `CLOSE_FRAGMENT` is end of virtual node.
+ *
+ * NOTE: This is how we store the information during the SSR streaming, once the SSR is complete
+ * this data needs to be serialized into a string and stored in the DOM as a script tag which has
+ * deferent serialization format.
+ */
+declare type VNodeData = [VNodeDataFlag, ...(Props | number)[]];
+
+/**
+ * Flags for VNodeData (Flags con be bitwise combined)
+ *
+ * @internal
+ */
+declare const enum VNodeDataFlag {
+    NONE = 0,
+    TEXT_DATA = 1,
+    VIRTUAL_NODE = 2,
+    ELEMENT_NODE = 4,
+    REFERENCE = 8,
+    SERIALIZE = 16
+}
+
+/**
+ * Flags for VNode.
+ *
+ * # Materialize vs Inflation
+ *
+ * - Materialized: The node has all of its children. Specifically `firstChild`/`lastChild` are NOT
+ *   `undefined`. Materialization creates lazy instantiation of the children. NOTE: Only
+ *   ElementVNode need to be materialized.
+ * - Inflation:
+ *
+ *   - If Text: It means that it is safe to write to the node. When Text nodes are first Deserialized
+ *       multiple text nodes can share the same DOM node. On write the sibling text nodes need to be
+ *       converted into separate text nodes.
+ *   - If Element: It means that the element tag attributes have not yet been read from the DOM.
+ *
+ * Inflation and materialization are not the same, they are two independent things.
+ *
+ * @internal
+ */
+declare const enum VNodeFlags {
+    Element = 1,
+    Virtual = 2,
+    ELEMENT_OR_VIRTUAL_MASK = 3,
+    Text = 4,
+    ELEMENT_OR_TEXT_MASK = 5,
+    TYPE_MASK = 7,
+    INFLATED_TYPE_MASK = 15,
+    Inflated = 8,
+    Resolved = 16,
+    Deleted = 32,
+    HasIterationItems = 64,
+    InflatedIterationItems = 128,
+    Cursor = 256,
+    NAMESPACE_MASK = 1536,
+    NEGATED_NAMESPACE_MASK = -1537,
+    NS_html = 0,// http://www.w3.org/1999/xhtml
+    NS_svg = 512,// http://www.w3.org/2000/svg
+    NS_math = 1024,// http://www.w3.org/1998/Math/MathML
+    HasTargetElement = 2048
+}
+
+/**
+ * Wait for the scheduler to drain.
+ *
+ * This is useful when testing async code.
+ *
+ * @param container - The application container.
+ * @public
+ */
+export declare function waitForDrain(container: Container): Promise<void>;
+
+/** @public */
+export declare function walkJSX(jsx: JSXOutput, apply: {
+    enter: (jsx: JSXNodeInternal) => void;
+    leave: (jsx: JSXNodeInternal) => void;
+    text: (text: _Stringifiable) => void;
+}): void;
+
+declare class WrappedSignalImpl<T> extends SignalImpl<T> {
+    $args$: any[];
+    $func$: (...args: any[]) => T;
+    $funcStr$: string | null;
+    $flags$: AllSignalFlags;
+    $hostElement$: HostElement | undefined;
+    [_EFFECT_BACK_REF]: Map<EffectProperty | string, EffectSubscription> | undefined;
+    constructor(container: Container | null, fn: (...args: any[]) => T, args: any[], fnStr: string | null, flags?: AllSignalFlags);
+    invalidate(): void;
+    get untrackedValue(): T;
+    $computeIfNeeded$(): void;
+    $unwrapIfSignal$(): SignalImpl<T> | WrappedSignalImpl<T>;
+    set value(_: any);
+    get value(): any;
+}
+
+export { }

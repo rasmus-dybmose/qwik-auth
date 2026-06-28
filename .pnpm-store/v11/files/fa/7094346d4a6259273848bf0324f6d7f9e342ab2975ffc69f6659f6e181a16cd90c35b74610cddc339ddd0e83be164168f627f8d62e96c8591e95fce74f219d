@@ -1,0 +1,5317 @@
+import type { AsyncLocalStorage } from 'node:async_hooks';
+import type * as CSS_2 from 'csstype';
+import { isBrowser } from './build';
+import { isDev } from './build';
+import { isServer } from './build';
+import { ResolvedManifest } from './optimizer';
+import type { ServerQwikManifest } from './optimizer';
+
+/**
+ * Qwik Optimizer marker function.
+ *
+ * Use `$(...)` to tell Qwik Optimizer to extract the expression in `$(...)` into a lazy-loadable
+ * resource referenced by `QRL`.
+ *
+ * @param expression - Expression which should be lazy loaded
+ * @public
+ * @see `implicit$FirstArg` for additional `____$(...)` rules.
+ *
+ * In this example, `$(...)` is used to capture the callback function of `onmousemove` into a
+ * lazy-loadable reference. This allows the code to refer to the function without actually
+ * loading the function. In this example, the callback function does not get loaded until
+ * `mousemove` event fires.
+ *
+ * ```tsx
+ * useOnDocument(
+ *   'mousemove',
+ *   $((event) => console.log('mousemove', event))
+ * );
+ * ```
+ *
+ * In this code, the Qwik Optimizer detects `$(...)` and transforms the code into:
+ *
+ * ```tsx
+ * // FILE: <current file>
+ * useOnDocument('mousemove', qrl('./chunk-abc.js', 'onMousemove'));
+ *
+ * // FILE: chunk-abc.js
+ * export const onMousemove = () => console.log('mousemove');
+ * ```
+ *
+ * ## Special Rules
+ *
+ * The Qwik Optimizer places special rules on functions that can be lazy-loaded.
+ *
+ * 1. The expression of the `$(expression)` function must be importable by the system.
+ * (expression shows up in `import` or has `export`)
+ * 2. If inlined function, then all lexically captured values must be:
+ *    - importable (vars show up in `import`s or `export`s)
+ *    - const (The capturing process differs from JS capturing in that writing to captured
+ * variables does not update them, and therefore writes are forbidden. The best practice is that
+ * all captured variables are constants.)
+ *    - Must be runtime serializable.
+ *
+ * ```tsx
+ *
+ * import { createContextId, useContext, useContextProvider } from './use/use-context';
+ * import { Resource } from './use/use-resource';
+ * import { useResource$ } from './use/use-resource-dollar';
+ * import { useSignal } from './use/use-signal';
+ *
+ * export const greet = () => console.log('greet');
+ * function topLevelFn() {}
+ *
+ * function myCode() {
+ *   const store = useStore({});
+ *   function localFn() {}
+ *   // Valid Examples
+ *   $(greet); // greet is importable
+ *   $(() => greet()); // greet is importable;
+ *   $(() => console.log(store)); // store is serializable.
+ *
+ *   // Compile time errors
+ *   $(topLevelFn); // ERROR: `topLevelFn` not importable
+ *   $(() => topLevelFn()); // ERROR: `topLevelFn` not importable
+ *
+ *   // Runtime errors
+ *   $(localFn); // ERROR: `localFn` fails serialization
+ *   $(() => localFn()); // ERROR: `localFn` fails serialization
+ * }
+ *
+ * ```
+ */
+export declare const $: <T>(expression: T) => QRL<T>;
+
+/**
+ * Register an external projection on a parent component VNode.
+ *
+ * Creates a new VirtualVNode that will render the given component QRL with the given props. The
+ * VNode is stored as a projection on the parent, and a low-priority cursor is added so the cursor
+ * walker will process it.
+ *
+ * Use `_setProjectionTarget` to set the DOM target element before the cursor fires.
+ *
+ * @internal
+ */
+export declare function _addProjection(container: _Container, parentVNode: _VirtualVNode, componentQRL: QRL<any>, props: Record<string, unknown>, slotName: string): _VirtualVNode;
+
+declare interface AddRootFn {
+    (obj: unknown, returnRef?: never): number;
+    (obj: unknown, returnRef: true): SeenRef;
+}
+
+declare type AllEventKeys = keyof AllEventsMap;
+
+declare type AllEventMapRaw = QwikHTMLElementEventMap & QwikDocumentEventMap & QwikWindowEventMap;
+
+declare type AllEventsMap = Omit<AllEventMapRaw, keyof EventCorrectionMap> & EventCorrectionMap;
+
+declare type _AllowPlainQrl<Q> = QRLEventHandlerMulti<any, any> extends Q ? Q extends QRLEventHandlerMulti<infer EV, infer EL> ? Q | (EL extends Element ? EventHandler<EV, EL> : never) : Q : Q extends QRL<infer U> ? Q | U : NonNullable<Q> extends never ? Q : QRL<Q> | Q;
+
+declare type AllSignalFlags = ComputedSignalFlags | SerializationSignalFlags | AsyncSignalFlags;
+
+/**
+ * TS defines these with the React syntax which is not compatible with Qwik. E.g. `ariaAtomic`
+ * instead of `aria-atomic`.
+ *
+ * @public
+ */
+declare interface AriaAttributes {
+    /**
+     * Identifies the currently active element when DOM focus is on a composite widget, textbox,
+     * group, or application.
+     */
+    'aria-activedescendant'?: string | undefined;
+    /**
+     * Indicates whether assistive technologies will present all, or only parts of, the changed region
+     * based on the change notifications defined by the aria-relevant attribute.
+     */
+    'aria-atomic'?: Booleanish | undefined;
+    /**
+     * Indicates whether inputting text could trigger display of one or more predictions of the user's
+     * intended value for an input and specifies how predictions would be presented if they are made.
+     */
+    'aria-autocomplete'?: 'none' | 'inline' | 'list' | 'both' | undefined;
+    /**
+     * Indicates an element is being modified and that assistive technologies MAY want to wait until
+     * the modifications are complete before exposing them to the user.
+     */
+    'aria-busy'?: Booleanish | undefined;
+    /**
+     * Indicates the current "checked" state of checkboxes, radio buttons, and other widgets.
+     *
+     * @see aria-pressed @see aria-selected.
+     */
+    'aria-checked'?: boolean | 'false' | 'mixed' | 'true' | undefined;
+    /**
+     * Defines the total number of columns in a table, grid, or treegrid.
+     *
+     * @see aria-colindex.
+     */
+    'aria-colcount'?: number | undefined;
+    /**
+     * Defines an element's column index or position with respect to the total number of columns
+     * within a table, grid, or treegrid.
+     *
+     * @see aria-colcount @see aria-colspan.
+     */
+    'aria-colindex'?: number | undefined;
+    /**
+     * Defines the number of columns spanned by a cell or gridcell within a table, grid, or treegrid.
+     *
+     * @see aria-colindex @see aria-rowspan.
+     */
+    'aria-colspan'?: number | undefined;
+    /**
+     * Identifies the element (or elements) whose contents or presence are controlled by the current
+     * element.
+     *
+     * @see aria-owns.
+     */
+    'aria-controls'?: string | undefined;
+    /**
+     * Indicates the element that represents the current item within a container or set of related
+     * elements.
+     */
+    'aria-current'?: boolean | 'false' | 'true' | 'page' | 'step' | 'location' | 'date' | 'time' | undefined;
+    /**
+     * Identifies the element (or elements) that describes the object.
+     *
+     * @see aria-labelledby
+     */
+    'aria-describedby'?: string | undefined;
+    /**
+     * Identifies the element that provides a detailed, extended description for the object.
+     *
+     * @see aria-describedby.
+     */
+    'aria-details'?: string | undefined;
+    /**
+     * Indicates that the element is perceivable but disabled, so it is not editable or otherwise
+     * operable.
+     *
+     * @see aria-hidden @see aria-readonly.
+     */
+    'aria-disabled'?: Booleanish | undefined;
+    /**
+     * Indicates what functions can be performed when a dragged object is released on the drop target.
+     *
+     * @deprecated In ARIA 1.1
+     */
+    'aria-dropeffect'?: 'none' | 'copy' | 'execute' | 'link' | 'move' | 'popup' | undefined;
+    /**
+     * Identifies the element that provides an error message for the object.
+     *
+     * @see aria-invalid @see aria-describedby.
+     */
+    'aria-errormessage'?: string | undefined;
+    /**
+     * Indicates whether the element, or another grouping element it controls, is currently expanded
+     * or collapsed.
+     */
+    'aria-expanded'?: Booleanish | undefined;
+    /**
+     * Identifies the next element (or elements) in an alternate reading order of content which, at
+     * the user's discretion, allows assistive technology to override the general default of reading
+     * in document source order.
+     */
+    'aria-flowto'?: string | undefined;
+    /**
+     * Indicates an element's "grabbed" state in a drag-and-drop operation.
+     *
+     * @deprecated In ARIA 1.1
+     */
+    'aria-grabbed'?: Booleanish | undefined;
+    /**
+     * Indicates the availability and type of interactive popup element, such as menu or dialog, that
+     * can be triggered by an element.
+     */
+    'aria-haspopup'?: boolean | 'false' | 'true' | 'menu' | 'listbox' | 'tree' | 'grid' | 'dialog' | undefined;
+    /**
+     * Indicates whether the element is exposed to an accessibility API.
+     *
+     * @see aria-disabled.
+     */
+    'aria-hidden'?: Booleanish | undefined;
+    /**
+     * Indicates the entered value does not conform to the format expected by the application.
+     *
+     * @see aria-errormessage.
+     */
+    'aria-invalid'?: boolean | 'false' | 'true' | 'grammar' | 'spelling' | undefined;
+    /**
+     * Indicates keyboard shortcuts that an author has implemented to activate or give focus to an
+     * element.
+     */
+    'aria-keyshortcuts'?: string | undefined;
+    /**
+     * Defines a string value that labels the current element.
+     *
+     * @see aria-labelledby.
+     */
+    'aria-label'?: string | undefined;
+    /**
+     * Identifies the element (or elements) that labels the current element.
+     *
+     * @see aria-describedby.
+     */
+    'aria-labelledby'?: string | undefined;
+    /** Defines the hierarchical level of an element within a structure. */
+    'aria-level'?: number | undefined;
+    /**
+     * Indicates that an element will be updated, and describes the types of updates the user agents,
+     * assistive technologies, and user can expect from the live region.
+     */
+    'aria-live'?: 'off' | 'assertive' | 'polite' | undefined;
+    /** Indicates whether an element is modal when displayed. */
+    'aria-modal'?: Booleanish | undefined;
+    /** Indicates whether a text box accepts multiple lines of input or only a single line. */
+    'aria-multiline'?: Booleanish | undefined;
+    /** Indicates that the user may select more than one item from the current selectable descendants. */
+    'aria-multiselectable'?: Booleanish | undefined;
+    /** Indicates whether the element's orientation is horizontal, vertical, or unknown/ambiguous. */
+    'aria-orientation'?: 'horizontal' | 'vertical' | undefined;
+    /**
+     * Identifies an element (or elements) in order to define a visual, functional, or contextual
+     * parent/child relationship between DOM elements where the DOM hierarchy cannot be used to
+     * represent the relationship.
+     *
+     * @see aria-controls.
+     */
+    'aria-owns'?: string | undefined;
+    /**
+     * Defines a short hint (a word or short phrase) intended to aid the user with data entry when the
+     * control has no value. A hint could be a sample value or a brief description of the expected
+     * format.
+     */
+    'aria-placeholder'?: string | undefined;
+    /**
+     * Defines an element's number or position in the current set of listitems or treeitems. Not
+     * required if all elements in the set are present in the DOM.
+     *
+     * @see aria-setsize.
+     */
+    'aria-posinset'?: number | undefined;
+    /**
+     * Indicates the current "pressed" state of toggle buttons.
+     *
+     * @see aria-checked @see aria-selected.
+     */
+    'aria-pressed'?: boolean | 'false' | 'mixed' | 'true' | undefined;
+    /**
+     * Indicates that the element is not editable, but is otherwise operable.
+     *
+     * @see aria-disabled.
+     */
+    'aria-readonly'?: Booleanish | undefined;
+    /**
+     * Indicates what notifications the user agent will trigger when the accessibility tree within a
+     * live region is modified.
+     *
+     * @see aria-atomic.
+     */
+    'aria-relevant'?: 'additions' | 'additions removals' | 'additions text' | 'all' | 'removals' | 'removals additions' | 'removals text' | 'text' | 'text additions' | 'text removals' | undefined;
+    /** Indicates that user input is required on the element before a form may be submitted. */
+    'aria-required'?: Booleanish | undefined;
+    /** Defines a human-readable, author-localized description for the role of an element. */
+    'aria-roledescription'?: string | undefined;
+    /**
+     * Defines the total number of rows in a table, grid, or treegrid.
+     *
+     * @see aria-rowindex.
+     */
+    'aria-rowcount'?: number | undefined;
+    /**
+     * Defines an element's row index or position with respect to the total number of rows within a
+     * table, grid, or treegrid.
+     *
+     * @see aria-rowcount @see aria-rowspan.
+     */
+    'aria-rowindex'?: number | undefined;
+    /**
+     * Defines the number of rows spanned by a cell or gridcell within a table, grid, or treegrid.
+     *
+     * @see aria-rowindex @see aria-colspan.
+     */
+    'aria-rowspan'?: number | undefined;
+    /**
+     * Indicates the current "selected" state of various widgets.
+     *
+     * @see aria-checked @see aria-pressed.
+     */
+    'aria-selected'?: Booleanish | undefined;
+    /**
+     * Defines the number of items in the current set of listitems or treeitems. Not required if all
+     * elements in the set are present in the DOM.
+     *
+     * @see aria-posinset.
+     */
+    'aria-setsize'?: number | undefined;
+    /** Indicates if items in a table or grid are sorted in ascending or descending order. */
+    'aria-sort'?: 'none' | 'ascending' | 'descending' | 'other' | undefined;
+    /** Defines the maximum allowed value for a range widget. */
+    'aria-valuemax'?: number | undefined;
+    /** Defines the minimum allowed value for a range widget. */
+    'aria-valuemin'?: number | undefined;
+    /**
+     * Defines the current value for a range widget.
+     *
+     * @see aria-valuetext.
+     */
+    'aria-valuenow'?: number | undefined;
+    /** Defines the human readable text alternative of aria-valuenow for a range widget. */
+    'aria-valuetext'?: string | undefined;
+}
+
+/** @public */
+declare type AriaRole = 'alert' | 'alertdialog' | 'application' | 'article' | 'banner' | 'button' | 'cell' | 'checkbox' | 'columnheader' | 'combobox' | 'complementary' | 'contentinfo' | 'definition' | 'dialog' | 'directory' | 'document' | 'feed' | 'figure' | 'form' | 'grid' | 'gridcell' | 'group' | 'heading' | 'img' | 'link' | 'list' | 'listbox' | 'listitem' | 'log' | 'main' | 'marquee' | 'math' | 'menu' | 'menubar' | 'menuitem' | 'menuitemcheckbox' | 'menuitemradio' | 'navigation' | 'none' | 'note' | 'option' | 'presentation' | 'progressbar' | 'radio' | 'radiogroup' | 'region' | 'row' | 'rowgroup' | 'rowheader' | 'scrollbar' | 'search' | 'searchbox' | 'separator' | 'slider' | 'spinbutton' | 'status' | 'switch' | 'tab' | 'table' | 'tablist' | 'tabpanel' | 'term' | 'textbox' | 'timer' | 'toolbar' | 'tooltip' | 'tree' | 'treegrid' | 'treeitem' | (string & {});
+
+declare type AsyncCtx<T = unknown> = {
+    track: Tracker;
+    /**
+     * Register a cleanup callback to be called when the async computation is aborted or completed.
+     * The next invocation will await the previous cleanup. If you do not want this, do not return a
+     * Promise.
+     */
+    cleanup: (callback: () => void | Promise<void>) => void;
+    /**
+     * A lazily created AbortSignal, for interrupting the async computation when needed, e.g. when the
+     * component is unmounted or the computation is invalidated. Pass it to `fetch` or other APIs that
+     * support it to ensure that unnecessary work is not performed.
+     */
+    readonly abortSignal: AbortSignal;
+    /** The result of the previous computation, if any */
+    readonly previous: T | undefined;
+    /** Extra info passed to `invalidate(info)` for this computation, if any. */
+    readonly info?: unknown;
+};
+
+/**
+ * Note, we don't pass the generic type to AsyncCtx because it causes TypeScript to not infer the
+ * type of the resource correctly. The type is only used for the `previous` property, which is not
+ * commonly used, and can be easily cast if needed.
+ *
+ * @public
+ */
+export declare type AsyncFn<T> = (ctx: AsyncCtx) => ValueOrPromise<T>;
+
+/** Retains job metadata and also serves as the argument for the compute function */
+declare class AsyncJob<T> implements AsyncCtx<T> {
+    readonly $signal$: _AsyncSignalImpl<T>;
+    /** First holds the compute promise and then the cleanup promise */
+    $promise$: Promise<void> | null | void;
+    $cleanupRequested$: boolean;
+    $canWrite$: boolean;
+    $track$: AsyncCtx<T>['track'] | undefined;
+    $cleanups$: Parameters<AsyncCtx<T>['cleanup']>[0][] | undefined;
+    $abortController$: AbortController | undefined;
+    info: unknown;
+    $infoVersion$: number | undefined;
+    constructor($signal$: _AsyncSignalImpl<T>, info: unknown, $infoVersion$: number | undefined);
+    get track(): AsyncCtx<T>['track'];
+    get abortSignal(): AbortSignal;
+    /** Backward compatible cache method for resource */
+    cache(): void;
+    get previous(): T | undefined;
+    cleanup(callback: () => void): void;
+}
+
+declare type AsyncQRL<T> = _QRLInternal<AsyncFn<T>>;
+
+/**
+ * An AsyncSignal holds the result of the given async function. If the function uses `track()` to
+ * track reactive state, and that state changes, the AsyncSignal is recalculated, and if the result
+ * changed, all tasks which are tracking the AsyncSignal will be re-run and all subscribers
+ * (components, tasks etc) that read the AsyncSignal will be updated.
+ *
+ * If the async function throws an error, the AsyncSignal will capture the error and set the `error`
+ * property. The error can be cleared by re-running the async function successfully.
+ *
+ * While the async function is running, the `.loading` property will be set to `true`. Once the
+ * function completes, `loading` will be set to `false`.
+ *
+ * If the value has not yet been resolved, reading the AsyncSignal will throw a Promise, which will
+ * retry the component or task once the value resolves.
+ *
+ * If the value has been resolved, but the async function is re-running, reading the AsyncSignal
+ * will subscribe to it and return the last resolved value until the new value is ready. As soon as
+ * the new value is ready, the subscribers will be updated.
+ *
+ * If the async function threw an error, reading the `.value` will throw that same error. Read from
+ * `.error` to check if there was an error.
+ *
+ * @public
+ */
+export declare interface AsyncSignal<T = unknown> extends ComputedSignal<T> {
+    /**
+     * Whether the signal is currently loading. This will trigger lazy loading of the signal, so you
+     * can use it like this:
+     *
+     * ```tsx
+     * signal.loading ? <Loading /> : signal.error ? <Error /> : <Component
+     * value={signal.value} />
+     * ```
+     */
+    loading: boolean;
+    /**
+     * Lets you read the loading state without subscribing to `.loading` updates. It also triggers
+     * lazy loading of the signal.
+     *
+     * Setting it will trigger listeners for `.loading`.
+     */
+    untrackedLoading: boolean;
+    /**
+     * The error that occurred while computing the signal, if any. This will be cleared when the
+     * signal is successfully computed. It does not trigger lazy loading of the signal.
+     */
+    error: Error | undefined;
+    /**
+     * Lets you read the error state without subscribing to `.error` updates. It does not trigger lazy
+     * loading of the signal.
+     *
+     * Setting it will trigger listeners for `.error`.
+     */
+    untrackedError: Error | undefined;
+    /**
+     * Expiration time in ms. Writable and immediately effective.
+     *
+     * When set, the signal is invalidated after this many ms. Whether it auto-recomputes depends on
+     * the `poll` property. `0` means no expiration.
+     */
+    expires: number;
+    /**
+     * Whether to automatically re-run the function when the value expires. Writable and immediately
+     * effective. Only relevant when `expires` is set.
+     *
+     * Defaults to `true`.
+     */
+    poll: boolean;
+    /** @deprecated Use `expires` and `poll` instead. Will be removed before v2 */
+    interval: number;
+    /** A promise that resolves when the value is computed or rejected. */
+    promise(): Promise<void>;
+    /** Abort the current computation and run cleanups if needed. */
+    abort(reason?: any): void;
+    /**
+     * Use this to force recalculation. If you pass `info`, it will be provided to the calculation
+     * function.
+     */
+    invalidate(info?: unknown): void;
+}
+
+declare const enum AsyncSignalFlags {
+    EAGER_CLEANUP = 32,
+    CLIENT_ONLY = 64,
+    CLEAR_ON_INVALIDATE = 128,
+    NO_POLL = 256
+}
+
+/**
+ * # ================================
+ *
+ * AsyncSignalImpl
+ *
+ * # ================================
+ *
+ * @internal
+ */
+export declare class _AsyncSignalImpl<T> extends ComputedSignalImpl<T, AsyncQRL<T>> implements BackRef, AsyncSignal<T> {
+    $untrackedLoading$: boolean;
+    $untrackedError$: Error | undefined;
+    $current$: AsyncJob<T> | null;
+    $jobs$: AsyncJob<T>[] | undefined;
+    $concurrency$: number | undefined;
+    $expires$: number | undefined;
+    $timeoutMs$: number | undefined;
+    $loadingEffects$: undefined | Set<EffectSubscription>;
+    $errorEffects$: undefined | Set<EffectSubscription>;
+    $pollTimeoutId$: ReturnType<typeof setTimeout> | undefined;
+    $computationTimeoutId$: ReturnType<typeof setTimeout> | undefined;
+    $info$: unknown | undefined;
+    $infoVersion$: number | undefined;
+    [_EFFECT_BACK_REF]: Map<_EffectProperty | string, EffectSubscription> | undefined;
+    constructor(container: _Container | null, fn: AsyncQRL<T>, flags?: ComputedSignalFlags | SerializationSignalFlags, options?: AsyncSignalOptions<T>);
+    get untrackedValue(): T;
+    set untrackedValue(value: T);
+    /**
+     * Read the value, subscribing if in a tracking context. Triggers computation if needed.
+     *
+     * Setting the value will mark the signal as not loading and clear any error, and prevent any
+     * pending computations from writing their results.
+     *
+     * If you want to set the value without affecting loading or error state, set `untrackedValue`
+     * instead and make sure to trigger effects manually if needed.
+     *
+     * If you want to abort pending computations when setting, you have to call `abort()` manually.
+     */
+    get value(): T;
+    set value(value: T);
+    /**
+     * Loading is true if the signal is still waiting for the promise to resolve, false if the promise
+     * has resolved or rejected.
+     *
+     * Accessing .loading will trigger computation if needed, since it's often used like
+     * `signal.loading ? <Loading /> : signal.value`.
+     */
+    get loading(): boolean;
+    set untrackedLoading(value: boolean);
+    get untrackedLoading(): boolean;
+    /** The error that occurred when the signal was resolved. */
+    get error(): Error | undefined;
+    set untrackedError(value: Error | undefined);
+    get untrackedError(): Error | undefined;
+    get expires(): number;
+    set expires(value: number);
+    get poll(): boolean;
+    set poll(value: boolean);
+    /** @deprecated Use `expires` and `poll` instead. */
+    get interval(): number;
+    set interval(value: number);
+    /** Invalidates the signal, causing it to re-compute its value. */
+    invalidate(info?: unknown): Promise<void>;
+    $setInvalid$(allowRecalc: boolean, mustClear: boolean | number): void;
+    /** Abort the current computation and run cleanups if needed. */
+    abort(reason?: any): void;
+    /** Schedule eager cleanup on next macro task if no subscribers remain. */
+    $scheduleEagerCleanup$(): void;
+    /** Returns a promise resolves when the signal finished computing. */
+    promise(): Promise<void>;
+    /** Run the computation if needed */
+    $computeIfNeeded$(): void;
+    $runComputation$(running: AsyncJob<T>): Promise<void>;
+    /**
+     * Sets the error from the given job. We only accept errors from the current job and we ignore
+     * AbortErrors.
+     */
+    $setError$(job: AsyncJob<T>, error: Error): void;
+    /** Called after SSR/unmount */
+    $destroy$(): Promise<void>;
+    private $clearNextPoll$;
+    private $scheduleNextPoll$;
+    private $hasSubscribers$;
+    $requestCleanups$(job: AsyncJob<T>, reason?: any): void;
+    /** Clean up and trigger signal compute once complete */
+    $runCleanups$(job: AsyncJob<T>): Promise<void> | undefined;
+}
+
+/** @public */
+export declare interface AsyncSignalOptions<T> extends ComputedOptions {
+    /** Like useSignal's `initial`; prevents the throw on first read when uninitialized */
+    initial?: T | (() => T);
+    /**
+     * Maximum number of concurrent computations. Use `0` for unlimited.
+     *
+     * Defaults to `1`.
+     */
+    concurrency?: number;
+    /**
+     * When subscribers drop to 0, run cleanup in the next tick, instead of waiting for the function
+     * inputs to change.
+     *
+     * Defaults to `false`, meaning cleanup happens only when inputs change.
+     */
+    eagerCleanup?: boolean;
+    /**
+     * Time in milliseconds after which the value expires.
+     *
+     * When the value expires and subscribers exist, the signal is invalidated. If `poll` is `true`
+     * (default), the function is re-run automatically. If `poll` is `false`, the value is marked
+     * stale and recomputation happens when reading `.value` or `.loading`.
+     *
+     * `0` (default) means no expiration.
+     */
+    expires?: number;
+    /**
+     * Whether to automatically re-run the function when the value expires. Only relevant when
+     * `expires` is set.
+     *
+     * Defaults to `true`.
+     */
+    poll?: boolean;
+    /** @deprecated Use `expires` and `poll` instead. Will be removed before v2 */
+    interval?: number;
+    /**
+     * When true, the async computation is postponed to the browser. On SSR, the signal remains
+     * INVALID and does not execute the function. On the client, it will compute on first read.
+     *
+     * Defaults to `false`.
+     */
+    clientOnly?: boolean;
+    /**
+     * When true (default), the previous value is kept while the signal re-computes after
+     * invalidation, so reads return stale data instead of throwing a promise. Reactivity will then
+     * update the readers when the new value is ready.
+     *
+     * When false, invalidation clears the value so reads throw the computation promise (like the
+     * initial load), which is useful for navigations where showing old data would be confusing.
+     *
+     * Note that polling invalidations (`expires` with `poll: true`) are not affected by this option
+     * and will keep the old value while the new value is loading, to avoid flashing loaders.
+     *
+     * This option only affects manual invalidations via `invalidate()`, and non-polling expirations
+     * (`poll: false`, or there are no subscribers).
+     *
+     * Defaults to `true`.
+     */
+    allowStale?: boolean;
+    /**
+     * Maximum time in milliseconds to wait for the async computation to complete. If exceeded, the
+     * computation is aborted and an error is thrown.
+     *
+     * If `0`, no timeout is applied.
+     *
+     * Defaults to `0`.
+     */
+    timeout?: number;
+}
+
+/**
+ * Replace given element's props with custom types and return all props specific to the element. Use
+ * this for known props that are incorrect or missing.
+ *
+ * Uses Prettify so we see the special props for each element in editor hover
+ */
+declare type Augmented<E, A = {}> = Prettify<Filtered<E, A> & A>;
+
+/** Class for back reference to the EffectSubscription */
+declare abstract class BackRef {
+    [_EFFECT_BACK_REF]: Map<any, any> | undefined;
+}
+
+declare type BivariantQrlFn<ARGS extends any[], RETURN> = {
+    /**
+     * Resolve the QRL of closure and invoke it.
+     *
+     * @param args - Closure arguments.
+     * @returns A promise of the return value of the closure.
+     */
+    bivarianceHack(...args: ARGS): Promise<RETURN>;
+}['bivarianceHack'];
+
+/** @public */
+declare type Booleanish = boolean | `${boolean}`;
+
+declare type Capture = {
+    [K in keyof HTMLElementEventMap as `capture:${K}`]?: boolean;
+};
+
+/**
+ * The current captured scope during QRL invocation. This is used to provide the lexical scope for
+ * QRL functions. It is used one time per invocation, synchronously, so it is safe to store it in
+ * module scope.
+ *
+ * @internal
+ */
+export declare let _captures: Readonly<unknown[]> | null;
+
+/**
+ * Handles events for bind:checked
+ *
+ * @internal
+ */
+export declare function _chk(this: string | undefined, _: any, element: HTMLInputElement): void | Promise<void>;
+
+declare const enum ChoreBits {
+    NONE = 0,
+    TASKS = 1,
+    NODE_DIFF = 2,
+    COMPONENT = 4,
+    INLINE_COMPONENT = 8,
+    NODE_PROPS = 16,
+    COMPUTE = 32,
+    CHILDREN = 64,
+    CLEANUP = 128,
+    RECONCILE = 256,
+    ERROR_WRAP = 512,
+    DIRTY_MASK = 1023
+}
+
+/**
+ * A class list can be a string, a boolean, an array, or an object.
+ *
+ * If it's an array, each item is a class list and they are all added.
+ *
+ * If it's an object, then the keys are class name strings, and the values are booleans that
+ * determine if the class name string should be added or not.
+ *
+ * @public
+ */
+export declare type ClassList = string | undefined | null | false | Record<string, boolean | string | number | null | undefined> | ClassList[];
+
+/** @internal */
+export declare interface ClientContainer extends _Container {
+    document: _QDocument;
+    element: _ContainerElement;
+    qContainer: string;
+    $locale$: string;
+    qManifestHash: string;
+    rootVNode: _ElementVNode;
+    $forwardRefs$: Array<number | string> | null;
+    vNodeLocate(id: string | Element): _VNode;
+    parseQRL<T = unknown>(qrl: string): QRL<T>;
+    $getForwardRef$(id: number): number | string | undefined;
+    $setRawState$(id: number, vParent: _ElementVNode | _VirtualVNode): void;
+}
+
+/**
+ * Declare a Qwik component that can be used to create UI.
+ *
+ * Use `component$` to declare a Qwik component. A Qwik component is a special kind of component
+ * that allows the Qwik framework to lazy load and execute the component independently of other Qwik
+ * components as well as lazy load the component's life-cycle hooks and event handlers.
+ *
+ * Side note: You can also declare regular (standard JSX) components that will have standard
+ * synchronous behavior.
+ *
+ * Qwik component is a facade that describes how the component should be used without forcing the
+ * implementation of the component to be eagerly loaded. A minimum Qwik definition consists of:
+ *
+ * ### Example
+ *
+ * An example showing how to create a counter component:
+ *
+ * ```tsx
+ * export interface CounterProps {
+ *   initialValue?: number;
+ *   step?: number;
+ * }
+ * export const Counter = component$((props: CounterProps) => {
+ *   const state = useSignal(props.initialValue || 0);
+ *   return (
+ *     <div>
+ *       <span>{state.value}</span>
+ *       <button onClick$={() => (state.value += props.step || 1)}>+</button>
+ *     </div>
+ *   );
+ * });
+ * ```
+ *
+ * - `component$` is how a component gets declared.
+ * - `{ value?: number; step?: number }` declares the public (props) interface of the component.
+ * - `{ count: number }` declares the private (state) interface of the component.
+ *
+ * The above can then be used like so:
+ *
+ * ```tsx
+ * export const OtherComponent = component$(() => {
+ *   return <Counter initialValue={100} />;
+ * });
+ * ```
+ *
+ * See also: `component`, `useCleanup`, `onResume`, `onPause`, `useOn`, `useOnDocument`,
+ * `useOnWindow`, `useStyles`
+ *
+ * @public
+ */
+export declare const component$: <PROPS = unknown>(onMount: OnRenderFn<PROPS>) => Component<PROPS>;
+
+/**
+ * Type representing the Qwik component.
+ *
+ * `Component` is the type returned by invoking `component$`.
+ *
+ * ```tsx
+ * interface MyComponentProps {
+ *   someProp: string;
+ * }
+ * const MyComponent: Component<MyComponentProps> = component$((props: MyComponentProps) => {
+ *   return <span>{props.someProp}</span>;
+ * });
+ * ```
+ *
+ * @public
+ */
+export declare type Component<PROPS = unknown> = FunctionComponent<PublicProps<PROPS>>;
+
+/** @public */
+export declare interface ComponentBaseProps {
+    key?: string | number | null | undefined;
+    'q:slot'?: string;
+}
+
+declare type ComponentChildren<PROPS> = PROPS extends {
+    children: any;
+} ? never : {
+    children?: JSXChildren;
+};
+
+/** @internal */
+export declare const componentQrl: <PROPS extends Record<any, any>>(componentQrl: QRL<OnRenderFn<PROPS>>) => Component<PROPS>;
+
+/** @public */
+export declare type ComputedFn<T> = () => T;
+
+/** @public */
+export declare interface ComputedOptions {
+    serializationStrategy?: SerializationStrategy;
+    container?: _Container;
+}
+
+/** @public */
+export declare type ComputedReturnType<T> = T extends Promise<any> ? never : ComputedSignal<T>;
+
+/**
+ * A computed signal is a signal which is calculated from other signals. When the signals change,
+ * the computed signal is recalculated, and if the result changed, all tasks which are tracking the
+ * signal will be re-run and all components that read the signal will be re-rendered.
+ *
+ * @public
+ */
+export declare interface ComputedSignal<T> extends Signal<T> {
+    /** @deprecated Use `trigger()` instead */
+    force(): void;
+    /** Use this to force recalculation. */
+    invalidate(): void;
+}
+
+declare const enum ComputedSignalFlags {
+    INVALID = 1,
+    RUN_EFFECTS = 2,
+    PRESERVE_ON_SEQ_CLEANUP = 4
+}
+
+/**
+ * A signal which is computed from other signals.
+ *
+ * The value is available synchronously, but the computation is done lazily.
+ */
+declare class ComputedSignalImpl<T, S extends _QRLInternal = ComputeQRL<T>> extends SignalImpl<T> implements BackRef {
+    /**
+     * The compute function is stored here.
+     *
+     * The computed functions must be executed synchronously (because of this we need to eagerly
+     * resolve the QRL during the mark dirty phase so that any call to it will be synchronous). )
+     */
+    $computeQrl$: S;
+    $flags$: ComputedSignalFlags | SerializationSignalFlags;
+    [_EFFECT_BACK_REF]: Map<_EffectProperty | string, EffectSubscription> | undefined;
+    constructor(container: _Container | null, fn: S, flags?: ComputedSignalFlags | SerializationSignalFlags);
+    invalidate(): void;
+    get untrackedValue(): T;
+    set untrackedValue(value: T);
+    $computeIfNeeded$(): void;
+}
+
+declare type ComputeQRL<T> = _QRLInternal<ComputedFn<T>>;
+
+/** @internal */
+export declare const _CONST_PROPS: unique symbol;
+
+/**
+ * Effect is something which needs to happen (side-effect) due to signal value change.
+ *
+ * There are three types of effects:
+ *
+ * - `Task`: `useTask`, `useVisibleTask`, `useResource`
+ * - `VNode` and `ISsrNode`: Either a component or `<Signal>`
+ * - `Signal2`: A derived signal which contains a computation function.
+ */
+declare type Consumer = _Task | _VNode | SignalImpl | ISsrNode;
+
+/** @internal */
+export declare interface _Container {
+    readonly $version$: string;
+    readonly $storeProxyMap$: ObjToProxyMap;
+    $rootContainer$: _Container | null;
+    $isOutOfOrderSegment$: boolean;
+    readonly $locale$: string;
+    readonly $getObjectById$: (id: number | string) => any;
+    readonly $serverData$: Record<string, any>;
+    readonly $instanceHash$: string | null;
+    $currentUniqueId$: number;
+    $buildBase$: string | null;
+    $renderPromise$: Promise<void> | null;
+    $resolveRenderPromise$: (() => void) | null;
+    $pendingCount$: number;
+    $checkPendingCount$(): void;
+    handleError(err: any, $host$: _HostElement | null): void;
+    getParentHost(host: _HostElement): _HostElement | null;
+    setContext<T>(host: _HostElement, context: ContextId<T>, value: T): void;
+    resolveContext<T>(host: _HostElement, contextId: ContextId<T>): T | undefined;
+    setHostProp<T>(host: _HostElement, name: string, value: T): void;
+    getHostProp<T>(host: _HostElement, name: string): T | null;
+    $appendStyle$(content: string, styleId: string, host: _HostElement, scoped: boolean): void;
+    /**
+     * When component is about to be executed, it may add/remove children. This can cause problems
+     * with the projection because deleting content will prevent the projection references from
+     * looking up vnodes. Therefore before we execute the component we need to ensure that all of its
+     * references to vnode are resolved.
+     *
+     * @param renderHost - Host element to ensure projection is resolved.
+     */
+    ensureProjectionResolved(host: _HostElement): void;
+    serializationCtxFactory(NodeConstructor: {
+        new (...rest: any[]): {
+            __brand__: 'SsrNode';
+        };
+    } | null, DomRefConstructor: {
+        new (...rest: any[]): {
+            __brand__: 'DomRef';
+        };
+    } | null, symbolToChunkResolver: SymbolToChunkResolver, writer?: StreamWriter): SerializationContext;
+}
+
+declare const enum ContainerDataProcessState {
+    NotStarted = 0,
+    ProcessingVNode = 1,
+    ProcessingState = 2,
+    ProcessingStateDone = 3
+}
+
+/** @internal */
+export declare interface _ContainerElement extends HTMLElement {
+    qContainer?: ClientContainer;
+    /**
+     * Map of element ID to Element. If VNodeData has a reference to an element, then it is added to
+     * this map for later retrieval.
+     *
+     * Once retrieved the element is replaced with its VNode.
+     *
+     * NOTE: This map leaks memory! Once the application is resumed we don't know which element IDs
+     * are still in the deserialized state. we will probably need a GC cycle. Some process running in
+     * the idle time which processes few elements at a time to see if they are still referenced and
+     * removes them from the map if they are not.
+     */
+    qVNodeRefs?: Map<number, Element | _ElementVNode>;
+    /** String from `<script type="qwik/vnode">` tag. */
+    qVnodeData?: string;
+    qDestroy?: () => void;
+    /** Segment-local strings from `<script type="qwik/vnode" q:r="...">` tags. */
+    qSegmentVnodeData?: Map<string, string>;
+}
+
+/**
+ * ContextId is a typesafe ID for your context.
+ *
+ * Context is a way to pass stores to the child components without prop-drilling.
+ *
+ * Use `createContextId()` to create a `ContextId`. A `ContextId` is just a serializable identifier
+ * for the context. It is not the context value itself. See `useContextProvider()` and
+ * `useContext()` for the values. Qwik needs a serializable ID for the context so that the it can
+ * track context providers and consumers in a way that survives resumability.
+ *
+ * ### Example
+ *
+ * ```tsx
+ * // Declare the Context type.
+ * interface TodosStore {
+ *   items: string[];
+ * }
+ * // Create a Context ID (no data is saved here.)
+ * // You will use this ID to both create and retrieve the Context.
+ * export const TodosContext = createContextId<TodosStore>('Todos');
+ *
+ * // Example of providing context to child components.
+ * export const App = component$(() => {
+ *   useContextProvider(
+ *     TodosContext,
+ *     useStore<TodosStore>({
+ *       items: ['Learn Qwik', 'Build Qwik app', 'Profit'],
+ *     })
+ *   );
+ *
+ *   return <Items />;
+ * });
+ *
+ * // Example of retrieving the context provided by a parent component.
+ * export const Items = component$(() => {
+ *   const todos = useContext(TodosContext);
+ *   return (
+ *     <ul>
+ *       {todos.items.map((item) => (
+ *         <li>{item}</li>
+ *       ))}
+ *     </ul>
+ *   );
+ * });
+ *
+ * ```
+ *
+ * @public
+ */
+export declare interface ContextId<STATE> {
+    /** Design-time property to store type information for the context. */
+    readonly __brand_context_type__: STATE;
+    /** A unique ID for the context. */
+    readonly id: string;
+}
+
+/**
+ * Low-level API for platform abstraction.
+ *
+ * Different platforms (browser, node, service workers) may have different ways of handling things
+ * such as `requestAnimationFrame` and imports. To make Qwik platform-independent Qwik uses the
+ * `CorePlatform` API to access the platform API.
+ *
+ * `CorePlatform` also is responsible for importing symbols. The import map is different on the
+ * client (browser) then on the server. For this reason, the server has a manifest that is used to
+ * map symbols to javascript chunks. The manifest is encapsulated in `CorePlatform`, for this
+ * reason, the `CorePlatform` can't be global as there may be multiple applications running at
+ * server concurrently.
+ *
+ * This is a low-level API and there should not be a need for you to access this.
+ *
+ * @public
+ */
+export declare interface CorePlatform {
+    /**
+     * True of running on the server platform.
+     *
+     * @returns True if we are running on the server (not the browser.)
+     */
+    isServer: boolean;
+    /**
+     * Retrieve a symbol value from QRL.
+     *
+     * Qwik needs to lazy load data and closures. For this Qwik uses QRLs that are serializable
+     * references of resources that are needed. The QRLs contain all the information necessary to
+     * retrieve the reference using `importSymbol`.
+     *
+     * Why not use `import()`? Because `import()` is relative to the current file, and the current
+     * file is always the Qwik framework. So QRLs have additional information that allows them to
+     * serialize imports relative to application base rather than the Qwik framework file.
+     *
+     * @param element - The element against which the `url` is resolved. Used to locate the container
+     *   root and `q:base` attribute.
+     * @param url - Relative URL retrieved from the attribute that needs to be resolved against the
+     *   container `q:base` attribute.
+     * @param symbol - The name of the symbol to import.
+     * @returns A promise that resolves to the imported symbol.
+     */
+    importSymbol: (containerEl: Element | undefined, url: string | URL | undefined | null, symbol: string) => ValueOrPromise<unknown>;
+    /**
+     * Perform operation on next request-animation-frame.
+     *
+     * @param fn - The function to call when the next animation frame is ready.
+     */
+    raf: (fn: () => any) => Promise<any>;
+    /**
+     * Retrieve chunk name for the symbol.
+     *
+     * When the application is running on the server the symbols may be imported from different files
+     * (as server build is typically a single javascript chunk.) For this reason, it is necessary to
+     * convert the chunks from server format to client (browser) format. This is done by looking up
+     * symbols (which are globally unique) in the manifest. (Manifest is the mapping of symbols to the
+     * client chunk names.)
+     *
+     * @param symbolName - Resolve `symbolName` against the manifest and return the chunk that
+     *   contains the symbol.
+     */
+    chunkForSymbol: (symbolName: string, chunk: string | null, parent?: string) => readonly [symbol: string, chunk: string] | undefined;
+}
+
+/** This corrects the TS definition for ToggleEvent @public */
+export declare interface CorrectedToggleEvent extends Event {
+    readonly newState: 'open' | 'closed';
+    readonly prevState: 'open' | 'closed';
+}
+
+/**
+ * Create a signal holding a `.value` which is calculated from the given async function (QRL). The
+ * standalone version of `useAsync$`.
+ *
+ * @public
+ */
+export declare const createAsync$: <T>(qrl: (arg: AsyncCtx<T>) => Promise<T>, options?: AsyncSignalOptions<T>) => AsyncSignal<T>;
+
+/** @internal */
+export declare const createAsyncQrl: <T>(qrl: QRL<AsyncFn<T>>, options?: AsyncSignalOptions<T>) => _AsyncSignalImpl<T>;
+
+/**
+ * Create a computed signal which is calculated from the given QRL. A computed signal is a signal
+ * which is calculated from other signals. When the signals change, the computed signal is
+ * recalculated.
+ *
+ * The QRL must be a function which returns the value of the signal. The function must not have side
+ * effects, and it must be synchronous.
+ *
+ * If you need the function to be async, use `createAsync$` instead (don't forget to use `track()`).
+ *
+ * @public
+ */
+export declare const createComputed$: <T>(qrl: () => T, options?: ComputedOptions) => ComputedReturnType<T>;
+
+/** @internal */
+export declare const createComputedQrl: <T>(qrl: QRL<() => T>, options?: ComputedOptions) => ComputedSignalImpl<T>;
+
+/**
+ * Create a context ID to be used in your application. The name should be written with no spaces.
+ *
+ * Context is a way to pass stores to the child components without prop-drilling.
+ *
+ * Use `createContextId()` to create a `ContextId`. A `ContextId` is just a serializable identifier
+ * for the context. It is not the context value itself. See `useContextProvider()` and
+ * `useContext()` for the values. Qwik needs a serializable ID for the context so that the it can
+ * track context providers and consumers in a way that survives resumability.
+ *
+ * ### Example
+ *
+ * ```tsx
+ * // Declare the Context type.
+ * interface TodosStore {
+ *   items: string[];
+ * }
+ * // Create a Context ID (no data is saved here.)
+ * // You will use this ID to both create and retrieve the Context.
+ * export const TodosContext = createContextId<TodosStore>('Todos');
+ *
+ * // Example of providing context to child components.
+ * export const App = component$(() => {
+ *   useContextProvider(
+ *     TodosContext,
+ *     useStore<TodosStore>({
+ *       items: ['Learn Qwik', 'Build Qwik app', 'Profit'],
+ *     })
+ *   );
+ *
+ *   return <Items />;
+ * });
+ *
+ * // Example of retrieving the context provided by a parent component.
+ * export const Items = component$(() => {
+ *   const todos = useContext(TodosContext);
+ *   return (
+ *     <ul>
+ *       {todos.items.map((item) => (
+ *         <li>{item}</li>
+ *       ))}
+ *     </ul>
+ *   );
+ * });
+ *
+ * ```
+ *
+ * @param name - The name of the context.
+ * @public
+ */
+export declare const createContextId: <STATE = unknown>(name: string) => ContextId<STATE>;
+
+/** @internal */
+export declare function _createDeserializeContainer(stateData: unknown[]): DeserializeContainer;
+
+/**
+ * Creates a QRL instance to represent a lazily loaded value. Normally this is a function, but it
+ * can be any value.
+ *
+ * When the value is a function, calling the returned qrl will load the underlying code when
+ * invoked, and call it with the captured scope. This always returns a promise since the code may
+ * not be loaded yet.
+ *
+ * To get the underlying function without invoking it, await `qrl.resolve()` and then `qrl.resolved`
+ * holds the loaded function, wrapped with the captured scope.
+ *
+ * @internal
+ */
+export declare const _createQRL: <TYPE>(chunk: string | null, symbol: string, symbolRef?: null | ValueOrPromise<TYPE>, symbolFn?: null | (() => Promise<Record<string, TYPE>>), captures?: QrlCaptures, container?: _Container) => _QRLInternal<TYPE>;
+
+/**
+ * Create a signal that holds a custom serializable value. See {@link useSerializer$} for more
+ * details.
+ *
+ * @public
+ */
+export declare const createSerializer$: <T, S>(arg: SerializerArg<T, S>) => T extends Promise<any> ? never : SerializerSignal<T>;
+
+/** @internal */
+export declare const createSerializerQrl: <T, S>(arg: QRL<{
+    serialize: (data: S | undefined) => T;
+    deserialize: (data: T) => S;
+    initial?: S;
+}>) => SerializerSignalImpl<T, S>;
+
+/**
+ * Creates a Signal with the given value. If no value is given, the signal is created with
+ * `undefined`.
+ *
+ * @public
+ */
+export declare const createSignal: {
+    <T>(): Signal<T | undefined>;
+    <T>(value: T): Signal<T>;
+};
+
+/** @internal */
+export declare function _createStore<T extends object>(container: _Container | null | undefined, obj: T, flags: _StoreFlags): T;
+
+/** @public */
+export declare interface CSSProperties extends CSS_2.Properties<string | number>, CSS_2.PropertiesHyphen<string | number> {
+    /**
+     * The index signature was removed to enable closed typing for style using CSSType. You're able to
+     * use type assertion or module augmentation to add properties or an index signature of your own.
+     *
+     * For examples and more information, visit:
+     * https://github.com/frenic/csstype#what-should-i-do-when-i-get-type-errors
+     */
+    [v: `--${string}`]: string | number | undefined;
+}
+
+/** @internal */
+export declare const _delay: (timeout: number) => Promise<unknown>;
+
+declare class DeleteOperation {
+    target: Element | Text;
+    constructor(target: Element | Text);
+}
+
+/**
+ * Deserialize data from string.
+ *
+ * @param rawStateData - Data to deserialize
+ * @internal
+ */
+export declare function _deserialize<T>(rawStateData: string): Promise<T>;
+
+declare interface DeserializeContainer {
+    $getObjectById$: (id: number | string) => unknown;
+    $getForwardRef$: (id: number) => number | string | undefined;
+    element: HTMLElement | null;
+    getSyncFn: (id: number) => (...args: unknown[]) => unknown;
+    $state$?: unknown[];
+    $storeProxyMap$: ObjToProxyMap;
+    $forwardRefs$: Array<number | string> | null;
+}
+
+/** @public */
+export declare interface DevJSX {
+    fileName: string;
+    lineNumber: number;
+    columnNumber: number;
+    stack?: string;
+}
+
+/** The Qwik-specific attributes that DOM elements accept @public */
+export declare interface DOMAttributes<EL extends Element> extends DOMAttributesBase<EL>, QwikEvents<EL> {
+    class?: ClassList | Signal<ClassList> | undefined;
+}
+
+declare interface DOMAttributesBase<EL extends Element> extends QwikIntrinsicAttributes, PreventDefault, StopPropagation, Capture, Passive, RefAttr<EL> {
+    dangerouslySetInnerHTML?: string | undefined;
+}
+
+/** @internal */
+declare class DomContainer extends _SharedContainer implements ClientContainer {
+    element: _ContainerElement;
+    qContainer: string;
+    qManifestHash: string;
+    rootVNode: _ElementVNode;
+    document: _QDocument;
+    $storeProxyMap$: ObjToProxyMap;
+    $qFuncs$: Array<(...args: unknown[]) => unknown>;
+    $instanceHash$: string;
+    $forwardRefs$: Array<number | string> | null;
+    vNodeLocate: (id: string | Element) => _VNode;
+    $containerDataProcessState$: ContainerDataProcessState;
+    $containerStateReadyCallbacks$: Array<() => void> | undefined;
+    $containerStateDataState$: unknown;
+    private $rawStateData$;
+    private $stateData$;
+    private $rootForwardRefs$;
+    private $styleIds$;
+    constructor(element: _ContainerElement);
+    $processContainerData$(): Generator<void, void, void>;
+    /** Tear down this container so stale references fail gracefully. */
+    $destroy$(): void;
+    /**
+     * The first time we render we need to hoist the styles. (Meaning we need to move all styles from
+     * component inline to <head>)
+     *
+     * We bulk move all of the styles, because the expensive part is for the browser to recompute the
+     * styles, (not the actual DOM manipulation.) By moving all of them at once we can minimize the
+     * reflow.
+     */
+    $hoistStyles$(): void;
+    $setRawState$(id: number, vParent: _VNode): void;
+    parseQRL<T = unknown>(qrlStr: string): QRL<T>;
+    handleError(err: any, host: _VNode | null): void;
+    setContext<T>(host: _VNode, context: ContextId<T>, value: T): void;
+    resolveContext<T>(host: _VNode, contextId: ContextId<T>): T | undefined;
+    getParentHost(host: _VNode): _VNode | null;
+    setHostProp<T>(host: _HostElement, name: string, value: T): void;
+    getHostProp<T>(host: _HostElement, name: string): T | null;
+    ensureProjectionResolved(vNode: _VirtualVNode): void;
+    $getObjectById$: (id: number | string) => unknown;
+    $getForwardRef$(id: number): number | string | undefined;
+    getSyncFn(id: number): (...args: unknown[]) => unknown;
+    $appendStyle$(content: string, styleId: string, host: _VirtualVNode, scoped: boolean): void;
+    /** Set the server data for the Qwik Router. */
+    private $setServerData$;
+}
+export { DomContainer }
+export { DomContainer as _DomContainer }
+
+declare type DomRef = {
+    $ssrNode$: ISsrNode;
+};
+
+/** @internal */
+export declare const _dumpState: (state: unknown[], color?: boolean, prefix?: string, limit?: number | null) => string;
+
+/** @internal */
+export declare const _eaC: (props: EachProps<any>) => JSXNode<unknown>;
+
+/** @public @experimental */
+export declare const Each: EachComponent;
+
+declare type EachComponent = <T, ITEM extends JSXOutput = JSXOutput>(props: PublicProps<EachProps<T, ITEM>>, key: string | null, flags: number, dev?: DevJSX) => JSXOutput;
+
+declare interface EachProps<T, ITEM extends JSXOutput = JSXOutput> {
+    items: readonly T[];
+    item$: QRL<(item: T, index: number) => ITEM>;
+    key$: QRL<(item: T, index: number) => string>;
+}
+
+/** @internal */
+export declare const _eaT: ({ track }: TaskCtx) => Promise<void>;
+
+/** @internal */
+export declare const _EFFECT_BACK_REF: unique symbol;
+
+declare type EffectBackRef = SignalImpl | StoreTarget | PropsProxy;
+
+/** @internal */
+export declare const enum _EffectProperty {
+    COMPONENT = ":",
+    VNODE = "."
+}
+
+/**
+ * An effect consumer plus type of effect, back references to producers and additional data
+ *
+ * An effect can be trigger by one or more of signal inputs. The first step of re-running an effect
+ * is to clear its subscriptions so that the effect can re add new set of subscriptions. In order to
+ * clear the subscriptions we need to store them here.
+ *
+ * Imagine you have effect such as:
+ *
+ * ```
+ * function effect1() {
+ *   console.log(signalA.value ? signalB.value : 'default');
+ * }
+ * ```
+ *
+ * In the above case the `signalB` needs to be unsubscribed when `signalA` is falsy. We do this by
+ * always clearing all of the subscriptions
+ *
+ * The `EffectSubscription` stores
+ *
+ * ```
+ * subscription1 = [effectConsumer1, EffectProperty.COMPONENT, Set[(signalA, signalB)]];
+ * ```
+ *
+ * The `signal1` and `signal2` back references are needed to "clear" existing subscriptions.
+ *
+ * Both `signalA` as well as `signalB` will have a reference to `subscription` to the so that the
+ * effect can be scheduled if either `signalA` or `signalB` triggers. The `subscription1` is shared
+ * between the signals.
+ *
+ * The second position `EffectProperty|string` store the property name of the effect.
+ *
+ * - Property name of the VNode
+ * - `EffectProperty.COMPONENT` if component
+ * - `EffectProperty.VNODE` if VNode
+ */
+declare class EffectSubscription {
+    consumer: Consumer;
+    property: _EffectProperty | string;
+    backRef: Set<EffectBackRef> | null;
+    data: _SubscriptionData | null;
+    constructor(consumer: Consumer, property: _EffectProperty | string, backRef?: Set<EffectBackRef> | null, data?: _SubscriptionData | null);
+}
+
+/** @internal */
+export declare const _ELEMENT_SEQ = "q:seq";
+
+/** @internal */
+export declare class _ElementVNode extends _VirtualVNode {
+    node: Element;
+    elementName: string | undefined;
+    constructor(key: string | null, flags: _VNodeFlags, parent: _ElementVNode | _VirtualVNode | null, previousSibling: _VNode | null | undefined, nextSibling: _VNode | null | undefined, props: Props | null, firstChild: _VNode | null | undefined, lastChild: _VNode | null | undefined, node: Element, elementName: string | undefined);
+}
+
+/** @internal */
+export declare const _EMPTY_ARRAY: any[];
+
+/** @internal */
+export declare const _EMPTY_OBJ: Record<string, any>;
+
+/** @public */
+export declare interface ErrorBoundaryStore {
+    error: any | undefined;
+}
+
+/** @public */
+export declare const event$: <T>(qrl: T) => QRL<T>;
+
+declare type EventCorrectionMap = {
+    auxclick: PointerEvent;
+    click: PointerEvent;
+    dblclick: PointerEvent;
+    input: InputEvent;
+    qvisible: QwikVisibleEvent;
+};
+
+declare type EventFromName<T extends string> = LcEvent<T>;
+
+/**
+ * A DOM event handler
+ *
+ * @public
+ */
+export declare type EventHandler<EV = Event, EL = Element> = {
+    bivarianceHack(event: EV, element: EL): any;
+}['bivarianceHack'];
+
+declare type EventQRL<T extends string = AllEventKeys> = QRL<EventHandler<EventFromName<T>, Element>> | undefined;
+
+/** @internal */
+export declare const eventQrl: <T>(qrl: QRL<T>) => QRL<T>;
+
+/** @internal */
+export declare function _executeSsrChores(container: SSRContainer, ssrNode: ISsrNode): ValueOrPromise<void>;
+
+declare type FilterBase<T> = {
+    [K in keyof T as K extends string ? K extends Uppercase<K> ? never : any extends T[K] ? never : false extends IsAcceptableDOMValue<T[K]> ? never : IsReadOnlyKey<T, K> extends true ? never : K extends UnwantedKeys ? never : K : never]?: T[K];
+};
+
+/** Only keep props that are specific to the element and make partial */
+declare type Filtered<T, A = {}> = {
+    [K in keyof Omit<FilterBase<T>, keyof HTMLAttributes<any> | keyof A>]?: T[K];
+};
+
+/** @internal */
+export declare const _fnSignal: <T extends (...args: any) => any>(fn: T, args: Parameters<T>, fnStr?: string) => WrappedSignalImpl<any>;
+
+/**
+ * Force a store to recompute and schedule effects.
+ *
+ * @public
+ */
+export declare const forceStoreEffects: (value: StoreTarget, prop: keyof StoreTarget) => void;
+
+/** @public */
+export declare const Fragment: FunctionComponent<{
+    children?: any;
+    key?: string | number | null;
+}>;
+
+/**
+ * Any function taking a props object that returns JSXOutput.
+ *
+ * The `key`, `flags` and `dev` parameters are for internal use.
+ *
+ * @public
+ */
+export declare type FunctionComponent<P = unknown> = {
+    renderFn(props: P, key: string | null, flags: number, dev?: DevJSX): JSXOutput;
+}['renderFn'];
+
+/** @internal */
+export declare const _getAsyncLocalStorage: () => (new <T>() => AsyncLocalStorage<T>) | undefined;
+
+/**
+ * Returns the client build manifest, which includes the mappings from symbols to bundles, the
+ * bundlegraph etc.
+ *
+ * @public
+ */
+export declare const getClientManifest: () => ServerQwikManifest | undefined;
+
+/** Used by the optimizer for spread props operations @internal */
+export declare const _getConstProps: (props: PropsProxy | Record<string, unknown> | null | undefined) => Props | null;
+
+/** @internal */
+export declare const _getContextContainer: () => _Container | undefined;
+
+/** @internal */
+export declare const _getContextEvent: () => unknown;
+
+/** @internal */
+export declare const _getContextHostElement: () => _HostElement | undefined;
+
+/** @public */
+declare function getDomContainer(element: Element): ClientContainer;
+export { getDomContainer as _getDomContainer }
+export { getDomContainer }
+
+/**
+ * Retrieve the current locale.
+ *
+ * If no current locale and there is no `defaultLocale` the function throws an error.
+ *
+ * @returns The locale.
+ * @public
+ */
+export declare function getLocale(defaultLocale?: string): string;
+
+/**
+ * Retrieve the `CorePlatform`.
+ *
+ * The `CorePlatform` is also responsible for retrieving the Manifest, that contains mappings from
+ * symbols to javascript import chunks. For this reason, `CorePlatform` can't be global, but is
+ * specific to the application currently running. On server it is possible that many different
+ * applications are running in a single server instance, and for this reason the `CorePlatform` is
+ * associated with the application document.
+ *
+ * @param docOrNode - The document (or node) of the application for which the platform is needed.
+ * @public
+ */
+export declare const getPlatform: () => CorePlatform;
+
+/** @internal */
+export declare function _getQContainerElement(element: Element): Element | null;
+
+/** @internal */
+export declare function _getSubscriber(effect: Consumer, prop: _EffectProperty | string, data?: _SubscriptionData): EffectSubscription;
+
+/** Used by the optimizer for spread props operations @internal */
+export declare const _getVarProps: (props: PropsProxy | Record<string, unknown> | null | undefined) => Props | null;
+
+/**
+ * The legacy transform, used by some JSX transpilers. The optimizer normally replaces this with
+ * optimized calls, with the same caveat as `jsx()`.
+ *
+ * @public
+ */
+declare function h<TYPE extends string | FunctionComponent<PROPS>, PROPS extends {} = {}>(type: TYPE, props?: PROPS | null, ...children: any[]): JSXNode<TYPE>;
+export { h as createElement }
+export { h }
+
+/**
+ * @returns True if the store has effects for the given prop
+ * @internal
+ */
+export declare const _hasStoreEffects: (value: StoreTarget, prop: keyof StoreTarget) => boolean;
+
+/**
+ * HMR event handler. The host VNode is captured at registration time via QRL captures.
+ *
+ * When called by the qwikloader or the test dispatch, `this` is the serialized captures string
+ * which we deserialize to get the host VNode. When called through `_qDispatch` (client-rendered),
+ * `_captures` is already set by `ensureQrlCaptures` in the QRL call chain.
+ *
+ * @internal
+ */
+export declare const _hmr: (this: string | undefined, event: CustomEvent<{
+    files: string[];
+    t: number;
+}>, element: Element) => void | Promise<void>;
+
+/** @internal */
+export declare type _HostElement = _VNode | ISsrNode;
+
+/** @public */
+declare type HTMLAttributeAnchorTarget = '_self' | '_blank' | '_parent' | '_top' | (string & {});
+
+/** @public */
+declare type HTMLAttributeReferrerPolicy = ReferrerPolicy;
+
+/** @public */
+declare interface HTMLAttributes<E extends Element> extends HTMLElementAttrs, DOMAttributes<E> {
+}
+
+declare interface HTMLAttributesBase extends AriaAttributes {
+    /** @deprecated Use `class` instead */
+    className?: ClassList | undefined;
+    contentEditable?: 'true' | 'false' | 'inherit' | undefined;
+    style?: CSSProperties | string | undefined;
+    role?: AriaRole | undefined;
+    about?: string | undefined;
+    datatype?: string | undefined;
+    inlist?: any;
+    property?: string | undefined;
+    resource?: string | undefined;
+    typeof?: string | undefined;
+    vocab?: string | undefined;
+    autoCapitalize?: 'none' | 'off' | 'sentences' | 'on' | 'words' | 'characters' | undefined;
+    autoCorrect?: string | undefined;
+    autoFocus?: boolean | undefined;
+    autoSave?: string | undefined;
+    hidden?: boolean | 'hidden' | 'until-found' | undefined;
+    itemProp?: string | undefined;
+    itemScope?: boolean | undefined;
+    itemType?: string | undefined;
+    itemID?: string | undefined;
+    itemRef?: string | undefined;
+    results?: number | undefined;
+    translate?: 'yes' | 'no' | undefined;
+    security?: string | undefined;
+    unselectable?: 'on' | 'off' | undefined;
+    /**
+     * Hints at the type of data that might be entered by the user while editing the element or its
+     * contents
+     *
+     * @see https://html.spec.whatwg.org/multipage/interaction.html#input-modalities:-the-inputmode-attribute
+     */
+    inputMode?: 'none' | 'text' | 'tel' | 'url' | 'email' | 'numeric' | 'decimal' | 'search' | undefined;
+    /**
+     * Specify that a standard HTML element should behave like a defined custom built-in element
+     *
+     * @see https://html.spec.whatwg.org/multipage/custom-elements.html#attr-is
+     */
+    is?: string | undefined;
+    popover?: 'manual' | 'auto' | undefined;
+}
+
+/** @public */
+declare type HTMLCrossOriginAttribute = 'anonymous' | 'use-credentials' | '' | undefined;
+
+/** @public */
+export declare interface HTMLElementAttrs extends HTMLAttributesBase, FilterBase<HTMLElement> {
+}
+
+/** @public */
+declare type HTMLInputAutocompleteAttribute = 'on' | 'off' | 'billing' | 'shipping' | 'name' | 'honorific-prefix' | 'given-name' | 'additional-name' | 'family-name' | 'honorific-suffix' | 'nickname' | 'username' | 'new-password' | 'current-password' | 'one-time-code' | 'organization-title' | 'organization' | 'street-address' | 'address-line1' | 'address-line2' | 'address-line3' | 'address-level4' | 'address-level3' | 'address-level2' | 'address-level1' | 'country' | 'country-name' | 'postal-code' | 'cc-name' | 'cc-given-name' | 'cc-additional-name' | 'cc-family-name' | 'cc-number' | 'cc-exp' | 'cc-exp-month' | 'cc-exp-year' | 'cc-csc' | 'cc-type' | 'transaction-currency' | 'transaction-amount' | 'language' | 'bday' | 'bday-day' | 'bday-month' | 'bday-year' | 'sex' | 'url' | 'photo';
+
+/** @public */
+declare type HTMLInputTypeAttribute = 'button' | 'checkbox' | 'color' | 'date' | 'datetime-local' | 'email' | 'file' | 'hidden' | 'image' | 'month' | 'number' | 'password' | 'radio' | 'range' | 'reset' | 'search' | 'submit' | 'tel' | 'text' | 'time' | 'url' | 'week' | (string & {});
+
+declare type IfEquals<X, Y, A, B> = (<T>() => T extends X ? 1 : 2) extends <T>() => T extends Y ? 1 : 2 ? A : B;
+
+/** @internal @deprecated v1 compat */
+export declare const _IMMUTABLE: unique symbol;
+
+/**
+ * Create a `____$(...)` convenience method from `___(...)`.
+ *
+ * It is very common for functions to take a lazy-loadable resource as a first argument. For this
+ * reason, the Qwik Optimizer automatically extracts the first argument from any function which ends
+ * in `$`.
+ *
+ * This means that `foo$(arg0)` and `foo($(arg0))` are equivalent with respect to Qwik Optimizer.
+ * The former is just a shorthand for the latter.
+ *
+ * For example, these function calls are equivalent:
+ *
+ * - `component$(() => {...})` is same as `component($(() => {...}))`
+ *
+ * ```tsx
+ * export function myApi(callback: QRL<() => void>): void {
+ *   // ...
+ * }
+ *
+ * export const myApi$ = implicit$FirstArg(myApi);
+ * // type of myApi$: (callback: () => void): void
+ *
+ * // can be used as:
+ * myApi$(() => console.log('callback'));
+ *
+ * // will be transpiled to:
+ * // FILE: <current file>
+ * myApi(qrl('./chunk-abc.js', 'callback'));
+ *
+ * // FILE: chunk-abc.js
+ * export const callback = () => console.log('callback');
+ * ```
+ *
+ * @param fn - A function that should have its first argument automatically `$`.
+ * @public
+ */
+export declare const implicit$FirstArg: <FIRST, REST extends any[], RET>(fn: (qrl: QRL<FIRST>, ...rest: REST) => RET) => ((qrl: FIRST, ...rest: REST) => RET);
+
+/**
+ * Inject a pre-loaded value into an AsyncSignal while preserving track() subscriptions. Calls
+ * `invalidate({ __v })` so the compute function reads the value from `info`, then triggers an
+ * immediate synchronous compute via the private $computeIfNeeded$() method (which is mangled in
+ * core builds, so callers from other packages must go through this helper).
+ *
+ * @internal
+ */
+export declare const _injectAsyncSignalValue: (signal: AsyncSignal<unknown>, value: unknown) => void;
+
+/**
+ * Create an inlined QRL. This is mostly useful on the server side for serialization.
+ *
+ * @param symbol - The object/function to register, or `null` to retrieve a previously registered
+ *   one by hash
+ * @param symbolName - The name of the symbol.
+ * @param lexicalScopeCapture - A set of lexically scoped variables to capture.
+ * @public
+ */
+export declare const inlinedQrl: <T>(symbol: T | null, symbolName: string, lexicalScopeCapture?: Readonly<unknown[]>) => QRL<T>;
+
+/** @internal */
+export declare const inlinedQrlDEV: <T = any>(symbol: T, symbolName: string, opts: QRLDev, lexicalScopeCapture?: Readonly<unknown[]>) => QRL<T>;
+
+declare class InsertOrMoveOperation {
+    target: Element | Text;
+    parent: Element;
+    beforeTarget: Element | Text | null;
+    constructor(target: Element | Text, parent: Element, beforeTarget: Element | Text | null);
+}
+
+/** @internal */
+declare type InternalServerComponent<PROPS = unknown> = FunctionComponent<PROPS> & {
+    [InternalServerComponentSymbol]: InternalServerComponentHandler;
+};
+
+/** @internal */
+declare type InternalServerComponentHandler = (ssr: SSRContainer, jsx: JSXNodeInternal, options: SSRRenderJSXOptions, enqueue: (value: StackValue) => void) => ValueOrPromise<void>;
+
+declare const InternalServerComponentSymbol: unique symbol;
+
+/**
+ * These are the HTML tags with handlers allowing plain callbacks, to be used for the JSX interface
+ *
+ * @public
+ */
+declare type IntrinsicHTMLElements = {
+    [key in keyof HTMLElementTagNameMap]: Augmented<HTMLElementTagNameMap[key], SpecialAttrs[key]> & HTMLAttributes<HTMLElementTagNameMap[key]>;
+} & {
+    /** For unknown tags we allow all props */
+    [unknownTag: string]: {
+        [prop: string]: any;
+    } & HTMLElementAttrs & HTMLAttributes<any>;
+};
+
+/**
+ * These are the SVG tags with handlers allowing plain callbacks, to be used for the JSX interface
+ *
+ * @public
+ */
+declare type IntrinsicSVGElements = {
+    [K in keyof Omit<SVGElementTagNameMap, keyof HTMLElementTagNameMap>]: LenientSVGProps<SVGElementTagNameMap[K]>;
+};
+
+/**
+ * Call a function with the given InvokeContext and given arguments.
+ *
+ * @internal
+ */
+export declare function _invoke<FN extends (...args: any[]) => any>(this: unknown, context: InvokeContext | undefined, fn: FN, ...args: Parameters<FN>): ReturnType<FN>;
+
+/** The shared state during an invoke() call */
+declare interface InvokeContext {
+    /** The Virtual parent component for the current component code */
+    $hostElement$: _HostElement | undefined;
+    /** The event we're currently handling */
+    $event$: PossibleEvents | undefined;
+    $effectSubscriber$: EffectSubscription | undefined;
+    $locale$: string | undefined;
+    $container$: _Container | undefined;
+}
+
+declare type IsAcceptableDOMValue<T> = T extends boolean | number | string | null | undefined ? ((...args: any[]) => any) extends T ? false : true : false;
+
+declare type IsAny<T> = 0 extends T & 1 ? true : false;
+
+export { isBrowser }
+
+export { isDev }
+
+/** @internal */
+export declare const _isJSXNode: <T>(n: unknown) => n is JSXNodeInternal<T>;
+
+declare type IsReadOnlyKey<T, K extends keyof T> = IfEquals<{
+    [Q in K]: T[K];
+}, {
+    -readonly [Q in K]: T[K];
+}, false, true>;
+
+export { isServer }
+
+/** @public */
+export declare const isSignal: (value: any) => value is Signal<unknown>;
+
+/** @internal */
+export declare interface ISsrComponentFrame {
+    componentNode: ISsrNode;
+    slots: (string | JSXChildren)[];
+    scopedStyleIds: Set<string>;
+    projectionScopedStyle: string | null;
+    projectionComponentFrame: ISsrComponentFrame | null;
+    projectionDepth: number;
+    consumeChildrenForSlot(projectionNode: ISsrNode, slotName: string): JSXChildren | null;
+    distributeChildrenIntoSlots(children: JSXChildren, parentScopedStyle: string | null, parentComponentFrame: ISsrComponentFrame | null): void;
+    hasSlot(slotName: string): boolean;
+}
+
+declare interface ISsrNode {
+    id: string;
+    flags: SsrNodeFlags;
+    dirty: ChoreBits;
+    parentComponent: ISsrNode | null;
+    children: ISsrNode[] | null;
+    vnodeData: VNodeData;
+    currentFile: string | null;
+    readonly [_EFFECT_BACK_REF]: Map<_EffectProperty | string, EffectSubscription> | null;
+    setProp(name: string, value: any): void;
+    getProp(name: string): any;
+    removeProp(name: string): void;
+    addChild(child: ISsrNode): void;
+    setTreeNonUpdatable(): void;
+}
+
+/** @internal */
+export declare const _isStore: (value: object) => boolean;
+
+/** @internal */
+export declare function _isStringifiable(value: unknown): value is _Stringifiable;
+
+/** @internal */
+export declare const _isTask: (value: any) => value is _Task;
+
+/** @internal */
+declare interface IStreamHandler {
+    flush(): ValueOrPromise<void>;
+    waitForPendingFlush(): ValueOrPromise<void>;
+    streamBlockStart(): void;
+    streamBlockEnd(): ValueOrPromise<void>;
+}
+
+/**
+ * Used by the JSX transpilers to create a JSXNode. Note that the optimizer will normally not use
+ * this, instead using _jsxSplit and _jsxSorted directly.
+ *
+ * The optimizer will also replace all `jsx()` calls with the more optimized versions.
+ *
+ * The exception is when the props are not a literal object, which can only happen when the `jsx`
+ * call is written directly.
+ *
+ * @public
+ */
+export declare const jsx: <T extends string | FunctionComponent<any>>(type: T, props: T extends FunctionComponent<infer PROPS> ? PROPS : Props, key?: string | number | null, _isStatic?: boolean, dev?: JsxDevOpts) => JSXNode<T>;
+
+/**
+ * @deprecated
+ * @internal
+ * No longer used since v2
+ */
+export declare const _jsxBranch: <T>(input?: T) => T | undefined;
+
+/** @internal @deprecated v1 compat */
+export declare const _jsxC: (type: any, mutable: any, _flags: any, key: any) => JSXNode<any>;
+
+/** @public */
+export declare type JSXChildren = string | number | boolean | null | undefined | Function | RegExp | JSXChildren[] | Promise<JSXChildren> | Signal<JSXChildren> | JSXNode;
+
+/**
+ * Alias of `jsx` for development purposes.
+ *
+ * @public
+ */
+export declare const jsxDEV: <T extends string | FunctionComponent<any>>(type: T, props: T extends FunctionComponent<infer PROPS> ? PROPS : Props, key?: string | number | null, _isStatic?: boolean, dev?: JsxDevOpts) => JSXNode<T>;
+
+declare interface JsxDevOpts {
+    fileName: string;
+    lineNumber: number;
+    columnNumber: number;
+}
+
+declare type JSXDocumentEvents = {
+    [K in keyof QwikDocumentEventMap as `document:on${PascalCaseName<K>}$`]: QwikDocumentEventMap[K];
+};
+
+declare type JSXElementEvents = {
+    [K in keyof QwikHTMLElementEventMap as `on${PascalCaseName<K>}$`]: QwikHTMLElementEventMap[K];
+};
+
+/**
+ * A JSX Node, an internal structure. You probably want to use `JSXOutput` instead.
+ *
+ * @public
+ */
+export declare interface JSXNode<T extends string | FunctionComponent | unknown = unknown> {
+    type: T;
+    props: T extends FunctionComponent<infer P> ? P : Record<any, unknown>;
+    children: JSXChildren | null;
+    key: string | null;
+    dev?: DevJSX;
+}
+
+declare const enum JSXNodeFlags {
+    None = 0,
+    StaticSubtree = 2,
+    HasCapturedProps = 4
+}
+
+declare class JSXNodeImpl<T = unknown> implements JSXNodeInternal<T> {
+    type: T;
+    children: JSXChildren;
+    flags: JSXNodeFlags;
+    toSort: boolean;
+    key: string | null;
+    varProps: Props;
+    constProps: Props | null;
+    dev?: DevJSX & {
+        stack: string | undefined;
+    };
+    _proxy: Props | null;
+    constructor(type: T, varProps: Props | null, constProps: Props | null, children: JSXChildren, flags: JSXNodeFlags, key: string | number | null | undefined, toSort?: boolean, dev?: DevJSX);
+    get props(): T extends FunctionComponent<infer PROPS> ? PROPS : Props;
+}
+
+/**
+ * The internal representation of a JSX Node.
+ *
+ * @internal
+ */
+export declare interface JSXNodeInternal<T extends string | FunctionComponent | unknown = unknown> extends JSXNode<T> {
+    /** The type of node */
+    type: T;
+    /** Do the varProps need sorting */
+    toSort: boolean;
+    /** The key property */
+    key: string | null;
+    /** Flags */
+    flags: JSXNodeFlags;
+    /**
+     * Props that are not guaranteed shallow equal across runs.
+     *
+     * Any prop that is in `constProps` takes precedence over `varProps`.
+     *
+     * Does not contain `children` or `key`.
+     *
+     * `onEvent$` props are normalized to the html `q-x:event` version
+     */
+    varProps: Props;
+    /**
+     * Props that will be shallow equal across runs. Does not contain any props that are in varProps.
+     *
+     * Any prop that is in `constProps` takes precedence over `varProps`.
+     *
+     * Does not contain `children` or `key`.
+     *
+     * `onEvent$` props are normalized to the html `q-x:event` version
+     */
+    constProps: Props | null;
+    /** The children of the node */
+    children: JSXChildren;
+    /** Filename etc for debugging */
+    dev?: DevJSX & {
+        stack: string | undefined;
+    };
+}
+
+/**
+ * Any valid output for a component
+ *
+ * @public
+ */
+export declare type JSXOutput = JSXNode | string | number | boolean | null | undefined | JSXOutput[];
+
+/** @internal @deprecated v1 compat */
+export declare const _jsxQ: (type: any, mutable: any, immutable: any, children: any, _flags: any, key: any) => JSXNode<any>;
+
+/** @internal @deprecated v1 compat */
+export declare const _jsxS: (type: any, mutable: any, immutable: any, _flags: any, key: any) => JSXNode<any>;
+
+/**
+ * Alias of `jsx` to support JSX syntax.
+ *
+ * @public
+ */
+export declare const jsxs: <T extends string | FunctionComponent<any>>(type: T, props: T extends FunctionComponent<infer PROPS> ? PROPS : Props, key?: string | number | null, _isStatic?: boolean, dev?: JsxDevOpts) => JSXNode<T>;
+
+/**
+ * Create a JSXNode with the properties fully split into variable and constant parts, and children
+ * separated out. Furthermore, the varProps must be a sorted object, that is, the keys must be
+ * sorted in ascending utf-8 value order.
+ *
+ * The constant parts are expected to be the same on every render, and are not checked for changes.
+ * This means that they are constant scalars or refs. When the ref is a signal or a store, it can
+ * still update the attribute on the vnode.
+ *
+ * @param type - The JSX type
+ * @param varProps - The properties of the tag, sorted, excluding children, key and any constProps
+ * @param constProps - The properties of the tag that are known to be constant references and don't
+ *   need checking for changes on re-render
+ * @param children - JSX children. Any `children` in the props objects are ignored.
+ * @internal
+ */
+export declare const _jsxSorted: <T>(type: T, varProps: Props | null, constProps: Props | null, children: JSXChildren | null, flags: number, key: string | number | null | undefined, dev?: DevJSX) => JSXNodeInternal<T>;
+
+/**
+ * Create a JSXNode, with the properties split into variable and constant parts, but the variable
+ * parts could include keys from `constProps`, as well as `key` and `children`.
+ *
+ * `constProps` cannot include `key` or `children`. The constant parts are expected to be the same
+ * on every render, and are not checked for changes. This means that they are constant scalars or
+ * refs. When the ref is a signal or a store, it can still update the attribute on the vnode.
+ *
+ * If `children` or `key` are defined, any `children`/`key` in the props will be ignored.
+ *
+ * @param type - The tag type
+ * @param varProps - The properties of the tag that could change, including children
+ * @param constProps - The properties of the tag that are known to be static and don't need checking
+ *   for changes on re-render
+ * @internal
+ */
+export declare const _jsxSplit: <T extends string | FunctionComponent<any>>(type: T, varProps: Props | null, constProps: Props | null, children: JSXChildren | null | undefined, flags: number, key?: string | number | null, dev?: DevJSX) => JSXNodeInternal<T>;
+
+/** @public */
+export declare type JSXTagName = keyof HTMLElementTagNameMap | Omit<string, keyof HTMLElementTagNameMap>;
+
+declare type JSXWindowEvents = {
+    [K in keyof QwikWindowEventMap as `window:on${PascalCaseName<K>}$`]: QwikWindowEventMap[K];
+};
+
+/**
+ * The names of events that Qwik knows about. They are all lowercase, but on the JSX side, they are
+ * PascalCase for nicer DX. (`onAuxClick$` vs `onauxclick$`)
+ *
+ * @public
+ */
+export declare type KnownEventNames = LiteralUnion<AllEventKeys, string>;
+
+/**
+ * Shared lazy-loading reference that holds module loading metadata. Multiple QRLs pointing to the
+ * same chunk+symbol can share a single LazyRef, differing only in their captured scope.
+ */
+declare class LazyRef<TYPE = unknown> {
+    readonly $chunk$: string | null;
+    readonly $symbol$: string;
+    readonly $symbolFn$: undefined | null | (() => Promise<Record<string, TYPE>>);
+    $ref$?: (null | ValueOrPromise<TYPE>) | undefined;
+    $container$: _Container | undefined;
+    dev?: QRLDev | null | undefined;
+    qrls?: Set<any>;
+    constructor($chunk$: string | null, $symbol$: string, $symbolFn$: undefined | null | (() => Promise<Record<string, TYPE>>), $ref$?: (null | ValueOrPromise<TYPE>) | undefined, container?: _Container | null);
+    /** We don't read hash very often so let's not allocate a string for every QRL */
+    get $hash$(): string;
+    $setRef$(ref: ValueOrPromise<TYPE>): void;
+    /** Load the raw module export without capture binding. */
+    $load$(): ValueOrPromise<TYPE>;
+}
+
+declare type LcEvent<T extends string, C extends string = Lowercase<T>> = C extends keyof AllEventsMap ? AllEventsMap[C] : Event;
+
+declare type LcEventNameMap = {
+    [name in PascalCaseNames as Lowercase<name>]: name;
+};
+
+/**
+ * These definitions are for the JSX namespace, they allow passing plain event handlers instead of
+ * QRLs
+ */
+declare interface LenientQwikElements extends IntrinsicHTMLElements, IntrinsicSVGElements {
+}
+
+/** @public */
+declare interface LenientSVGProps<T extends Element> extends SVGAttributes, DOMAttributes<T> {
+}
+
+/**
+ * Allows creating a union type by combining primitive types and literal types without sacrificing
+ * auto-completion in IDEs for the literal type part of the union.
+ *
+ * This type is a workaround for Microsoft/TypeScript#29729. It will be removed as soon as it's not
+ * needed anymore.
+ *
+ * Example:
+ *
+ * ```ts
+ * // Before
+ * type Pet = 'dog' | 'cat' | string;
+ *
+ * const pet: Pet = '';
+ * // Start typing in your TypeScript-enabled IDE.
+ * // You **will not** get auto-completion for `dog` and `cat` literals.
+ *
+ * // After
+ * type Pet2 = LiteralUnion<'dog' | 'cat', string>;
+ *
+ * const pet: Pet2 = '';
+ * // You **will** get auto-completion for `dog` and `cat` literals.
+ * ```
+ */
+declare type LiteralUnion<LiteralType, BaseType extends Primitive> = LiteralType | (BaseType & Record<never, never>);
+
+/** @internal */
+export declare const _mapApp_findIndx: <T>(array: (T | null)[], key: string, start: number) => number;
+
+/** @internal */
+export declare const _mapArray_get: <T>(array: (T | null)[], key: string, start: number) => T | null;
+
+/** @internal */
+export declare const _mapArray_set: <T>(array: (T | null)[], key: string, value: T | null, start: number, allowNullValue?: boolean) => void;
+
+/**
+ * Mark this signal as owned outside of the component that read it.
+ *
+ * Externally owned signals are preserved when found in a component's sequential scope during
+ * component cleanup.
+ *
+ * @internal
+ */
+export declare const _markSignalAsExternallyOwned: (signal: ComputedSignal<unknown>) => void;
+
+declare class MaybeAsyncSignal {
+}
+
+declare type MediaSpecialAttrs = {
+    crossOrigin?: HTMLCrossOriginAttribute;
+};
+
+/** @public @deprecated Use `AnimationEvent` and use the second argument to the handler function for the current event target */
+export declare type NativeAnimationEvent = AnimationEvent;
+
+/** @public @deprecated Use `ClipboardEvent` and use the second argument to the handler function for the current event target */
+export declare type NativeClipboardEvent = ClipboardEvent;
+
+/** @public @deprecated Use `CompositionEvent` and use the second argument to the handler function for the current event target */
+export declare type NativeCompositionEvent = CompositionEvent;
+
+/** @public @deprecated Use `DragEvent` and use the second argument to the handler function for the current event target */
+export declare type NativeDragEvent = DragEvent;
+
+/** @public @deprecated Use `FocusEvent` and use the second argument to the handler function for the current event target */
+export declare type NativeFocusEvent = FocusEvent;
+
+/** @public @deprecated Use `KeyboardEvent` and use the second argument to the handler function for the current event target */
+export declare type NativeKeyboardEvent = KeyboardEvent;
+
+/** @public @deprecated Use `MouseEvent` and use the second argument to the handler function for the current event target */
+export declare type NativeMouseEvent = MouseEvent;
+
+/** @public @deprecated Use `PointerEvent` and use the second argument to the handler function for the current event target */
+export declare type NativePointerEvent = PointerEvent;
+
+/** @public @deprecated Use `TouchEvent` and use the second argument to the handler function for the current event target */
+export declare type NativeTouchEvent = TouchEvent;
+
+/** @public @deprecated Use `TransitionEvent` and use the second argument to the handler function for the current event target */
+export declare type NativeTransitionEvent = TransitionEvent;
+
+/** @public @deprecated Use `UIEvent` and use the second argument to the handler function for the current event target */
+export declare type NativeUIEvent = UIEvent;
+
+/** @public @deprecated Use `WheelEvent` and use the second argument to the handler function for the current event target */
+export declare type NativeWheelEvent = WheelEvent;
+
+/** @internal */
+export declare function _newInvokeContext(locale?: string, hostElement?: _HostElement, event?: Exclude<PossibleEvents, typeof RenderEvent>): InvokeContext;
+
+declare interface NodePropData {
+    $scopedStyleIdPrefix$: string | null;
+    $isConst$: boolean;
+}
+
+/** @internal */
+export declare const _noopQrl: <T>(symbolName: string, lexicalScopeCapture?: Readonly<unknown[]>) => QRL<T>;
+
+/** @internal */
+export declare const _noopQrlDEV: <T>(symbolName: string, opts: QRLDev, lexicalScopeCapture?: Readonly<unknown[]>) => QRL<T>;
+
+/**
+ * Returned type of the `noSerialize()` function. It will be TYPE or undefined.
+ *
+ * @public
+ * @see noSerialize
+ */
+export declare type NoSerialize<T> = (T & {
+    __no_serialize__?: true;
+}) | undefined;
+
+/**
+ * Marks a property on a store as non-serializable.
+ *
+ * At times it is necessary to store values on a store that are non-serializable. Normally this is a
+ * runtime error as Store wants to eagerly report when a non-serializable property is assigned to
+ * it.
+ *
+ * You can use `noSerialize()` to mark a value as non-serializable. The value is persisted in the
+ * Store but does not survive serialization. The implication is that when your application is
+ * resumed, the value of this object will be `undefined`. You will be responsible for recovering
+ * from this.
+ *
+ * See: [noSerialize Tutorial](http://qwik.dev/tutorial/store/no-serialize)
+ *
+ * @public
+ */
+export declare const noSerialize: <T extends object | undefined>(input: T) => NoSerialize<T>;
+
+/**
+ * If an object has this property, it will not be serialized. Use this on prototypes to avoid having
+ * to call `noSerialize()` on every object.
+ *
+ * @public
+ */
+export declare const NoSerializeSymbol: unique symbol;
+
+/** @public */
+declare type Numberish = number | `${number}`;
+
+declare type ObjectProps<T> = IsAny<T> extends true ? any : unknown extends T ? never : T extends Record<any, any> ? T : never;
+
+declare type ObjToProxyMap = WeakMap<any, any>;
+
+declare type _Only$<P> = {
+    [K in keyof P as K extends `${string}$` ? K : never]: _AllowPlainQrl<P[K]>;
+};
+
+/** @public */
+export declare type OnRenderFn<PROPS> = (props: PROPS) => JSXOutput;
+
+/** @public */
+export declare interface OnVisibleTaskOptions {
+    /**
+     * The strategy to use to determine when the "VisibleTask" should first execute.
+     *
+     * - `intersection-observer`: the task will first execute when the element is visible in the
+     *   viewport, under the hood it uses the IntersectionObserver API.
+     * - `document-ready`: the task will first execute when the document is ready, under the hood it
+     *   uses the document `load` event.
+     * - `document-idle`: the task will first execute when the document is idle, under the hood it uses
+     *   the requestIdleCallback API.
+     */
+    strategy?: VisibleTaskStrategy;
+}
+
+/** @internal */
+declare type OutOfOrderRevealBoundary = {
+    attrs: string;
+    showFallback: boolean;
+    resolve: () => void;
+};
+
+/** @internal */
+declare class OutOfOrderRevealCoordinator<ITEM extends RevealItemLike = RevealItemLike> {
+    private id;
+    private collapsed;
+    private count;
+    private pendingItems;
+    private orderCode;
+    constructor(id: number, order: RevealOrder, collapsed: boolean);
+    register(registration: RevealRegistrationLike<ITEM>): OutOfOrderRevealBoundary;
+    canReveal(registration: RevealRegistrationLike<ITEM>): boolean;
+    script(): string;
+}
+
+/** @internal */
+declare const _OWNER: unique symbol;
+
+declare type PascalCaseName<T extends string> = T extends keyof LcEventNameMap ? LcEventNameMap[T] : Capitalize<T>;
+
+/**
+ * Capitalized multi-word names of some known events so we have nicer qwik attributes. For example,
+ * instead of `oncompositionEnd$` we can use `onCompositionEnd$`. Note that any capitalization
+ * works, so `oncompositionend$` is also valid. This is just for DX.
+ *
+ * Add any multi-word event names to this list. Single word events are automatically converted.
+ */
+declare type PascalCaseNames = 'AnimationEnd' | 'AnimationIteration' | 'AnimationStart' | 'AuxClick' | 'BeforeToggle' | 'CanPlay' | 'CanPlayThrough' | 'CompositionEnd' | 'CompositionStart' | 'CompositionUpdate' | 'ContextMenu' | 'DblClick' | 'DragEnd' | 'DragEnter' | 'DragExit' | 'DragLeave' | 'DragOver' | 'DragStart' | 'DurationChange' | 'FocusIn' | 'FocusOut' | 'FullscreenChange' | 'FullscreenError' | 'GotPointerCapture' | 'KeyDown' | 'KeyPress' | 'KeyUp' | 'LoadedData' | 'LoadedMetadata' | 'LoadEnd' | 'LoadStart' | 'LostPointerCapture' | 'MouseDown' | 'MouseEnter' | 'MouseLeave' | 'MouseMove' | 'MouseOut' | 'MouseOver' | 'MouseUp' | 'PointerCancel' | 'PointerDown' | 'PointerEnter' | 'PointerLeave' | 'PointerMove' | 'PointerOut' | 'PointerOver' | 'PointerUp' | 'QIdle' | 'QInit' | 'QResume' | 'QSymbol' | 'QVisible' | 'QViewTransition' | 'RateChange' | 'RateChange' | 'SecurityPolicyViolation' | 'SelectionChange' | 'SelectStart' | 'TimeUpdate' | 'TouchCancel' | 'TouchEnd' | 'TouchMove' | 'TouchStart' | 'TransitionCancel' | 'TransitionEnd' | 'TransitionRun' | 'TransitionStart' | 'VisibilityChange' | 'VolumeChange';
+
+declare type Passive = {
+    [K in keyof HTMLElementEventMap as `passive:${K}`]?: boolean;
+};
+
+declare type PopoverTargetAction = 'hide' | 'show' | 'toggle';
+
+declare type PossibleEvents = Event | SimplifiedServerRequestEvent | typeof TaskEvent | typeof RenderEvent;
+
+/**
+ * @deprecated This is no longer needed as the preloading happens automatically in qrl-class. You
+ *   can remove this component from your app.
+ * @alpha
+ */
+export declare const PrefetchGraph: (_opts?: {
+    base?: string;
+    manifestHash?: string;
+    manifestURL?: string;
+    nonce?: string;
+}) => JSXOutput;
+
+/**
+ * @deprecated This is no longer needed as the preloading happens automatically in qrl-class.ts.
+ *   Leave this in your app for a while so it uninstalls existing service workers, but don't use it
+ *   for new projects.
+ * @alpha
+ */
+export declare const PrefetchServiceWorker: (opts: {
+    base?: string;
+    scope?: string;
+    path?: string;
+    verbose?: boolean;
+    fetchBundleGraph?: boolean;
+    nonce?: string;
+}) => JSXOutput;
+
+/**
+ * Preprocess the state data to:
+ *
+ * - Replace RootRef with the actual object
+ * - Create a map for forward refs
+ * - Create an array of indexes for initial QRLs
+ *
+ * Before:
+ *
+ * ```
+ * 0 Object [
+ *   String "foo"
+ *   Object [
+ *     String "shared"
+ *     Number 1
+ *   ]
+ * ]
+ * 1 Object [
+ *   String "bar"
+ *   RootRef 2
+ * ]
+ * 2 RootRef "0 1"
+ * (59 chars)
+ * ```
+ *
+ * After:
+ *
+ * ```
+ * 0 Object [
+ *   String "foo"
+ *   RootRef 2
+ * ]
+ * 1 Object [
+ *   String "bar"
+ *   RootRef 2
+ * ]
+ * 2 Object [
+ *   String "shared"
+ *   Number 1
+ * ]
+ * (55 chars)
+ * ```
+ *
+ * @param data - The state data to preprocess
+ * @returns The preprocessed state data
+ * @internal
+ */
+export declare function _preprocessState(data: unknown[], container: DeserializeContainer, segmentId?: string, startIndex?: number): void;
+
+declare type Prettify<T> = {} & {
+    [K in keyof T]: T[K];
+};
+
+declare type PreventDefault = {
+    [K in keyof HTMLElementEventMap as `preventdefault:${K}`]?: boolean;
+};
+
+/** Matches any primitive value. */
+declare type Primitive = null | undefined | string | number | boolean | symbol | bigint;
+
+/**
+ * Alias for `QRL<T>`. Of historic relevance only.
+ *
+ * @public
+ */
+export declare type PropFunction<T> = QRL<T>;
+
+declare type Props = Record<string, unknown>;
+
+/** @internal */
+declare const _PROPS_HANDLER: unique symbol;
+
+/**
+ * Infers `Props` from the component or tag.
+ *
+ * @example
+ *
+ * ```tsx
+ * const Desc = component$(({desc, ...props}: { desc: string } & PropsOf<'div'>) => {
+ *  return <div {...props}>{desc}</div>;
+ * });
+ *
+ * const TitleBox = component$(({title, ...props}: { title: string } & PropsOf<Box>) => {
+ *   return <Box {...props}><h1>{title}</h1></Box>;
+ * });
+ * ```
+ *
+ * @public
+ */
+export declare type PropsOf<COMP> = COMP extends string ? COMP extends keyof QwikIntrinsicElements ? QwikIntrinsicElements[COMP] : QwikIntrinsicElements['span'] : NonNullable<COMP> extends never ? never : COMP extends FunctionComponent<infer PROPS> ? PROPS extends Record<any, infer V> ? IsAny<V> extends true ? never : ObjectProps<PROPS> : COMP extends Component<infer OrigProps> ? ObjectProps<OrigProps> : PROPS : never;
+
+declare type PropsProxy = {
+    [_VAR_PROPS]: Props;
+    [_CONST_PROPS]: Props | null;
+    [_OWNER]: JSXNodeInternal;
+    [_PROPS_HANDLER]: PropsProxyHandler;
+} & Record<string | symbol, unknown>;
+
+declare class PropsProxyHandler implements ProxyHandler<any> {
+    owner: JSXNodeImpl;
+    $effects$: undefined | Map<string | symbol, Set<EffectSubscription>>;
+    $container$: _Container | null;
+    constructor(owner: JSXNodeImpl);
+    get(_: any, prop: string | symbol): any;
+    set(_: any, prop: string | symbol, value: any): boolean;
+    deleteProperty(_: any, prop: string | symbol): boolean;
+    has(_: any, prop: string | symbol): boolean;
+    getOwnPropertyDescriptor(_: any, p: string | symbol): PropertyDescriptor | undefined;
+    ownKeys(): string[];
+}
+
+declare type PropType<T extends object, P extends keyof T> = P extends keyof T ? T[P] : 'value' extends keyof T ? T['value'] : never;
+
+/**
+ * Extends the defined component PROPS, adding the default ones (children and q:slot) and allowing
+ * plain functions to QRL arguments.
+ *
+ * @public
+ */
+export declare type PublicProps<PROPS> = (PROPS extends Record<any, any> ? Omit<PROPS, `${string}$`> & _Only$<PROPS> : unknown extends PROPS ? {} : PROPS) & ComponentBaseProps & ComponentChildren<PROPS>;
+
+/** @internal */
+export declare interface _QDocument extends Document {
+    qVNodeData: WeakMap<Element, string>;
+    /** True once root document VNode data has been scheduled at least once. */
+    qVNodeDataStarted?: boolean;
+    /** True when root, segment, and patch VNode data work is fully drained. */
+    qVNodeDataReady?: boolean;
+    /** Internal yielding state for queued VNode data jobs. */
+    qVNodeDataState?: unknown;
+    /** Callbacks waiting for root, segment, and patch VNode data work to drain. */
+    qVNodeDataCallbacks?: Array<() => void>;
+    /** True once the root document VNode data has been fully processed. */
+    qVNodeDataProcessed?: boolean;
+    /** Processes one vnode patch script. */
+    qProcessVNodeDataPatch?: (script: Element | null) => void;
+    /** Processes an out-of-order Suspense segment after its resolved HTML is swapped in. */
+    qProcessOOOS?: (boundaryId: number, content: Element | null) => void;
+}
+
+/**
+ * The `QRL` type represents a lazy-loadable AND serializable resource.
+ *
+ * QRL stands for Qwik URL.
+ *
+ * Use `QRL` when you want to refer to a lazy-loaded resource. `QRL`s are most often used for code
+ * (functions) but can also be used for other resources such as `string`s in the case of styles.
+ *
+ * `QRL` is an opaque token that is generated by the Qwik Optimizer. (Do not rely on any properties
+ * in `QRL` as it may change between versions.)
+ *
+ * ## Creating `QRL` references
+ *
+ * Creating `QRL` is done using `$(...)` function. `$(...)` is a special marker for the Qwik
+ * Optimizer that marks that the code should be extracted into a lazy-loaded symbol.
+ *
+ * ```tsx
+ * useOnDocument(
+ *   'mousemove',
+ *   $((event) => console.log('mousemove', event))
+ * );
+ * ```
+ *
+ * In the above code, the Qwik Optimizer detects `$(...)` and transforms the code as shown below:
+ *
+ * ```tsx
+ * // FILE: <current file>
+ * useOnDocument('mousemove', qrl('./chunk-abc.js', 'onMousemove'));
+ *
+ * // FILE: chunk-abc.js
+ * export const onMousemove = () => console.log('mousemove');
+ * ```
+ *
+ * NOTE: `qrl(...)` is a result of Qwik Optimizer transformation. You should never have to invoke
+ * this function directly in your application. The `qrl(...)` function should be invoked only after
+ * the Qwik Optimizer transformation.
+ *
+ * ## Using `QRL`s
+ *
+ * Use `QRL` type in your application when you want to get a lazy-loadable reference to a resource
+ * (most likely a function).
+ *
+ * ```tsx
+ * // Example of declaring a custom functions which takes callback as QRL.
+ * export function useMyFunction(callback: QRL<() => void>) {
+ *   doExtraStuff();
+ *   // The callback passed to `onDocument` requires `QRL`.
+ *   useOnDocument('mousemove', callback);
+ * }
+ * ```
+ *
+ * In the above example, the way to think about the code is that you are not asking for a callback
+ * function but rather a reference to a lazy-loadable callback function. Specifically, the function
+ * loading should be delayed until it is actually needed. In the above example, the function would
+ * not load until after a `mousemove` event on `document` fires.
+ *
+ * ## Resolving `QRL` references
+ *
+ * At times it may be necessary to resolve a `QRL` reference to the actual value. This can be
+ * performed using `QRL.resolve(..)` function.
+ *
+ * ```tsx
+ * // Assume you have QRL reference to a greet function
+ * const lazyGreet: QRL<() => void> = $(() => console.log('Hello World!'));
+ *
+ * // Use `qrlImport` to load / resolve the reference.
+ * const greet: () => void = await lazyGreet.resolve();
+ *
+ * //  Invoke it
+ * greet();
+ * ```
+ *
+ * NOTE: `element` is needed because `QRL`s are relative and need a base location to resolve
+ * against. The base location is encoded in the HTML in the form of `<div q:base="/url">`.
+ *
+ * ## `QRL.resolved`
+ *
+ * Once `QRL.resolve()` returns, the value is stored under `QRL.resolved`. This allows the value to
+ * be used without having to await `QRL.resolve()` again.
+ *
+ * ## Question: Why not just use `import()`?
+ *
+ * At first glance, `QRL` serves the same purpose as `import()`. However, there are three subtle
+ * differences that need to be taken into account.
+ *
+ * 1. `QRL`s must be serializable into HTML.
+ * 2. `QRL`s must be resolved by framework relative to `q:base`.
+ * 3. `QRL`s must be able to capture lexically scoped variables.
+ * 4. `QRL`s encapsulate the difference between running with and without Qwik Optimizer.
+ * 5. `QRL`s allow expressing lazy-loaded boundaries without thinking about chunk and symbol names.
+ *
+ * Let's assume that you intend to write code such as this:
+ *
+ * ```tsx
+ * return <button onClick={() => (await import('./chunk-abc.js')).onClick}>
+ * ```
+ *
+ * The above code needs to be serialized into DOM such as:
+ *
+ * ```
+ * <div q:base="/build/">
+ *   <button q-e:click="./chunk-abc.js#onClick">...</button>
+ * </div>
+ * ```
+ *
+ * 1. Notice there is no easy way to extract chunk (`./chunk-abc.js`) and symbol (`onClick`) into HTML.
+ * 2. Notice that even if you could extract it, the `import('./chunk-abc.js')` would become relative to
+ *    where the `import()` file is declared. Because it is our framework doing the load, the
+ *    `./chunk-abc.js` would become relative to the framework file. This is not correct, as it
+ *    should be relative to the original file generated by the bundler.
+ * 3. Next, the framework needs to resolve the `./chunk-abc.js` and needs a base location that is
+ *    encoded in the HTML.
+ * 4. The QRL needs to be able to capture lexically scoped variables. (`import()` only allows loading
+ *    top-level symbols which don't capture variables.)
+ * 5. As a developer, you don't want to think about `import` and naming the chunks and symbols. You
+ *    just want to say: "this should be lazy."
+ *
+ * These are the main reasons why Qwik introduces its own concept of `QRL`.
+ *
+ * @public
+ * @see `$`
+ */
+export declare type QRL<TYPE = unknown> = {
+    __qwik_serializable__?: any;
+    __brand__QRL__?: TYPE;
+    /** Resolve the QRL and return the actual value. */
+    resolve(): Promise<TYPE>;
+    /** The resolved value, once `resolve()` returns. */
+    resolved: undefined | TYPE;
+    getCaptured(): unknown[] | null;
+    getSymbol(): string;
+    getHash(): string;
+    dev?: QRLDev | null;
+} & BivariantQrlFn<QrlArgs<TYPE>, QrlReturn<TYPE>>;
+
+/**
+ * Used by Qwik Optimizer to point to lazy-loaded resources.
+ *
+ * This function should be used by the Qwik Optimizer only. The function should not be directly
+ * referred to in the source code of the application.
+ *
+ * @param chunkOrFn - Chunk name (or function which is stringified to extract chunk name)
+ * @param symbol - Symbol to lazy load
+ * @param lexicalScopeCapture - A set of lexically scoped variables to capture.
+ * @public
+ * @see `QRL`, `$(...)`
+ */
+export declare const qrl: <T = any>(chunkOrFn: string | (() => Promise<any>), symbol: string, lexicalScopeCapture?: Readonly<unknown[]> | null, stackOffset?: number) => QRL<T>;
+
+declare type QrlArgs<T> = T extends (...args: infer ARGS) => any ? ARGS : unknown[];
+
+declare type QrlCaptures = Readonly<unknown[]> | string | null;
+
+/** @public */
+declare interface QRLDev {
+    file: string;
+    lo: number;
+    hi: number;
+}
+
+/** @internal */
+export declare const qrlDEV: <T = any>(chunkOrFn: string | (() => Promise<any>), symbol: string, opts: QRLDev, lexicalScopeCapture?: Readonly<unknown[]>) => QRL<T>;
+
+/**
+ * An event handler for Qwik events, can be a handler QRL or an array of handler QRLs.
+ *
+ * @public
+ */
+export declare type QRLEventHandlerMulti<EV extends Event, EL> = QRL<EventHandler<EV, EL>> | undefined | null | QRLEventHandlerMulti<EV, EL>[];
+
+/** @internal */
+export declare type _QRLInternal<TYPE = unknown> = QRL<TYPE> & QRLInternalMethods<TYPE>;
+
+declare type QRLInternalMethods<TYPE> = {
+    readonly $chunk$: string | null;
+    readonly $symbol$: string;
+    readonly $hash$: string;
+    /** Captures are stored lazily after deserialization. */
+    readonly $captures$?: QrlCaptures;
+    dev?: QRLDev | null;
+    resolve(container?: _Container): Promise<TYPE>;
+    resolved: undefined | TYPE;
+    getSymbol(): string;
+    getHash(): string;
+    getCaptured(): unknown[] | null;
+    getFn(currentCtx?: InvokeContext, 
+    /** If this returns false, the function execution will be skipped */
+    beforeFn?: () => void | false): TYPE extends (...args: any) => any ? (...args: Parameters<TYPE>) => ValueOrPromise<ReturnType<TYPE> | undefined> : unknown;
+    $callFn$(withThis: unknown, ...args: QrlArgs<TYPE>): ValueOrPromise<QrlReturn<TYPE>>;
+    $setDev$(dev: QRLDev | null): void;
+    /**
+     * "with captures" - Get a new QRL for these captures, reusing the lazy ref. It's an internal
+     * method but we need to have a stable name because it gets called in user code by the optimizer,
+     * after the $name$ props are mangled
+     */
+    w(captures: QrlCaptures): _QRLInternal<TYPE>;
+    /**
+     * "set ref" - Set the ref of the QRL. It's an internal method but we need to have a stable name
+     * because it gets called in user code by the optimizer, after the $name$ props are mangled
+     */
+    s(ref: ValueOrPromise<TYPE>): void;
+    /**
+     * Needed for deserialization and importing. We don't always have the container while creating
+     * qrls in async sections of code
+     */
+    readonly $container$?: _Container | null;
+    /** The shared lazy-loading reference */
+    readonly $lazy$: LazyRef<TYPE>;
+};
+
+declare type QrlReturn<T> = T extends (...args: any) => infer R ? Awaited<R> : unknown;
+
+/**
+ * Extract function into a synchronously loadable QRL.
+ *
+ * NOTE: Synchronous QRLs functions can't close over any variables, including exports.
+ *
+ * @param fn - Extracted function
+ * @param serializedFn - Serialized function in string form.
+ * @returns
+ * @internal
+ */
+export declare const _qrlSync: <TYPE extends Function>(fn: TYPE, serializedFn?: string) => SyncQRL<TYPE>;
+
+/** @internal */
+export declare function _qrlToString(serializationContext: SerializationContext, qrl: _QRLInternal | SyncQRLInternal): string;
+
+/** @internal */
+export declare function _qrlToString(serializationContext: SerializationContext, qrl: _QRLInternal | SyncQRLInternal, raw: true): [string, string, string | null];
+
+/** @internal */
+export declare const _qrlWithChunk: <T = any>(chunk: string, importer: () => Promise<any>, symbol: string, lexicalScopeCapture?: Readonly<unknown[]>) => QRL<T>;
+
+/** @internal */
+export declare const _qrlWithChunkDEV: <T = any>(chunk: string, importer: () => Promise<any>, symbol: string, opts: QRLDev, lexicalScopeCapture?: Readonly<unknown[]>) => QRL<T>;
+
+/** @public @deprecated Use `AnimationEvent` and use the second argument to the handler function for the current event target */
+export declare type QwikAnimationEvent<T = Element> = NativeAnimationEvent;
+
+/** The Qwik DOM attributes without plain handlers, for use as function parameters @public */
+export declare interface QwikAttributes<EL extends Element> extends DOMAttributesBase<EL>, QwikEvents<EL, false> {
+    class?: ClassList | undefined;
+}
+
+/** @public @deprecated Use `Event` and use the second argument to the handler function for the current event target. Also note that in Qwik, onInput$ with the InputEvent is the event that behaves like onChange in React. */
+export declare type QwikChangeEvent<T = Element> = Event;
+
+/** @public @deprecated Use `ClipboardEvent` and use the second argument to the handler function for the current event target */
+export declare type QwikClipboardEvent<T = Element> = NativeClipboardEvent;
+
+/** @public @deprecated Use `CompositionEvent` and use the second argument to the handler function for the current event target */
+export declare type QwikCompositionEvent<T = Element> = NativeCompositionEvent;
+
+declare type QwikCustomEventsPlain<EL> = {
+    /** The handler */
+    [key: `${'document:' | 'window:' | ''}on${string}$`]: QRLEventHandlerMulti<Event, EL> | EventHandler<Event, EL>;
+};
+
+declare type QwikDocumentEventMap = Omit<DocumentEventMap, keyof QwikHTMLElementEventMap> & Omit<QwikHTMLElementEventMap, 'qvisible' | 'focus' | 'blur'> & {
+    qidle: QwikIdleEvent;
+    qinit: QwikInitEvent;
+    qsymbol: QwikSymbolEvent;
+    qresume: QwikResumeEvent;
+    qviewtransition: QwikViewTransitionEvent;
+};
+
+/** @public */
+export declare interface QwikDOMAttributes extends DOMAttributes<Element> {
+}
+
+/** @public @deprecated Use `DragEvent` and use the second argument to the handler function for the current event target */
+export declare type QwikDragEvent<T = Element> = NativeDragEvent;
+
+/** @public */
+declare type QwikEvents<EL, Plain extends boolean = true> = Plain extends true ? QwikKnownEventsPlain<EL> & QwikCustomEventsPlain<EL> : QwikKnownEvents<EL>;
+
+/** @public @deprecated Use `FocusEvent` and use the second argument to the handler function for the current event target */
+export declare type QwikFocusEvent<T = Element> = NativeFocusEvent;
+
+declare type QwikHTMLElementEventMap = Omit<HTMLElementEventMap, keyof EventCorrectionMap> & EventCorrectionMap;
+
+/**
+ * The DOM props without plain handlers, for use inside functions
+ *
+ * @public
+ */
+export declare type QwikHTMLElements = {
+    [tag in keyof HTMLElementTagNameMap]: Augmented<HTMLElementTagNameMap[tag], SpecialAttrs[tag]> & HTMLElementAttrs & QwikAttributes<HTMLElementTagNameMap[tag]>;
+};
+
+/** Emitted by qwik-loader on document when the document first becomes idle @public */
+export declare type QwikIdleEvent = CustomEvent<{}>;
+
+/** Emitted by qwik-loader on document when the document first becomes interactive @public */
+export declare type QwikInitEvent = CustomEvent<{}>;
+
+/** @public */
+declare interface QwikIntrinsicAttributes {
+    key?: string | number | null | undefined;
+    children?: JSXChildren;
+    /** Corresponding slot name used to project the element into. */
+    'q:slot'?: string;
+    'q:shadowRoot'?: boolean;
+    fetchPriority?: 'auto' | 'high' | 'low';
+}
+
+/**
+ * The interface holds available attributes of both native DOM elements and custom Qwik elements. An
+ * example showing how to define a customizable wrapper component:
+ *
+ * ```tsx
+ * import { component$, Slot, type QwikIntrinsicElements } from "@qwik.dev/core";
+ *
+ * type WrapperProps = {
+ *   attributes?: QwikIntrinsicElements["div"];
+ * };
+ *
+ * export default component$<WrapperProps>(({ attributes }) => {
+ *   return (
+ *     <div {...attributes} class="p-2">
+ *       <Slot />
+ *     </div>
+ *   );
+ * });
+ * ```
+ *
+ * Note: It is shorter to use `PropsOf<'div'>`
+ *
+ * @public
+ */
+export declare interface QwikIntrinsicElements extends QwikHTMLElements, QwikSVGElements {
+}
+
+/** @public @deprecated Use `Event` and use the second argument to the handler function for the current event target */
+export declare type QwikInvalidEvent<T = Element> = Event;
+
+/** @public */
+declare namespace QwikJSX {
+    type Element = JSXOutput;
+    type ElementType = string | FunctionComponent<Record<any, any>>;
+    interface IntrinsicAttributes extends QwikIntrinsicAttributes {
+    }
+    interface ElementChildrenAttribute {
+        children: JSXChildren;
+    }
+    interface IntrinsicElements extends LenientQwikElements {
+    }
+}
+export { QwikJSX as JSX }
+export { QwikJSX }
+
+declare type QwikJSXEvents = JSXElementEvents & JSXDocumentEvents & JSXWindowEvents;
+
+/** @public @deprecated Use `KeyboardEvent` and use the second argument to the handler function for the current event target */
+export declare type QwikKeyboardEvent<T = Element> = NativeKeyboardEvent;
+
+declare type QwikKnownEvents<EL> = {
+    [K in keyof QwikJSXEvents]?: QRLEventHandlerMulti<QwikJSXEvents[K], EL>;
+};
+
+declare type QwikKnownEventsPlain<EL> = {
+    [K in keyof QwikJSXEvents]?: QRLEventHandlerMulti<QwikJSXEvents[K], EL> | EventHandler<QwikJSXEvents[K], EL>;
+};
+
+/** @public @deprecated Use `MouseEvent` and use the second argument to the handler function for the current event target */
+export declare type QwikMouseEvent<T = Element, E = NativeMouseEvent> = E;
+
+/** @public @deprecated Use `PointerEvent` and use the second argument to the handler function for the current event target */
+export declare type QwikPointerEvent<T = Element> = NativePointerEvent;
+
+/**
+ * Emitted by qwik-core on the container element when it resumes from a paused state. You cannot put
+ * a Qwik event handler on the container so you must listen on the document instead. @public
+ */
+export declare type QwikResumeEvent = CustomEvent<{}>;
+
+/** @public @deprecated Use `SubmitEvent` and use the second argument to the handler function for the current event target */
+export declare type QwikSubmitEvent<T = Element> = SubmitEvent;
+
+/**
+ * The SVG props without plain handlers, for use inside functions
+ *
+ * @public
+ */
+export declare type QwikSVGElements = {
+    [K in keyof Omit<SVGElementTagNameMap, keyof HTMLElementTagNameMap>]: SVGProps<SVGElementTagNameMap[K]>;
+};
+
+/** Emitted by qwik-loader on document when a module was lazily loaded @public */
+export declare type QwikSymbolEvent = CustomEvent<{
+    symbol: string;
+    element: Element;
+    reqTime: number;
+    qBase?: string;
+    href?: string;
+}>;
+
+/** @public @deprecated Use `TouchEvent` and use the second argument to the handler function for the current event target */
+export declare type QwikTouchEvent<T = Element> = NativeTouchEvent;
+
+/** @public @deprecated Use `TransitionEvent` and use the second argument to the handler function for the current event target */
+export declare type QwikTransitionEvent<T = Element> = NativeTransitionEvent;
+
+/** @public @deprecated Use `UIEvent` and use the second argument to the handler function for the current event target */
+export declare type QwikUIEvent<T = Element> = NativeUIEvent;
+
+/** Emitted by qwik-core on document when the a view transition start @public */
+export declare type QwikViewTransitionEvent = CustomEvent<ViewTransition>;
+
+/**
+ * Handled by qwik-loader when an element becomes visible. Used by `useVisibleTask$`. Does not
+ * bubble. @public
+ */
+export declare type QwikVisibleEvent = CustomEvent<IntersectionObserverEntry>;
+
+/** @public @deprecated Use `WheelEvent` and use the second argument to the handler function for the current event target */
+export declare type QwikWheelEvent<T = Element> = NativeWheelEvent;
+
+declare type QwikWindowEventMap = Omit<WindowEventHandlersEventMap, keyof QwikDocumentEventMap> & QwikDocumentEventMap;
+
+/**
+ * @deprecated Use `Readonly<Signal<T>>` instead.
+ * @public
+ */
+export declare interface ReadonlySignal<T = unknown> {
+    readonly value: T;
+}
+
+/** @internal */
+export declare const _reC: (props: RevealProps) => JSXNodeInternal<InternalServerComponent<SSRRevealSlotProps>> | JSXNodeInternal<FunctionComponent<    {
+name?: string;
+children?: JSXChildren;
+}>>;
+
+/**
+ * A ref can be either a signal or a function. Note that the type of Signal is Element so that it
+ * can accept more specialized elements too
+ *
+ * @public
+ */
+declare type Ref<EL extends Element = Element> = Signal<Element | undefined> | RefFnInterface<EL>;
+
+declare interface RefAttr<EL extends Element> {
+    ref?: Ref<EL> | undefined;
+}
+
+declare type RefFnInterface<EL> = {
+    (el: EL): void;
+};
+
+/**
+ * Register a QRL symbol globally for lookup by its hash. This is used by the optimizer to register
+ * the names passed in `reg_ctx_name`.
+ *
+ * @internal
+ */
+export declare const _regSymbol: (symbol: any, hash: string) => any;
+
+declare class RemoveAllChildrenOperation {
+    target: Element;
+    constructor(target: Element);
+}
+
+/**
+ * Remove an external projection from its parent and clean up.
+ *
+ * @internal
+ */
+export declare function _removeProjection(container: _Container, parentVNode: _VirtualVNode, vnode: _VirtualVNode, slotName: string): void;
+
+/**
+ * Render JSX.
+ *
+ * Use this method to render JSX. This function does reconciling which means it always tries to
+ * reuse what is already in the DOM (rather then destroy and recreate content.) It returns a cleanup
+ * function you could use for cleaning up subscriptions.
+ *
+ * @param parent - Element which will act as a parent to `jsxNode`. When possible the rendering will
+ *   try to reuse existing nodes.
+ * @param jsxNode - JSX to render
+ * @returns An object containing a cleanup function.
+ * @public
+ */
+export declare const render: (parent: Element | Document, jsxNode: JSXOutput | FunctionComponent<any>, opts?: RenderOptions) => Promise<RenderResult>;
+
+declare const RenderEvent = "qRender";
+
+/** @public */
+export declare const RenderOnce: FunctionComponent<{
+    children?: unknown;
+    key?: string | number | null | undefined;
+}>;
+
+/** @internal */
+/** @internal */
+/** @public */
+export declare interface RenderOptions {
+    serverData?: Record<string, any>;
+}
+
+/** @public */
+export declare interface RenderResult {
+    cleanup(): void;
+}
+
+/** @public */
+export declare interface RenderSSROptions {
+    containerTagName: string;
+    containerAttributes: Record<string, string>;
+    stream: StreamWriter;
+    base?: string;
+    serverData?: Record<string, any>;
+    manifestHash: string;
+}
+
+/** @internal */
+export declare const _reR: () => boolean;
+
+/**
+ * Resumes selected state (e.g. polling AsyncSignals) by deserializing captures. Used for
+ * document:onQIdle to resume async signals with active polling.
+ *
+ * @internal
+ */
+export declare function _res(this: string | undefined, _: any, element: Element): void | Promise<void>;
+
+/** @internal */
+export declare const _resolveContextWithoutSequentialScope: <STATE>(context: ContextId<STATE>) => STATE | undefined;
+
+/**
+ * ```tsx
+ * const Cmp = component$(() => {
+ *   const city = useSignal('');
+ *
+ *   const weather = useAsync$(async ({ track, cleanup, abortSignal }) => {
+ *     const cityName = track(city);
+ *     const res = await fetch(`http://weatherdata.com?city=${cityName}`, {
+ *       signal: abortSignal,
+ *     });
+ *     const temp = (await res.json()) as { temp: number };
+ *     return temp;
+ *   });
+ *
+ *   return (
+ *     <div>
+ *       <input name="city" bind:value={city} />
+ *       <div>
+ *         Temperature:{' '}
+ *         {weather.loading
+ *           ? 'Loading...'
+ *           : weather.error
+ *             ? `Error: ${weather.error.message}`
+ *             : weather.value.temp}
+ *       </div>
+ *     </div>
+ *   );
+ * });
+ * ```
+ *
+ * @deprecated Use `useAsync$` instead, which is more efficient, and has a more flexible API. Just
+ *   read the `loading` and `error` properties from the returned signal to determine the status.
+ * @public
+ */
+export declare const Resource: <T>({ value, onResolved, onPending, onRejected, }: ResourceProps<T>) => JSXOutput;
+
+/** @public */
+export declare interface ResourceCtx<T = unknown> extends AsyncCtx<T> {
+    /** @deprecated Does not do anything */
+    cache(policyOrMilliseconds: number | 'immutable'): void;
+}
+
+/** @public */
+export declare type ResourceFn<T> = (ctx: ResourceCtx) => ValueOrPromise<T>;
+
+/**
+ * Options to pass to `useResource$()`
+ *
+ * @public
+ * @see useResource
+ */
+export declare interface ResourceOptions {
+    /**
+     * Timeout in milliseconds. If the resource takes more than the specified millisecond, it will
+     * timeout. Resulting on a rejected resource.
+     */
+    timeout?: number;
+}
+
+/** @public */
+export declare type ResourcePending<T> = ResourceReturn<T>;
+
+/** @public */
+export declare interface ResourceProps<T> {
+    readonly value: ResourceReturn<T> | Signal<Promise<T> | T> | Promise<T>;
+    onResolved: (value: T) => JSXOutput | Promise<JSXOutput>;
+    onPending?: () => JSXOutput | Promise<JSXOutput>;
+    onRejected?: (reason: Error) => JSXOutput | Promise<JSXOutput>;
+}
+
+/** @public */
+export declare type ResourceRejected<T> = ResourceReturn<T>;
+
+/** @public */
+export declare type ResourceResolved<T> = ResourceReturn<T>;
+
+/** @public */
+export declare type ResourceReturn<T> = {
+    readonly value: Promise<T>;
+    readonly loading: boolean;
+};
+
+declare interface ResourceReturnInternal<T> {
+    __brand: 'resource';
+    value: Promise<T>;
+    loading: boolean;
+    signal: AsyncSignal<{
+        r: T;
+    }>;
+}
+
+/** @internal */
+export declare const _restProps: (props: PropsProxy, omit?: string[], target?: Props) => Props;
+
+/** @internal */
+export declare const _reT: ({ cleanup }: TaskCtx) => void;
+
+/**
+ * Retries a function that throws a promise. If you pass `onError`, you're responsible for handling
+ * errors.
+ *
+ * @internal
+ */
+export declare function _retryOnPromise<T>(fn: () => ValueOrPromise<T>, onError?: (e: any) => ValueOrPromise<T>): ValueOrPromise<T>;
+
+/** @public @experimental */
+export declare const Reveal: typeof _reC;
+
+declare interface RevealItemLike {
+    boundary: {
+        pending: {
+            untrackedValue: number;
+        };
+    };
+}
+
+/** @public @experimental */
+export declare type RevealOrder = 'parallel' | 'sequential' | 'reverse' | 'together';
+
+/** @public @experimental */
+export declare type RevealProps = {
+    order?: RevealOrder;
+    collapsed?: boolean;
+};
+
+declare interface RevealRegistrationLike<ITEM extends RevealItemLike = RevealItemLike> {
+    reveal: {
+        order: RevealOrder;
+        items: ITEM[];
+    };
+    item: ITEM;
+}
+
+/**
+ * The resource function wrapper
+ *
+ * @internal
+ */
+export declare const _rsc: <T>(arg: ResourceCtx<T>) => Promise<{
+    r: T;
+}>;
+
+/**
+ * This is called by qwik-loader to run a QRL. It has to be synchronous when possible.
+ *
+ * @internal
+ */
+export declare function _run(this: string, event: Event, element: Element): ValueOrPromise<unknown>;
+
+/** Stores the location of an object. If no parent, it's a root. */
+declare type SeenRef = {
+    $index$: number;
+    $parent$?: SeenRef | null;
+};
+
+declare interface SegmentRenderContext {
+    container: SSRSegmentContainer;
+    writer: SSRInternalStreamWriter;
+    htmlChunks: SSRSegmentWriteChunk[];
+}
+
+declare interface SerializationContext {
+    $serialize$: () => ValueOrPromise<void>;
+    $serializePatch$: (rootStart: number, rootIds: number[], extraRootId?: number | string | number[], streamedRootLimit?: number) => ValueOrPromise<void>;
+    $symbolToChunkResolver$: SymbolToChunkResolver;
+    /**
+     * Map from object to parent and index reference.
+     *
+     * If object is found in `objMap` will return the parent reference and index path.
+     *
+     * `objMap` return:
+     *
+     * - `{ parent, index }` - The parent object and the index within that parent.
+     * - `undefined` - Object has not been seen yet.
+     */
+    getSeenRef: (obj: unknown) => SeenRef | undefined;
+    /** Returns the root index of the object, if it is a root. Otherwise returns undefined. */
+    $hasRootId$: (obj: unknown) => number | undefined;
+    /**
+     * Root objects which need to be serialized.
+     *
+     * Roots are entry points into the object graph. Typically the roots are held by the listeners.
+     *
+     * Returns the index of the root object.
+     */
+    $addRoot$: AddRootFn;
+    $addDuplicateRoot$: (obj: unknown) => SeenRef;
+    $commitRoot$: (root: unknown, obj: unknown) => number;
+    /** Mark an object as seen during serialization. This is used to handle backreferences and cycles */
+    $markSeen$: (obj: unknown, parent: SeenRef | undefined, index: number) => SeenRef;
+    $roots$: unknown[];
+    $rootObjs$: unknown[];
+    $onAddRoot$?: (id: number, root: unknown, obj: unknown) => void;
+    $forwardRefOffset$: number;
+    $serializedRootCount$: number;
+    $serializedForwardRefCount$: number;
+    $rootStateRootCount$: number;
+    $hasRootStateForwardRefs$: boolean;
+    $promoteToRoot$: (ref: SeenRef, obj: unknown, index?: number) => void;
+    $addSyncFn$($funcStr$: string | null, argsCount: number, fn: Function): number;
+    $setSyncFnOffset$(offset: number, existingFns?: string[]): void;
+    $isSsrNode$: (obj: unknown) => obj is ISsrNode;
+    $isDomRef$: (obj: unknown) => obj is DomRef;
+    $markSsrNodeForSerialization$: (node: ISsrNode, flags: number) => void;
+    $writer$: SSRInternalStreamWriter;
+    $setWriter$(writer: SSRInternalStreamWriter): void;
+    $syncFns$: string[];
+    $eventQrls$: Set<QRL>;
+    $eventNames$: Set<string>;
+    $renderSymbols$: Set<string>;
+    $storeProxyMap$: ObjToProxyMap;
+    $eagerResume$: Set<unknown>;
+    $setProp$: (obj: any, prop: string, value: any) => void;
+}
+
+declare const enum SerializationSignalFlags {
+    SERIALIZATION_STRATEGY_NEVER = 8,
+    SERIALIZATION_STRATEGY_ALWAYS = 16,
+    SERIALIZATION_ALL_STRATEGIES = 24
+}
+
+/**
+ * Serialization strategy for computed and async signals. This determines whether to serialize their
+ * value during SSR.
+ *
+ * - `never`: The value is never serialized. When the component is resumed, the value will be
+ *   recalculated when it is first read.
+ * - `always`: The value is always serialized. This is the default.
+ *
+ * **IMPORTANT**: When you use `never`, your serialized HTML is smaller, but the recalculation will
+ * trigger subscriptions, meaning that other signals using this signal will recalculate, even if
+ * this signal didn't change.
+ *
+ * This is normally not a problem, but for async signals it may mean fetching something again.
+ *
+ * @public
+ */
+export declare type SerializationStrategy = 'never' | 'always';
+
+/**
+ * Serialize data to string using SerializationContext.
+ *
+ * @internal
+ */
+export declare function _serialize<T>(data: T): Promise<string>;
+
+/**
+ * Serialize and deserialize custom objects.
+ *
+ * If you need to use scoped state, you can pass a function instead of an object. The function will
+ * be called with the current value, and you can return a new value.
+ *
+ * @public
+ */
+declare type SerializerArg<T, S> = SerializerArgObject<T, S> | (() => SerializerArgObject<T, S> & {
+    /**
+     * This gets called when reactive state used during `deserialize` changes. You may mutate the
+     * current object, or return a new object.
+     *
+     * If it returns a value, that will be used as the new value, and listeners will be triggered.
+     * If no change happened, don't return anything.
+     *
+     * If you mutate the current object, you must return it so that it will trigger listeners.
+     */
+    update?: (current: T) => T | void;
+});
+
+/** @public */
+declare type SerializerArgObject<T, S> = {
+    /**
+     * This will be called with initial or serialized data to reconstruct an object. If no
+     * `initialData` is provided, it will be called with `undefined`.
+     *
+     * This must not return a Promise.
+     */
+    deserialize: (data: Awaited<S>) => T;
+    /** The initial value to use when deserializing. */
+    initial?: S | undefined;
+    /**
+     * This will be called with the object to get the serialized data. You can return a Promise if you
+     * need to do async work.
+     *
+     * The result may be anything that Qwik can serialize.
+     *
+     * If you do not provide it, the object will be serialized as `undefined`. However, if the object
+     * has a `[SerializerSymbol]` property, that will be used as the serializer instead.
+     */
+    serialize?: (obj: T) => S;
+};
+
+/**
+ * A serializer signal holds a custom serializable value. See `useSerializer$` for more details.
+ *
+ * @public
+ */
+declare interface SerializerSignal<T> extends ComputedSignal<T> {
+    /** Fake property to make the serialization linter happy */
+    __no_serialize__: true;
+}
+
+/**
+ * A signal which provides a non-serializable value. It works like a computed signal, but it is
+ * handled slightly differently during serdes.
+ *
+ * @public
+ */
+declare class SerializerSignalImpl<T, S> extends ComputedSignalImpl<T> {
+    constructor(container: _Container | null, argQrl: _QRLInternal<SerializerArg<T, S>>);
+    $didInitialize$: boolean;
+    $computeIfNeeded$(): void;
+}
+
+/**
+ * If an object has this property as a function, it will be called with the object and should return
+ * a serializable value.
+ *
+ * This can be used to clean up, integrate with other libraries, etc.
+ *
+ * The type your object should conform to is:
+ *
+ * ```ts
+ * {
+ *   [SerializerSymbol]: (this: YourType, toSerialize: YourType) => YourSerializableType;
+ * }
+ * ```
+ *
+ * @public
+ */
+export declare const SerializerSymbol: unique symbol;
+
+declare class SetAttributeOperation {
+    target: Element;
+    attrName: string;
+    attrValue: any;
+    scopedStyleIdPrefix: string | null;
+    isSvg: boolean;
+    constructor(target: Element, attrName: string, attrValue: any, scopedStyleIdPrefix: string | null, isSvg: boolean);
+}
+
+/** @internal */
+export declare function _setEvent(serializationCtx: SerializationContext, key: string, rawValue: unknown, hasMovedCaptures: boolean): string | SSRWriteChunk[] | null;
+
+/**
+ * Sets the `CorePlatform`.
+ *
+ * This is useful to override the platform in tests to change the behavior of,
+ * `requestAnimationFrame`, and import resolution.
+ *
+ * @param doc - The document of the application for which the platform is needed.
+ * @param platform - The platform to use.
+ * @public
+ */
+export declare const setPlatform: (plt: CorePlatform) => CorePlatform;
+
+/**
+ * Set the DOM target element for an external projection VNode.
+ *
+ * When the cursor walker processes this VNode, DOM operations will target this element instead of
+ * walking the parent chain.
+ *
+ * @internal
+ */
+export declare function _setProjectionTarget(vnode: _VirtualVNode, targetElement: Element): void;
+
+declare class SetTextOperation {
+    target: Text;
+    text: string;
+    constructor(target: Text, text: string);
+}
+
+/** @internal */
+export declare abstract class _SharedContainer implements _Container {
+    readonly $version$: string;
+    readonly $storeProxyMap$: ObjToProxyMap;
+    $rootContainer$: _Container | null;
+    $isOutOfOrderSegment$: boolean;
+    readonly $locale$: string;
+    readonly $getObjectById$: (id: number | string) => any;
+    $serverData$: Record<string, any>;
+    $currentUniqueId$: number;
+    $instanceHash$: string | null;
+    $buildBase$: string | null;
+    $renderPromise$: Promise<void> | null;
+    $resolveRenderPromise$: (() => void) | null;
+    $pendingCount$: number;
+    constructor(serverData: Record<string, any>, locale: string);
+    trackSignalValue<T>(signal: Signal, subscriber: _HostElement, property: string, data: _SubscriptionData): T;
+    serializationCtxFactory(NodeConstructor: {
+        new (...rest: any[]): {
+            __brand__: 'SsrNode';
+        };
+    } | null, DomRefConstructor: {
+        new (...rest: any[]): {
+            __brand__: 'DomRef';
+        };
+    } | null, symbolToChunkResolver: SymbolToChunkResolver, writer?: StreamWriter): SerializationContext;
+    $checkPendingCount$(): void;
+    abstract ensureProjectionResolved(host: _HostElement): void;
+    abstract handleError(err: any, $host$: _HostElement | null): void;
+    abstract getParentHost(host: _HostElement): _HostElement | null;
+    abstract setContext<T>(host: _HostElement, context: ContextId<T>, value: T): void;
+    abstract resolveContext<T>(host: _HostElement, contextId: ContextId<T>): T | undefined;
+    abstract setHostProp<T>(host: _HostElement, name: string, value: T): void;
+    abstract getHostProp<T>(host: _HostElement, name: string): T | null;
+    abstract $appendStyle$(content: string, styleId: string, host: _HostElement, scoped: boolean): void;
+}
+
+/** @internal */
+export declare const _shC: (props: ShowProps<any>) => JSXNode<unknown>;
+
+/** @public @experimental */
+export declare const Show: ShowComponent;
+
+/** @public @experimental */
+export declare type ShowComponent = <WHEN = unknown, THEN extends JSXOutput = JSXOutput, ELSE extends JSXOutput = JSXOutput>(props: PublicProps<ShowProps<WHEN, THEN, ELSE>>, key: string | null, flags: number, dev?: DevJSX) => JSXOutput;
+
+/** @public @experimental */
+export declare interface ShowProps<WHEN = unknown, THEN extends JSXOutput = JSXOutput, ELSE extends JSXOutput = JSXOutput> {
+    when$: QRL<() => WHEN>;
+    then$: QRL<(when: WHEN) => THEN>;
+    else$?: QRL<(when: WHEN) => ELSE>;
+}
+
+/** @internal */
+export declare const _shT: ({ track }: TaskCtx) => ValueOrPromise<void | undefined>;
+
+/**
+ * A signal is a reactive value which can be read and written. When the signal is written, all tasks
+ * which are tracking the signal will be re-run and all components that read the signal will be
+ * re-rendered.
+ *
+ * Furthermore, when a signal value is passed as a prop to a component, the optimizer will
+ * automatically forward the signal. This means that `return <div title={signal.value}>hi</div>`
+ * will update the `title` attribute when the signal changes without having to re-render the
+ * component.
+ *
+ * @public
+ */
+export declare interface Signal<T = any> {
+    /** Reading from this subscribes to updates; writing to this triggers updates. */
+    value: T;
+    /** Reading from this does not subscribe to updates; writing to this does not trigger updates. */
+    untrackedValue: T;
+    /**
+     * Use this to trigger running subscribers, for example when the value mutated but remained the
+     * same object.
+     */
+    trigger(): void;
+}
+
+declare class SignalImpl<T = any> implements Signal<T> {
+    $untrackedValue$: T;
+    /** Store a list of effects which are dependent on this signal. */
+    $effects$: undefined | Set<EffectSubscription>;
+    $container$: _Container | null;
+    $wrappedSignal$: WrappedSignalImpl<T> | null;
+    constructor(container: _Container | null | undefined, value: T);
+    /**
+     * Use this to trigger running subscribers, for example when the calculated value has mutated but
+     * remained the same object
+     */
+    trigger(): void;
+    /** @deprecated Use `trigger()` instead */
+    force(): void;
+    get untrackedValue(): T;
+    set untrackedValue(value: T);
+    get value(): T;
+    set value(value: T);
+    valueOf(): void;
+    toString(): string;
+    toJSON(): {
+        value: T;
+    };
+}
+
+declare interface SimplifiedServerRequestEvent<T = unknown> {
+    url: URL;
+    locale: string | undefined;
+    request: Request;
+}
+
+/** @public */
+declare type Size = number | string;
+
+/** @public */
+export declare const SkipRender: JSXNode;
+
+/**
+ * Allows to project the children of the current component. `<Slot/>` can only be used within the
+ * context of a component defined with `component$`.
+ *
+ * @public
+ */
+export declare const Slot: FunctionComponent<{
+    name?: string;
+    children?: JSXChildren;
+}>;
+
+/** @public */
+export declare interface SnapshotListener {
+    key: string;
+    qrl: QRL<any>;
+    el: Element;
+}
+
+/** @public */
+export declare type SnapshotMeta = Record<string, SnapshotMetaValue>;
+
+/** @public */
+export declare interface SnapshotMetaValue {
+    w?: string;
+    s?: string;
+    h?: string;
+    c?: string;
+}
+
+/** @public */
+export declare interface SnapshotResult {
+    /** @deprecated Not longer used in v2 */
+    state?: SnapshotState;
+    funcs: string[];
+    qrls: QRL[];
+    /** @deprecated Not longer used in v2 */
+    objs?: any[];
+    resources: ResourceReturnInternal<any>[];
+    mode: 'render' | 'listeners' | 'static';
+}
+
+/** @public @deprecated not longer used in v2 */
+export declare interface SnapshotState {
+    ctx: SnapshotMeta;
+    refs: Record<string, string>;
+    objs: any[];
+    subs: any[];
+}
+
+declare type SpecialAttrs = {
+    a: {
+        download?: any;
+        target?: HTMLAttributeAnchorTarget | undefined;
+        referrerPolicy?: HTMLAttributeReferrerPolicy | undefined;
+    };
+    area: {
+        referrerPolicy?: HTMLAttributeReferrerPolicy | undefined;
+        children?: undefined;
+    };
+    audio: MediaSpecialAttrs;
+    base: {
+        children?: undefined;
+    };
+    button: {
+        form?: string | undefined;
+        value?: string | ReadonlyArray<string> | number | undefined;
+        popovertarget?: string | undefined;
+        popovertargetaction?: PopoverTargetAction | undefined;
+    };
+    canvas: {
+        height?: Size | undefined;
+        width?: Size | undefined;
+    };
+    col: {
+        width?: Size | undefined;
+        children?: undefined;
+    };
+    data: {
+        value?: string | ReadonlyArray<string> | number | undefined;
+    };
+    embed: {
+        height?: Size | undefined;
+        width?: Size | undefined;
+        children?: undefined;
+    };
+    fieldset: {
+        form?: string | undefined;
+    };
+    hr: {
+        children?: undefined;
+    };
+    iframe: {
+        allowTransparency?: boolean | undefined;
+        /** @deprecated Deprecated */
+        frameBorder?: number | string | undefined;
+        height?: Size | undefined;
+        loading?: 'eager' | 'lazy' | undefined;
+        sandbox?: string | undefined;
+        seamless?: boolean | undefined;
+        width?: Size | undefined;
+        children?: undefined;
+    };
+    img: {
+        crossOrigin?: HTMLCrossOriginAttribute;
+        /** Intrinsic height of the image in pixels. */
+        height?: Numberish | undefined;
+        referrerPolicy?: HTMLAttributeReferrerPolicy | undefined;
+        /** Intrinsic width of the image in pixels. */
+        width?: Numberish | undefined;
+        children?: undefined;
+    };
+    input: {
+        /**
+         * For type: HTMLInputTypeAttribute, excluding 'button' | 'color' | 'file' | 'hidden' | 'image'|
+         * 'range' | 'reset' | 'submit' | 'checkbox' | 'radio'
+         */
+        autoComplete?: HTMLInputAutocompleteAttribute | Omit<HTMLInputAutocompleteAttribute, string> | undefined;
+        /** For type: 'checkbox' | 'radio' */
+        'bind:checked'?: Signal<boolean | undefined>;
+        /**
+         * For type: HTMLInputTypeAttribute, excluding 'button' | 'reset' | 'submit' | 'checkbox' |
+         * 'radio'
+         */
+        'bind:value'?: Signal<string | undefined | number>;
+        enterKeyHint?: 'enter' | 'done' | 'go' | 'next' | 'previous' | 'search' | 'send' | undefined;
+        height?: Size | undefined;
+        max?: number | string | undefined;
+        maxLength?: number | undefined;
+        min?: number | string | undefined;
+        minLength?: number | undefined;
+        step?: number | string | undefined;
+        type?: HTMLInputTypeAttribute | undefined;
+        value?: string | ReadonlyArray<string> | number | undefined | null | FormDataEntryValue;
+        width?: Size | undefined;
+        children?: undefined;
+        /** For type: 'button' */
+        popovertarget?: string | undefined;
+        popovertargetaction?: PopoverTargetAction | undefined;
+    };
+    label: {
+        form?: string | undefined;
+        for?: string | undefined;
+        /** @deprecated Use `for` */
+        htmlFor?: string | undefined;
+    };
+    li: {
+        value?: string | ReadonlyArray<string> | number | undefined;
+    };
+    link: {
+        crossOrigin?: HTMLCrossOriginAttribute;
+        referrerPolicy?: HTMLAttributeReferrerPolicy | undefined;
+        sizes?: string | undefined;
+        type?: string | undefined;
+        /** @deprecated Use `charset` instead */
+        charSet?: string | undefined;
+        charset?: string | undefined;
+        children?: undefined;
+    };
+    meta: {
+        /** @deprecated Use `charset` instead */
+        charSet?: 'utf-8' | undefined;
+        /** Qwik only supports utf-8 */
+        charset?: 'utf-8' | undefined;
+        children?: undefined;
+    };
+    meter: {
+        form?: string | undefined;
+        value?: string | ReadonlyArray<string> | number | undefined;
+    };
+    object: {
+        classID?: string | undefined;
+        form?: string | undefined;
+        height?: Size | undefined;
+        width?: Size | undefined;
+        wmode?: string | undefined;
+    };
+    ol: {
+        type?: '1' | 'a' | 'A' | 'i' | 'I' | undefined;
+    };
+    optgroup: {
+        disabled?: boolean | undefined;
+        label?: string | undefined;
+    };
+    option: {
+        value?: string | ReadonlyArray<string> | number | undefined;
+        children?: string;
+    };
+    output: {
+        form?: string | undefined;
+        for?: string | undefined;
+        /** @deprecated Use `for` instead */
+        htmlFor?: string | undefined;
+    };
+    param: {
+        value?: string | ReadonlyArray<string> | number | undefined;
+        children?: undefined;
+    };
+    progress: {
+        max?: number | string | undefined;
+        value?: string | ReadonlyArray<string> | number | undefined;
+    };
+    script: {
+        crossOrigin?: HTMLCrossOriginAttribute;
+        referrerPolicy?: HTMLAttributeReferrerPolicy | undefined;
+    };
+    select: {
+        form?: string | undefined;
+        value?: string | ReadonlyArray<string> | number | undefined;
+        'bind:value'?: Signal<string | undefined>;
+    };
+    source: {
+        /** Allowed if the parent is a `picture` element */
+        height?: Size | undefined;
+        /** Allowed if the parent is a `picture` element */
+        width?: Size | undefined;
+        children?: undefined;
+    };
+    style: {
+        scoped?: boolean | undefined;
+        children?: string;
+    };
+    table: {
+        cellPadding?: number | string | undefined;
+        cellSpacing?: number | string | undefined;
+        width?: Size | undefined;
+    };
+    td: TableCellSpecialAttrs;
+    th: TableCellSpecialAttrs;
+    title: {
+        children?: string;
+    };
+    textarea: {
+        enterKeyHint?: 'enter' | 'done' | 'go' | 'next' | 'previous' | 'search' | 'send' | undefined;
+        form?: string | undefined;
+        value?: string | ReadonlyArray<string> | number | undefined;
+        'bind:value'?: Signal<string | undefined>;
+        children?: string;
+    };
+    track: {
+        children?: undefined;
+    };
+    video: MediaSpecialAttrs & {
+        height?: Numberish | undefined;
+        width?: Numberish | undefined;
+        disablePictureInPicture?: boolean | undefined;
+        disableRemotePlayback?: boolean | undefined;
+    };
+} & {
+    [key: string]: {};
+};
+
+/** @public */
+export declare const SSRComment: FunctionComponent<{
+    data: string;
+}>;
+
+declare interface SSRContainer extends _Container {
+    readonly tag: string;
+    readonly isHtml: boolean;
+    readonly size: number;
+    readonly writer: SSRInternalStreamWriter;
+    readonly streamHandler: IStreamHandler;
+    readonly serializationCtx: SerializationContext;
+    readonly symbolToChunkResolver: SymbolToChunkResolver;
+    readonly resolvedManifest: ResolvedManifest;
+    readonly outOfOrderStreaming: boolean;
+    additionalHeadNodes: Array<JSXNodeInternal>;
+    additionalBodyNodes: Array<JSXNodeInternal>;
+    $noScriptHere$: number;
+    /**
+     * Lets the container place a root-level `useOn` placeholder `<script>` itself when injecting it
+     * inline would put it at an illegal position. Returns `true` if the container took the node, in
+     * which case the caller must not inject it into the component's JSX.
+     */
+    $deferRootPlaceholder$(scriptNode: JSXNodeInternal<string>): boolean;
+    write(text: string): void;
+    openContainer(): void;
+    closeContainer(): ValueOrPromise<void>;
+    openElement(elementName: string, key: string | null, varAttrs: Props, constAttrs: Props | null, styleScopedId: string | null, currentFile: string | null, hasMovedCaptures?: boolean): string | undefined;
+    closeElement(): ValueOrPromise<void>;
+    openFragment(attrs: Props): void;
+    closeFragment(): void;
+    openProjection(attrs: Props): void;
+    closeProjection(): void;
+    openComponent(attrs: Props): void;
+    getComponentFrame(projectionDepth: number): ISsrComponentFrame | null;
+    getParentComponentFrame(): ISsrComponentFrame | null;
+    closeComponent(): Promise<void>;
+    textNode(text: string): void;
+    htmlNode(rawHtml: string): void;
+    commentNode(text: string): void;
+    addRoot(obj: any): number | string | undefined;
+    getOrCreateLastNode(): ISsrNode;
+    addUnclaimedProjection(frame: ISsrComponentFrame, name: string, children: JSXChildren): void;
+    isStatic(): boolean;
+    render(jsx: JSXOutput): Promise<void>;
+    renderJSX(jsx: JSXOutput, options: SSRRenderJSXOptions): Promise<void>;
+    $runQueuedRender$<T>(render: () => ValueOrPromise<T>): ValueOrPromise<T>;
+    nextOutOfOrderId(): number;
+    emitOutOfOrderSegmentScripts(scripts: string): void;
+    segment(segmentId: string, jsx: JSXOutput, options: SSRRenderJSXOptions): Promise<SSROutOfOrderSegment>;
+    queueOutOfOrderSegment(segment: Promise<void>): void;
+    emitOutOfOrderExecutorIfNeeded(): void;
+    emitInlineScript(script: string): void;
+    writeScript(attrs: Props, body?: string): void;
+    emitPreloaderPre(): void;
+    emitQwikLoaderAtTopIfNeeded(): void;
+    emitPatchDataIfNeeded(): void;
+    emitBackpatchDataAndExecutorIfNeeded(): void;
+    addBackpatchEntry(ssrNodeId: string, attrName: string, serializedValue: string | boolean | null): void;
+}
+
+/** @public */
+export declare type SSRHintProps = {
+    dynamic?: boolean;
+};
+
+/** @internal */
+declare interface SSRInternalStreamWriter extends StreamWriter {
+    writeRootRef(id: number): ValueOrPromise<void>;
+    writeRootRefPath(path: number[]): ValueOrPromise<void>;
+    writeRootRefDelta(id: number, base: number): ValueOrPromise<void>;
+    toString(remap?: number[]): string;
+}
+
+declare const enum SsrNodeFlags {
+    Updatable = 1
+}
+
+declare type SSROutOfOrderSegment = SegmentRenderContext;
+
+/** @public */
+export declare const SSRRaw: FunctionComponent<{
+    data: string;
+}>;
+
+declare interface SSRRenderJSXOptions {
+    currentStyleScoped: string | null;
+    parentComponentFrame: ISsrComponentFrame | null;
+}
+
+declare type SSRRevealSlotProps = {
+    coordinator: OutOfOrderRevealCoordinator;
+};
+
+/** @internal */
+declare interface SSRRootRefDeltaChunk {
+    readonly id: number;
+    readonly base: number;
+}
+
+/** @internal */
+declare interface SSRRootRefPathChunk {
+    readonly path: number[];
+}
+
+declare interface SSRSegmentContainer extends SSRContainer {
+    $rootContainer$: SSRContainer;
+    $recordExternalRootEffect$(producer: unknown, effect: EffectSubscription, prop: string | symbol | null, sourceEffects?: Map<string | symbol, Set<EffectSubscription>>): void;
+    $finalizeOutOfOrderSegment$(segmentId: string, segment: SSROutOfOrderSegment): Promise<{
+        html: string;
+        scripts: string;
+    }>;
+}
+
+/** @internal */
+declare type SSRSegmentWriteChunk = string | {
+    readonly type: 'root-ref';
+    readonly localId: number;
+} | {
+    readonly type: 'root-ref-path';
+    readonly localPath: number[];
+} | {
+    readonly type: 'root-ref-delta';
+    readonly localId: number;
+    readonly localBaseId: number;
+};
+
+/** @public */
+export declare const SSRStream: FunctionComponent<SSRStreamProps>;
+
+/** @public */
+export declare const SSRStreamBlock: FunctionComponent<{
+    children?: JSXOutput;
+}>;
+
+/** @public */
+export declare type SSRStreamChildren = AsyncGenerator<JSXChildren, void, any> | ((stream: SSRStreamWriter) => Promise<void>) | (() => AsyncGenerator<JSXChildren, void, any>);
+
+/** @public */
+export declare type SSRStreamProps = {
+    children: SSRStreamChildren;
+};
+
+/** @public */
+export declare interface SSRStreamWriter {
+    write(chunk: JSXOutput): void;
+}
+
+/** @internal */
+declare type SSRWriteChunk = string | number | SSRRootRefPathChunk | SSRRootRefDeltaChunk;
+
+declare type StackFn = () => ValueOrPromise<void>;
+
+declare type StackValue = ValueOrPromise<JSXOutput | StackFn | Promise<JSXOutput> | typeof Promise | AsyncGenerator | typeof MaybeAsyncSignal>;
+
+declare type StopPropagation = {
+    [K in keyof HTMLElementEventMap as `stoppropagation:${K}`]?: boolean;
+};
+
+/** @internal */
+export declare const enum _StoreFlags {
+    NONE = 0,
+    RECURSIVE = 1,
+    IMMUTABLE = 2
+}
+
+declare type StoreTarget = Record<string | symbol, any>;
+
+/** @internal */
+export declare interface StreamWriter {
+    write(chunk: string): ValueOrPromise<void>;
+    waitForDrain?(): ValueOrPromise<void>;
+}
+
+/** @file Shared types */
+/** @internal */
+export declare type _Stringifiable = string | boolean | number | null;
+
+/** @internal */
+export declare class _SubscriptionData {
+    data: NodePropData;
+    constructor(data: NodePropData);
+}
+
+/** @internal */
+export declare class _SubscriptionPatch {
+    rootId: number;
+    subscriptions: Set<EffectSubscription> | Map<string | symbol, Set<EffectSubscription>>;
+    constructor(rootId?: number, subscriptions?: Set<EffectSubscription> | Map<string | symbol, Set<EffectSubscription>>);
+}
+
+/** @internal */
+export declare const _suC: (props: SuspenseProps) => JSXNodeInternal<string>[];
+
+/** @public @experimental */
+export declare const Suspense: typeof _suC;
+
+/** @public @experimental */
+export declare type SuspenseProps = {
+    fallback?: JSXOutput;
+    showStale?: boolean;
+    delay?: number;
+};
+
+/** @internal */
+export declare const _suT: ({ track, cleanup }: TaskCtx) => void;
+
+/**
+ * The TS types don't include the SVG attributes so we have to define them ourselves
+ *
+ * NOTE: These props are probably not complete
+ *
+ * @public
+ */
+export declare interface SVGAttributes<T extends Element = Element> extends AriaAttributes {
+    color?: string | undefined;
+    height?: Size | undefined;
+    id?: string | undefined;
+    lang?: string | undefined;
+    max?: number | string | undefined;
+    media?: string | undefined;
+    method?: string | undefined;
+    min?: number | string | undefined;
+    name?: string | undefined;
+    style?: CSSProperties | string | undefined;
+    target?: string | undefined;
+    type?: string | undefined;
+    width?: Size | undefined;
+    role?: string | undefined;
+    tabindex?: number | undefined;
+    crossOrigin?: HTMLCrossOriginAttribute;
+    'accent-height'?: number | string | undefined;
+    accumulate?: 'none' | 'sum' | undefined;
+    additive?: 'replace' | 'sum' | undefined;
+    'alignment-baseline'?: 'auto' | 'baseline' | 'before-edge' | 'text-before-edge' | 'middle' | 'central' | 'after-edge' | 'text-after-edge' | 'ideographic' | 'alphabetic' | 'hanging' | 'mathematical' | 'inherit' | undefined;
+    allowReorder?: 'no' | 'yes' | undefined;
+    alphabetic?: number | string | undefined;
+    amplitude?: number | string | undefined;
+    'arabic-form'?: 'initial' | 'medial' | 'terminal' | 'isolated' | undefined;
+    ascent?: number | string | undefined;
+    attributeName?: string | undefined;
+    attributeType?: string | undefined;
+    autoReverse?: Booleanish | undefined;
+    azimuth?: number | string | undefined;
+    baseFrequency?: number | string | undefined;
+    'baseline-shift'?: number | string | undefined;
+    baseProfile?: number | string | undefined;
+    bbox?: number | string | undefined;
+    begin?: number | string | undefined;
+    bias?: number | string | undefined;
+    by?: number | string | undefined;
+    calcMode?: number | string | undefined;
+    'cap-height'?: number | string | undefined;
+    clip?: number | string | undefined;
+    'clip-path'?: string | undefined;
+    clipPathUnits?: number | string | undefined;
+    'clip-rule'?: number | string | undefined;
+    'color-interpolation'?: number | string | undefined;
+    'color-interpolation-filters'?: 'auto' | 's-rGB' | 'linear-rGB' | 'inherit' | undefined;
+    'color-profile'?: number | string | undefined;
+    'color-rendering'?: number | string | undefined;
+    contentScriptType?: number | string | undefined;
+    contentStyleType?: number | string | undefined;
+    cursor?: number | string;
+    cx?: number | string | undefined;
+    cy?: number | string | undefined;
+    d?: string | undefined;
+    decelerate?: number | string | undefined;
+    descent?: number | string | undefined;
+    diffuseConstant?: number | string | undefined;
+    direction?: number | string | undefined;
+    display?: number | string | undefined;
+    divisor?: number | string | undefined;
+    'dominant-baseline'?: number | string | undefined;
+    dur?: number | string | undefined;
+    dx?: number | string | undefined;
+    dy?: number | string | undefined;
+    'edge-mode'?: number | string | undefined;
+    elevation?: number | string | undefined;
+    'enable-background'?: number | string | undefined;
+    end?: number | string | undefined;
+    exponent?: number | string | undefined;
+    externalResourcesRequired?: number | string | undefined;
+    fill?: string | undefined;
+    'fill-opacity'?: number | string | undefined;
+    'fill-rule'?: 'nonzero' | 'evenodd' | 'inherit' | undefined;
+    filter?: string | undefined;
+    filterRes?: number | string | undefined;
+    filterUnits?: number | string | undefined;
+    'flood-color'?: number | string | undefined;
+    'flood-opacity'?: number | string | undefined;
+    focusable?: number | string | undefined;
+    'font-family'?: string | undefined;
+    'font-size'?: number | string | undefined;
+    'font-size-adjust'?: number | string | undefined;
+    'font-stretch'?: number | string | undefined;
+    'font-style'?: number | string | undefined;
+    'font-variant'?: number | string | undefined;
+    'font-weight'?: number | string | undefined;
+    format?: number | string | undefined;
+    fr?: number | string | undefined;
+    from?: number | string | undefined;
+    fx?: number | string | undefined;
+    fy?: number | string | undefined;
+    g1?: number | string | undefined;
+    g2?: number | string | undefined;
+    'glyph-name'?: number | string | undefined;
+    'glyph-orientation-horizontal'?: number | string | undefined;
+    'glyph-orientation-vertical'?: number | string | undefined;
+    glyphRef?: number | string | undefined;
+    gradientTransform?: string | undefined;
+    gradientUnits?: string | undefined;
+    hanging?: number | string | undefined;
+    'horiz-adv-x'?: number | string | undefined;
+    'horiz-origin-x'?: number | string | undefined;
+    href?: string | undefined;
+    ideographic?: number | string | undefined;
+    'image-rendering'?: number | string | undefined;
+    in2?: number | string | undefined;
+    in?: string | undefined;
+    intercept?: number | string | undefined;
+    k1?: number | string | undefined;
+    k2?: number | string | undefined;
+    k3?: number | string | undefined;
+    k4?: number | string | undefined;
+    k?: number | string | undefined;
+    kernelMatrix?: number | string | undefined;
+    kernelUnitLength?: number | string | undefined;
+    kerning?: number | string | undefined;
+    keyPoints?: number | string | undefined;
+    keySplines?: number | string | undefined;
+    keyTimes?: number | string | undefined;
+    lengthAdjust?: number | string | undefined;
+    'letter-spacing'?: number | string | undefined;
+    'lighting-color'?: number | string | undefined;
+    limitingConeAngle?: number | string | undefined;
+    local?: number | string | undefined;
+    'marker-end'?: string | undefined;
+    markerHeight?: number | string | undefined;
+    'marker-mid'?: string | undefined;
+    'marker-start'?: string | undefined;
+    markerUnits?: number | string | undefined;
+    markerWidth?: number | string | undefined;
+    mask?: string | undefined;
+    maskContentUnits?: number | string | undefined;
+    maskUnits?: number | string | undefined;
+    mathematical?: number | string | undefined;
+    mode?: number | string | undefined;
+    numOctaves?: number | string | undefined;
+    offset?: number | string | undefined;
+    opacity?: number | string | undefined;
+    operator?: number | string | undefined;
+    order?: number | string | undefined;
+    orient?: number | string | undefined;
+    orientation?: number | string | undefined;
+    origin?: number | string | undefined;
+    overflow?: number | string | undefined;
+    'overline-position'?: number | string | undefined;
+    'overline-thickness'?: number | string | undefined;
+    'paint-order'?: number | string | undefined;
+    panose1?: number | string | undefined;
+    path?: string | undefined;
+    pathLength?: number | string | undefined;
+    patternContentUnits?: string | undefined;
+    patternTransform?: number | string | undefined;
+    patternUnits?: string | undefined;
+    'pointer-events'?: number | string | undefined;
+    points?: string | undefined;
+    pointsAtX?: number | string | undefined;
+    pointsAtY?: number | string | undefined;
+    pointsAtZ?: number | string | undefined;
+    preserveAlpha?: number | string | undefined;
+    preserveAspectRatio?: string | undefined;
+    primitiveUnits?: number | string | undefined;
+    r?: number | string | undefined;
+    radius?: number | string | undefined;
+    refX?: number | string | undefined;
+    refY?: number | string | undefined;
+    'rendering-intent'?: number | string | undefined;
+    repeatCount?: number | string | undefined;
+    repeatDur?: number | string | undefined;
+    requiredextensions?: number | string | undefined;
+    requiredFeatures?: number | string | undefined;
+    restart?: number | string | undefined;
+    result?: string | undefined;
+    rotate?: number | string | undefined;
+    rx?: number | string | undefined;
+    ry?: number | string | undefined;
+    scale?: number | string | undefined;
+    seed?: number | string | undefined;
+    'shape-rendering'?: number | string | undefined;
+    slope?: number | string | undefined;
+    spacing?: number | string | undefined;
+    specularConstant?: number | string | undefined;
+    specularExponent?: number | string | undefined;
+    speed?: number | string | undefined;
+    spreadMethod?: string | undefined;
+    startOffset?: number | string | undefined;
+    stdDeviation?: number | string | undefined;
+    stemh?: number | string | undefined;
+    stemv?: number | string | undefined;
+    stitchTiles?: number | string | undefined;
+    'stop-color'?: string | undefined;
+    'stop-opacity'?: number | string | undefined;
+    'strikethrough-position'?: number | string | undefined;
+    'strikethrough-thickness'?: number | string | undefined;
+    string?: number | string | undefined;
+    stroke?: string | undefined;
+    'stroke-dasharray'?: string | number | undefined;
+    'stroke-dashoffset'?: string | number | undefined;
+    'stroke-linecap'?: 'butt' | 'round' | 'square' | 'inherit' | undefined;
+    'stroke-linejoin'?: 'miter' | 'round' | 'bevel' | 'inherit' | undefined;
+    'stroke-miterlimit'?: string | undefined;
+    'stroke-opacity'?: number | string | undefined;
+    'stroke-width'?: number | string | undefined;
+    surfaceScale?: number | string | undefined;
+    systemLanguage?: number | string | undefined;
+    tableValues?: number | string | undefined;
+    targetX?: number | string | undefined;
+    targetY?: number | string | undefined;
+    'text-anchor'?: string | undefined;
+    'text-decoration'?: number | string | undefined;
+    textLength?: number | string | undefined;
+    'text-rendering'?: number | string | undefined;
+    to?: number | string | undefined;
+    transform?: string | undefined;
+    u1?: number | string | undefined;
+    u2?: number | string | undefined;
+    'underline-position'?: number | string | undefined;
+    'underline-thickness'?: number | string | undefined;
+    unicode?: number | string | undefined;
+    'unicode-bidi'?: number | string | undefined;
+    'unicode-range'?: number | string | undefined;
+    'units-per-em'?: number | string | undefined;
+    'v-alphabetic'?: number | string | undefined;
+    values?: string | undefined;
+    'vector-effect'?: number | string | undefined;
+    version?: string | undefined;
+    'vert-adv-y'?: number | string | undefined;
+    'vert-origin-x'?: number | string | undefined;
+    'vert-origin-y'?: number | string | undefined;
+    'v-hanging'?: number | string | undefined;
+    'v-ideographic'?: number | string | undefined;
+    viewBox?: string | undefined;
+    viewTarget?: number | string | undefined;
+    visibility?: number | string | undefined;
+    'v-mathematical'?: number | string | undefined;
+    widths?: number | string | undefined;
+    'word-spacing'?: number | string | undefined;
+    'writing-mode'?: number | string | undefined;
+    x1?: number | string | undefined;
+    x2?: number | string | undefined;
+    x?: number | string | undefined;
+    'x-channel-selector'?: string | undefined;
+    'x-height'?: number | string | undefined;
+    'xlink:actuate'?: string | undefined;
+    'xlink:arcrole'?: string | undefined;
+    'xlink:href'?: string | undefined;
+    'xlink:role'?: string | undefined;
+    'xlink:show'?: string | undefined;
+    'xlink:title'?: string | undefined;
+    'xlink:type'?: string | undefined;
+    'xml:base'?: string | undefined;
+    'xml:lang'?: string | undefined;
+    'xml:space'?: string | undefined;
+    xmlns?: string | undefined;
+    'xmlns:xlink'?: string | undefined;
+    y1?: number | string | undefined;
+    y2?: number | string | undefined;
+    y?: number | string | undefined;
+    yChannelSelector?: string | undefined;
+    z?: number | string | undefined;
+    zoomAndPan?: string | undefined;
+}
+
+/** @public */
+export declare interface SVGProps<T extends Element> extends SVGAttributes, QwikAttributes<T> {
+}
+
+declare type SymbolToChunkResolver = (symbol: string) => string;
+
+/**
+ * Extract function into a synchronously loadable QRL.
+ *
+ * NOTE: Synchronous QRLs functions can't close over any variables, including exports.
+ *
+ * @param fn - Function to extract.
+ * @returns
+ * @public
+ */
+export declare const sync$: <T extends Function>(fn: T) => SyncQRL<T>;
+
+declare const SYNC_QRL = "<sync>";
+
+/** @public */
+export declare type SyncQRL<TYPE extends Function> = QRL<TYPE> & {
+    __brand__SyncQRL__: TYPE;
+    resolved: TYPE;
+    dev?: QRLDev | null;
+} & BivariantQrlFn<QrlArgs<TYPE>, QrlReturn<TYPE>>;
+
+declare type SyncQRLInternal = _QRLInternal & SyncQRLSymbol;
+
+declare interface SyncQRLSymbol {
+    $symbol$: typeof SYNC_QRL;
+}
+
+declare type TableCellSpecialAttrs = {
+    align?: 'left' | 'center' | 'right' | 'justify' | 'char' | undefined;
+    height?: Size | undefined;
+    width?: Size | undefined;
+    valign?: 'top' | 'middle' | 'bottom' | 'baseline' | undefined;
+};
+
+/** @internal */
+export declare class _Task<T = unknown, B = T> extends BackRef {
+    $flags$: TaskFlags;
+    $index$: number;
+    $el$: _HostElement;
+    $qrl$: _QRLInternal<T>;
+    $destroy$: (() => void) | null;
+    $destroyPromise$: Promise<void> | undefined;
+    $taskPromise$: Promise<void> | null;
+    constructor($flags$: TaskFlags, $index$: number, $el$: _HostElement, $qrl$: _QRLInternal<T>, $destroy$: (() => void) | null);
+}
+
+/**
+ * Used internally as a qwikloader event handler to schedule a task. The `this` context is the
+ * captures part of the QRL, provided by qwikloader.
+ *
+ * @internal
+ */
+export declare function _task(this: string, _event: Event, element: Element): void | Promise<void>;
+
+/** @public */
+export declare interface TaskCtx {
+    track: Tracker;
+    cleanup: (callback: () => ValueOrPromise<void>) => void;
+}
+
+declare const TaskEvent = "qTask";
+
+/** @internal */
+declare const enum TaskFlags {
+    VISIBLE_TASK = 1,
+    TASK = 2,
+    DIRTY = 4,
+    RENDER_BLOCKING = 8,
+    NEEDS_CLEANUP = 16,
+    EVENTS_REGISTERED = 32
+}
+
+/** @public */
+export declare type TaskFn = (ctx: TaskCtx) => ValueOrPromise<void | (() => ValueOrPromise<void>)>;
+
+/** @public */
+export declare interface TaskOptions {
+    /** Block the rendering of the component until the task completes. Default is `true` */
+    deferUpdates?: boolean;
+}
+
+/** @internal */
+export declare class _TextVNode extends _VNode {
+    node: Text | null;
+    text: string | undefined;
+    constructor(flags: _VNodeFlags, parent: _VNode | null, previousSibling: _VNode | null | undefined, nextSibling: _VNode | null | undefined, props: Props | null, node: Text | null, text: string | undefined);
+}
+
+/**
+ * Used to signal to Qwik which state should be watched for changes.
+ *
+ * The `Tracker` is passed into the `taskFn` of `useTask`. It is intended to be used to wrap state
+ * objects in a read proxy which signals to Qwik which properties should be watched for changes. A
+ * change to any of the properties causes the `taskFn` to rerun.
+ *
+ * ### Example
+ *
+ * The `obs` passed into the `taskFn` is used to mark `state.count` as a property of interest. Any
+ * changes to the `state.count` property will cause the `taskFn` to rerun.
+ *
+ * ```tsx
+ * const Cmp = component$(() => {
+ *   const store = useStore({ count: 0, doubleCount: 0 });
+ *   const signal = useSignal(0);
+ *   useTask$(({ track }) => {
+ *     // Any signals or stores accessed inside the task will be tracked
+ *     const count = track(() => store.count);
+ *     // For stores you can also pass the store and specify the property
+ *     track(store, 'count');
+ *     // You can also pass a signal to track() directly
+ *     const signalCount = track(signal);
+ *     store.doubleCount = count + signalCount;
+ *   });
+ *   return (
+ *     <div>
+ *       <span>
+ *         {store.count} / {store.doubleCount}
+ *       </span>
+ *       <button
+ *         onClick$={() => {
+ *           store.count++;
+ *           signal.value++;
+ *         }}
+ *       >
+ *         +
+ *       </button>
+ *     </div>
+ *   );
+ * });
+ * ```
+ *
+ * @public
+ * @see `useTask`
+ */
+export declare interface Tracker {
+    /**
+     * Include the expression using stores / signals to track:
+     *
+     * ```tsx
+     * track(() => store.count);
+     * ```
+     *
+     * The `track()` function also returns the value of the scoped expression:
+     *
+     * ```tsx
+     * const count = track(() => store.count);
+     * ```
+     */
+    <T>(fn: () => T): T;
+    /**
+     * Used to track the whole object. If any property of the passed store changes, the task will be
+     * scheduled to run. Also accepts signals.
+     *
+     * Note that the change tracking is not deep. If you want to track changes to nested properties,
+     * you need to use `track` on each of them.
+     *
+     * ```tsx
+     * track(store); // returns store
+     * track(signal); // returns signal.value
+     * ```
+     */
+    <T extends object>(obj: T): T extends Signal<infer U> ? U : T;
+    /**
+     * Used to track to track a specific property of an object.
+     *
+     * Note that the change tracking is not deep. If you want to track changes to nested properties,
+     * you need to use `track` on each of them.
+     *
+     * ```tsx
+     * track(store, 'propA'); // returns store.propA
+     * ```
+     */
+    <T extends object, P extends keyof T>(obj: T, prop: P): T[P];
+}
+
+/** @internal */
+export declare const _UNINITIALIZED: unique symbol;
+
+/**
+ * Get the value of the expression without tracking listeners. A function will be invoked, signals
+ * will return their value, and stores will be unwrapped (they return the backing object).
+ *
+ * When you pass a function, you can also pass additional arguments that the function will receive.
+ *
+ * Note that stores are not unwrapped recursively.
+ *
+ * @param expr - The function or object to evaluate without tracking.
+ * @param args - Additional arguments to pass when `expr` is a function.
+ * @public
+ */
+export declare const untrack: <T, A extends any[]>(expr: ((...args: A) => T) | Signal<T> | T, ...args: A) => T;
+
+declare type UnwantedKeys = keyof HTMLAttributesBase | keyof DOMAttributes<any> | keyof ARIAMixin | keyof GlobalEventHandlers | 'enterKeyHint' | 'innerText' | 'innerHTML' | 'outerHTML' | 'inputMode' | 'outerText' | 'nodeValue' | 'textContent';
+
+/**
+ * Get the original object that was wrapped by the store. Useful if you want to clone a store
+ * (structuredClone, IndexedDB,...)
+ *
+ * @public
+ */
+export declare const unwrapStore: <T>(value: T) => T;
+
+/**
+ * Update the props on an external projection VNode and trigger re-rendering.
+ *
+ * @internal
+ */
+export declare function _updateProjectionProps(container: _Container, vnode: _VirtualVNode, newProps: Record<string, unknown>): void;
+
+/**
+ * Creates an AsyncSignal which holds the result of the given async function. If the function uses
+ * `track()` to track reactive state, and that state changes, the AsyncSignal is recalculated, and
+ * if the result changed, all tasks which are tracking the AsyncSignal will be re-run and all
+ * subscribers (components, tasks etc) that read the AsyncSignal will be updated.
+ *
+ * If the async function throws an error, the AsyncSignal will capture the error and set the `error`
+ * property. The error can be cleared by re-running the async function successfully.
+ *
+ * While the async function is running, the `loading` property will be set to `true`. Once the
+ * function completes, `loading` will be set to `false`.
+ *
+ * If the value has not yet been resolved, reading the AsyncSignal will throw a Promise, which will
+ * retry the component or task once the value resolves.
+ *
+ * If the value has been resolved, but the async function is re-running, reading the AsyncSignal
+ * will subscribe to it and return the last resolved value until the new value is ready. As soon as
+ * the new value is ready, the subscribers will be updated.
+ *
+ * @public
+ */
+export declare const useAsync$: <T>(qrl: AsyncFn<T>, options?: AsyncSignalOptions<T> | undefined) => AsyncSignal<T>;
+
+/** @internal */
+export declare const useAsyncQrl: <T>(qrl: QRL<AsyncFn<T>>, options?: AsyncSignalOptions<T>) => AsyncSignal<T>;
+
+/**
+ * Creates a computed signal which is calculated from the given function. A computed signal is a
+ * signal which is calculated from other signals. When the signals change, the computed signal is
+ * recalculated, and if the result changed, all tasks which are tracking the signal will be re-run
+ * and all components that read the signal will be re-rendered.
+ *
+ * The function must be synchronous and must not have any side effects.
+ *
+ * @public
+ */
+export declare const useComputed$: <T>(qrl: ComputedFn<T>, options?: ComputedOptions | undefined) => ComputedReturnType<T>;
+
+/** @internal */
+export declare const useComputedQrl: <T>(qrl: QRL<ComputedFn<T>>, options?: ComputedOptions) => ComputedReturnType<T>;
+
+/**
+ * Stores a value which is retained for the lifetime of the component. Subsequent calls to
+ * `useConstant` will always return the first value given.
+ *
+ * If the value is a function, the function is invoked once to calculate the actual value. You can
+ * then also pass arguments to call the function with, so that you don't need to create a new
+ * function on every render.
+ *
+ * @example
+ *
+ * ```tsx
+ * const fixedRandomValue = useConstant(() => Math.random);
+ * const otherFixedRandomValue = useConstant(Math.random);
+ *
+ * const getConfig = (env: string) => { ... }
+ * const config = useConstant(getConfig, environment);
+ * ```
+ *
+ * @public
+ */
+export declare const useConstant: <T, A extends any[]>(value: ((...args: A) => T) | T, ...args: A) => T;
+
+declare interface UseContext {
+    <STATE, T>(context: ContextId<STATE>, transformer: (value: STATE) => T): T;
+    <STATE, T>(context: ContextId<STATE>, defaultValue: T): STATE | T;
+    <STATE>(context: ContextId<STATE>): STATE;
+}
+
+/**
+ * Retrieve Context value.
+ *
+ * Use `useContext()` to retrieve the value of context in a component. To retrieve a value a parent
+ * component needs to invoke `useContextProvider()` to assign a value.
+ *
+ * ### Example
+ *
+ * ```tsx
+ * // Declare the Context type.
+ * interface TodosStore {
+ *   items: string[];
+ * }
+ * // Create a Context ID (no data is saved here.)
+ * // You will use this ID to both create and retrieve the Context.
+ * export const TodosContext = createContextId<TodosStore>('Todos');
+ *
+ * // Example of providing context to child components.
+ * export const App = component$(() => {
+ *   useContextProvider(
+ *     TodosContext,
+ *     useStore<TodosStore>({
+ *       items: ['Learn Qwik', 'Build Qwik app', 'Profit'],
+ *     })
+ *   );
+ *
+ *   return <Items />;
+ * });
+ *
+ * // Example of retrieving the context provided by a parent component.
+ * export const Items = component$(() => {
+ *   const todos = useContext(TodosContext);
+ *   return (
+ *     <ul>
+ *       {todos.items.map((item) => (
+ *         <li>{item}</li>
+ *       ))}
+ *     </ul>
+ *   );
+ * });
+ *
+ * ```
+ *
+ * @param context - The context to retrieve a value from.
+ * @public
+ */
+export declare const useContext: UseContext;
+
+/**
+ * Assign a value to a Context.
+ *
+ * Use `useContextProvider()` to assign a value to a context. The assignment happens in the
+ * component's function. Once assigned, use `useContext()` in any child component to retrieve the
+ * value.
+ *
+ * Context is a way to pass stores to the child components without prop-drilling. Note that scalar
+ * values are allowed, but for reactivity you need signals or stores.
+ *
+ * ### Example
+ *
+ * ```tsx
+ * // Declare the Context type.
+ * interface TodosStore {
+ *   items: string[];
+ * }
+ * // Create a Context ID (no data is saved here.)
+ * // You will use this ID to both create and retrieve the Context.
+ * export const TodosContext = createContextId<TodosStore>('Todos');
+ *
+ * // Example of providing context to child components.
+ * export const App = component$(() => {
+ *   useContextProvider(
+ *     TodosContext,
+ *     useStore<TodosStore>({
+ *       items: ['Learn Qwik', 'Build Qwik app', 'Profit'],
+ *     })
+ *   );
+ *
+ *   return <Items />;
+ * });
+ *
+ * // Example of retrieving the context provided by a parent component.
+ * export const Items = component$(() => {
+ *   const todos = useContext(TodosContext);
+ *   return (
+ *     <ul>
+ *       {todos.items.map((item) => (
+ *         <li>{item}</li>
+ *       ))}
+ *     </ul>
+ *   );
+ * });
+ *
+ * ```
+ *
+ * @param context - The context to assign a value to.
+ * @param value - The value to assign to the context.
+ * @public
+ */
+export declare const useContextProvider: <STATE>(context: ContextId<STATE>, newValue: STATE) => void;
+
+/** @public */
+export declare const useErrorBoundary: () => ErrorBoundaryStore;
+
+/**
+ * Injected by the optimizer into component$ bodies in HMR mode. Registers a document event listener
+ * that triggers component re-render on HMR updates.
+ *
+ * @internal
+ */
+export declare function _useHmr(devPath: string): void;
+
+/** @public */
+export declare const useId: () => string;
+
+/**
+ * Used by the Qwik Optimizer to restore the lexically scoped variables.
+ *
+ * This method should not be present in the application source code.
+ *
+ * NOTE: `useLexicalScope` method can only be used in the synchronous portion of the callback
+ * (before any `await` statements.)
+ *
+ * @deprecated Use `_captures` instead.
+ * @internal
+ */
+export declare const useLexicalScope: <VARS extends any[]>() => VARS;
+
+/**
+ * Register a listener on the current component's host element.
+ *
+ * Used to programmatically add event listeners. Useful from custom `use*` methods, which do not
+ * have access to the JSX. Otherwise, it's adding a JSX listener in the `<div>` is a better idea.
+ *
+ * Events are case sensitive.
+ *
+ * @public
+ * @see `useOn`, `useOnWindow`, `useOnDocument`.
+ */
+export declare const useOn: <T extends KnownEventNames>(event: T | T[], eventQrl: EventQRL<T>, options?: UseOnOptions) => void;
+
+/**
+ * Register a listener on `document`.
+ *
+ * Used to programmatically add event listeners. Useful from custom `use*` methods, which do not
+ * have access to the JSX.
+ *
+ * Events are case sensitive.
+ *
+ * @public
+ * @see `useOn`, `useOnWindow`, `useOnDocument`.
+ *
+ * ```tsx
+ * function useScroll() {
+ *   useOnDocument(
+ *     'scroll',
+ *     $((event) => {
+ *       console.log('body scrolled', event);
+ *     })
+ *   );
+ * }
+ *
+ * const Cmp = component$(() => {
+ *   useScroll();
+ *   return <div>Profit!</div>;
+ * });
+ * ```
+ */
+export declare const useOnDocument: <T extends KnownEventNames>(event: T | T[], eventQrl: EventQRL<T>, options?: UseOnOptions) => void;
+
+/** @public */
+export declare type UseOnOptions = UseOnOptionsBase & ({
+    passive?: boolean;
+    preventdefault?: never;
+} | {
+    passive?: never;
+    preventdefault?: boolean;
+});
+
+declare interface UseOnOptionsBase {
+    capture?: boolean;
+    stoppropagation?: boolean;
+}
+
+/**
+ * Register a listener on `window`.
+ *
+ * Used to programmatically add event listeners. Useful from custom `use*` methods, which do not
+ * have access to the JSX.
+ *
+ * Events are case sensitive.
+ *
+ * @public
+ * @see `useOn`, `useOnWindow`, `useOnDocument`.
+ *
+ * ```tsx
+ * function useAnalytics() {
+ *   useOnWindow(
+ *     'popstate',
+ *     $((event) => {
+ *       console.log('navigation happened', event);
+ *       // report to analytics
+ *     })
+ *   );
+ * }
+ *
+ * const Cmp = component$(() => {
+ *   useAnalytics();
+ *   return <div>Profit!</div>;
+ * });
+ * ```
+ */
+export declare const useOnWindow: <T extends KnownEventNames>(event: T | T[], eventQrl: EventQRL<T>, options?: UseOnOptions) => void;
+
+/**
+ * This method works like an async memoized function that runs whenever some tracked value changes
+ * and returns some data.
+ *
+ * `useResource` however returns immediate a `ResourceReturn` object that contains the data and a
+ * state that indicates if the data is available or not.
+ *
+ * The status can be one of the following:
+ *
+ * - `pending` - the data is not yet available.
+ * - `resolved` - the data is available.
+ * - `rejected` - the data is not available due to an error or timeout.
+ *
+ * Be careful when using a `try/catch` statement in `useResource$`. If you catch the error and don't
+ * re-throw it (or a new Error), the resource status will never be `rejected`.
+ *
+ * @deprecated Use `useAsync$` instead, which is more powerful and flexible. `useResource$` is still
+ *   available for backward compatibility but it is recommended to migrate to `useAsync$` for new
+ *   code and when updating existing code.
+ * @public
+ * @see useAsync$
+ * @see Resource
+ * @see ResourceReturn
+ */
+export declare const useResource$: <T>(qrl: ResourceFn<T>, opts?: ResourceOptions | undefined) => ResourceReturn<T>;
+
+/** @internal */
+export declare const useResourceQrl: <T>(qrl: QRL<ResourceFn<T>>, opts?: ResourceOptions) => ResourceReturn<T>;
+
+/**
+ * Creates a signal which holds a custom serializable value. It requires that the value implements
+ * the `CustomSerializable` type, which means having a function under the `[SerializeSymbol]`
+ * property that returns a serializable value when called.
+ *
+ * The `fn` you pass is called with the result of the serialization (in the browser, only when the
+ * value is needed), or `undefined` when not yet initialized. If you refer to other signals, `fn`
+ * will be called when those change just like computed signals, and then the argument will be the
+ * previous output, not the serialized result.
+ *
+ * This is useful when using third party libraries that use custom objects that are not
+ * serializable.
+ *
+ * Note that the `fn` is called lazily, so it won't impact container resume.
+ *
+ * @example
+ *
+ * ```tsx
+ * class MyCustomSerializable {
+ *   constructor(public n: number) {}
+ *   inc() {
+ *     this.n++;
+ *   }
+ * }
+ * const Cmp = component$(() => {
+ *   const custom = useSerializer$({
+ *     deserialize: (data) => new MyCustomSerializable(data),
+ *     serialize: (data) => data.n,
+ *     initial: 2,
+ *   });
+ *   return <div onClick$={() => custom.value.inc()}>{custom.value.n}</div>;
+ * });
+ * ```
+ *
+ * @example
+ *
+ * When using a Signal as the data to create the object, you need to pass the configuration as a
+ * function, and you can then also provide the `update` function to update the object when the
+ * signal changes.
+ *
+ * By returning an object from `update`, you signal that the listeners have to be notified. You can
+ * mutate the current object but you should return it so that it will trigger listeners.
+ *
+ * ```tsx
+ * const Cmp = component$(() => {
+ *   const n = useSignal(2);
+ *   const custom = useSerializer$(() =>
+ *     ({
+ *       deserialize: () => new MyCustomSerializable(n.value),
+ *       update: (current) => {
+ *         current.n = n.value;
+ *         return current;
+ *       }
+ *     })
+ *   );
+ *   return <div onClick$={() => n.value++}>{custom.value.n}</div>;
+ * });
+ * ```
+ *
+ * @public
+ */
+export declare const useSerializer$: typeof createSerializer$;
+
+/** @internal */
+export declare const useSerializerQrl: <T, S>(qrl: QRL<SerializerArg<T, S>>) => SerializerSignalImpl<T, S>;
+
+/** @public */
+export declare function useServerData<T>(key: string): T | undefined;
+
+/** @public */
+export declare function useServerData<T, B = T>(key: string, defaultValue: B): T | B;
+
+/** @public */
+export declare interface UseSignal {
+    <T>(): Signal<T | undefined>;
+    <T>(value: T | (() => T)): Signal<T>;
+}
+
+/**
+ * Creates an object with a single reactive `.value` property, that Qwik can track across
+ * serializations.
+ *
+ * Use it to create state for your application. The object has a getter and setter to track reads
+ * and writes of the `.value` property. When the value changes, any functions that read from it will
+ * re-run.
+ *
+ * Prefer `useSignal` over `useStore` when possible, as it is more efficient.
+ *
+ * ### Example
+ *
+ * ```tsx
+ * const Signals = component$(() => {
+ *   const counter = useSignal(1);
+ *   const text = useSignal('changeme');
+ *   const toggle = useSignal(false);
+ *
+ *   // useSignal() can also accept a function to calculate the initial value
+ *   const state = useSignal(() => {
+ *     return expensiveInitialValue();
+ *   });
+ *
+ *   return (
+ *     <div>
+ *       <button onClick$={() => counter.value++}>Counter: {counter.value}</button>
+ *       {
+ *         // pass signal values as the value, the optimizer will make it pass the signal
+ *       }
+ *       <Child state={state.value} />
+ *       {
+ *         // signals can be bound to inputs. A property named `bind:x` implies that the property
+ * is a signal
+ *       }
+ *       <input type="text" bind:value={text} />
+ *       <input type="checkbox" bind:checked={toggle} />
+ *     </div>
+ *   );
+ * });
+ * ```
+ *
+ * @public
+ */
+export declare const useSignal: UseSignal;
+
+/**
+ * Creates a reactive object that Qwik can track across serialization.
+ *
+ * Use it to create state for your application. The returned object is a Proxy that tracks reads and
+ * writes. When any of the properties change, the functions that read those properties will re-run.
+ *
+ * `Store`s are deep by default, meaning that any objects assigned to properties will also become
+ * `Store`s. This includes arrays.
+ *
+ * Prefer `useSignal` over `useStore` when possible, as it is more efficient.
+ *
+ * ### Example
+ *
+ * Example showing how `useStore` is used in Counter example to keep track of the count.
+ *
+ * ```tsx
+ * const Stores = component$(() => {
+ *   const counter = useCounter(1);
+ *
+ *   // Reactivity happens even for nested objects and arrays
+ *   const userData = useStore({
+ *     name: 'Manu',
+ *     address: {
+ *       address: '',
+ *       city: '',
+ *     },
+ *     orgs: [],
+ *   });
+ *
+ *   // useStore() can also accept a function to calculate the initial value
+ *   const state = useStore(() => {
+ *     return {
+ *       value: expensiveInitialValue(),
+ *     };
+ *   });
+ *
+ *   return (
+ *     <div>
+ *       <div>Counter: {counter.value}</div>
+ *       <Child userData={userData} state={state} />
+ *     </div>
+ *   );
+ * });
+ *
+ * function useCounter(step: number) {
+ *   // Multiple stores can be created in custom hooks for convenience and composability
+ *   const counterStore = useStore({
+ *     value: 0,
+ *   });
+ *   useVisibleTask$(() => {
+ *     // Only runs in the client
+ *     const timer = setInterval(() => {
+ *       counterStore.value += step;
+ *     }, 500);
+ *     return () => {
+ *       clearInterval(timer);
+ *     };
+ *   });
+ *   return counterStore;
+ * }
+ * ```
+ *
+ * @public
+ */
+export declare const useStore: <STATE extends object>(initialState: STATE | (() => STATE), opts?: UseStoreOptions) => STATE;
+
+/** @public */
+export declare interface UseStoreOptions {
+    /** If `true` then all nested objects and arrays will be tracked as well. Default is `true`. */
+    deep?: boolean;
+    /** If `false` then the object will not be tracked for changes. Default is `true`. */
+    reactive?: boolean;
+}
+
+/**
+ * A lazy-loadable reference to a component's styles.
+ *
+ * Component styles allow Qwik to lazy load the style information for the component only when
+ * needed. (And avoid double loading it in case of SSR hydration.)
+ *
+ * ```tsx
+ * import styles from './code-block.css?inline';
+ *
+ * export const CmpStyles = component$(() => {
+ *   useStyles$(styles);
+ *
+ *   return <div>Some text</div>;
+ * });
+ * ```
+ *
+ * @public
+ * @see `useStylesScoped`
+ */
+export declare const useStyles$: (qrl: string) => UseStyles;
+
+/** @public */
+declare interface UseStyles {
+    styleId: string;
+}
+
+/** @internal */
+export declare const useStylesQrl: (styles: QRL<string>) => UseStyles;
+
+/**
+ * A lazy-loadable reference to a component's styles, that is scoped to the component.
+ *
+ * Component styles allow Qwik to lazy load the style information for the component only when
+ * needed. (And avoid double loading it in case of SSR hydration.)
+ *
+ * ```tsx
+ * import scoped from './code-block.css?inline';
+ *
+ * export const CmpScopedStyles = component$(() => {
+ *   useStylesScoped$(scoped);
+ *
+ *   return <div>Some text</div>;
+ * });
+ * ```
+ *
+ * @public
+ * @see `useStyles`
+ */
+export declare const useStylesScoped$: (qrl: string) => UseStylesScoped;
+
+/** @public */
+export declare interface UseStylesScoped {
+    scopeId: string;
+}
+
+/** @internal */
+export declare const useStylesScopedQrl: (styles: QRL<string>) => UseStylesScoped;
+
+/**
+ * Reruns the `taskFn` when the observed inputs change.
+ *
+ * Use `useTask` to observe changes on a set of inputs, and then re-execute the `taskFn` when those
+ * inputs change.
+ *
+ * The `taskFn` only executes if the observed inputs change. To observe the inputs, use the `obs`
+ * function to wrap property reads. This creates subscriptions that will trigger the `taskFn` to
+ * rerun.
+ *
+ * @param task - Function which should be re-executed when changes to the inputs are detected
+ * @public
+ *
+ * ### Example
+ *
+ * The `useTask` function is used to observe the `store.count` property. Any changes to the
+ * `store.count` cause the `taskFn` to execute which in turn updates the `store.doubleCount` to
+ * the double of `store.count`.
+ *
+ * ```tsx
+ * const Cmp = component$(() => {
+ *   const store = useStore({
+ *     count: 0,
+ *     doubleCount: 0,
+ *     debounced: 0,
+ *   });
+ *
+ *   // Double count task
+ *   useTask$(({ track }) => {
+ *     const count = track(() => store.count);
+ *     store.doubleCount = 2 * count;
+ *   });
+ *
+ *   // Debouncer task
+ *   useTask$(({ track }) => {
+ *     const doubleCount = track(() => store.doubleCount);
+ *     const timer = setTimeout(() => {
+ *       store.debounced = doubleCount;
+ *     }, 2000);
+ *     return () => {
+ *       clearTimeout(timer);
+ *     };
+ *   });
+ *   return (
+ *     <div>
+ *       <div>
+ *         {store.count} / {store.doubleCount}
+ *       </div>
+ *       <div>{store.debounced}</div>
+ *     </div>
+ *   );
+ * });
+ * ```
+ *
+ * @public
+ * @see `Tracker`
+ */
+export declare const useTask$: (fn: TaskFn, opts?: TaskOptions) => void;
+
+/** @internal */
+export declare const useTaskQrl: (qrl: QRL<TaskFn>, opts?: TaskOptions) => void;
+
+/**
+ * ```tsx
+ * const Timer = component$(() => {
+ *   const store = useStore({
+ *     count: 0,
+ *   });
+ *
+ *   useVisibleTask$(() => {
+ *     // Only runs in the client
+ *     const timer = setInterval(() => {
+ *       store.count++;
+ *     }, 500);
+ *     return () => {
+ *       clearInterval(timer);
+ *     };
+ *   });
+ *
+ *   return <div>{store.count}</div>;
+ * });
+ * ```
+ *
+ * @public
+ */
+export declare const useVisibleTask$: (fn: TaskFn, opts?: OnVisibleTaskOptions) => void;
+
+/** @internal */
+export declare const useVisibleTaskQrl: (qrl: QRL<TaskFn>, opts?: OnVisibleTaskOptions) => void;
+
+/**
+ * Handles events for bind:value
+ *
+ * @internal
+ */
+export declare function _val(this: string | undefined, _: any, element: HTMLInputElement): void | Promise<void>;
+
+/**
+ * Type representing a value which is either resolve or a promise.
+ *
+ * @public
+ */
+export declare type ValueOrPromise<T> = T | Promise<T>;
+
+/** @internal */
+export declare const _VAR_PROPS: unique symbol;
+
+/** @internal */
+export declare const _verifySerializable: <T>(value: T, preMessage?: string) => T;
+
+/**
+ * 2.0.0-beta.37-dev+853febe
+ *
+ * @public
+ */
+export declare const version: string;
+
+/** @internal */
+export declare class _VirtualVNode extends _VNode {
+    key: string | null;
+    firstChild: _VNode | null | undefined;
+    lastChild: _VNode | null | undefined;
+    constructor(key: string | null, flags: _VNodeFlags, parent: _ElementVNode | _VirtualVNode | null, previousSibling: _VNode | null | undefined, nextSibling: _VNode | null | undefined, props: Props | null, firstChild: _VNode | null | undefined, lastChild: _VNode | null | undefined);
+}
+
+/** @public */
+export declare type VisibleTaskStrategy = 'intersection-observer' | 'document-ready' | 'document-idle';
+
+/** @internal */
+export declare abstract class _VNode implements BackRef {
+    flags: _VNodeFlags;
+    parent: _VNode | null;
+    previousSibling: _VNode | null | undefined;
+    nextSibling: _VNode | null | undefined;
+    props: Props | null;
+    [_EFFECT_BACK_REF]: Map<any, any> | undefined;
+    slotParent: _VNode | null;
+    dirty: ChoreBits;
+    dirtyChildren: _VNode[] | null;
+    nextDirtyChildIndex: number;
+    constructor(flags: _VNodeFlags, parent: _VNode | null, previousSibling: _VNode | null | undefined, nextSibling: _VNode | null | undefined, props: Props | null);
+    toString(): string;
+}
+
+/** @internal */
+export declare const _vnode_ensureElementInflated: (container: _Container, vnode: _VNode) => void;
+
+/** @internal */
+export declare const _vnode_getAttrKeys: (container: _Container, vnode: _ElementVNode | _VirtualVNode) => string[];
+
+/** @internal */
+export declare const _vnode_getElementName: (vnode: _ElementVNode) => string;
+
+/** @internal */
+export declare const _vnode_getFirstChild: (vnode: _VNode) => _VNode | null;
+
+/** @internal */
+export declare const _vnode_getProp: <T = unknown>(vNode: _VNode, key: string, getObject: ((id: string) => unknown) | null) => T | null;
+
+/** @internal */
+export declare const _vnode_getVNodeForChildNode: (vNode: _ElementVNode, childElement: Element) => _ElementVNode;
+
+/** @internal */
+export declare const _vnode_insertBefore: (journal: _VNodeJournal, parent: _ElementVNode | _VirtualVNode, newChild: _VNode, insertBefore: _VNode | null) => void;
+
+/** @internal */
+export declare const _vnode_isElementVNode: (vNode: _VNode) => vNode is _ElementVNode;
+
+/** @internal */
+export declare const _vnode_isMaterialized: (vNode: _VNode) => boolean;
+
+/** @internal */
+export declare const _vnode_isTextVNode: (vNode: _VNode) => vNode is _TextVNode;
+
+/** @internal */
+export declare const _vnode_isVirtualVNode: (vNode: _VNode) => vNode is _VirtualVNode;
+
+/** @internal */
+export declare const _vnode_newVirtual: () => _VirtualVNode;
+
+/** @internal */
+export declare const _vnode_remove: (journal: _VNodeJournal, vParent: _ElementVNode | _VirtualVNode, vToRemove: _VNode, removeDOM: boolean) => void;
+
+/** @internal */
+export declare const _vnode_setProp: (vNode: _VNode, key: string, value: unknown) => void;
+
+/** @internal */
+export declare function _vnode_toString(this: _VNode | null, depth?: number, offset?: string, materialize?: boolean, siblings?: boolean, colorize?: boolean, container?: _Container | null): string;
+
+/**
+ * Array of numbers which describes virtual nodes in the tree.
+ *
+ * HTML can't account for:
+ *
+ * - Multiple text nodes in a row. (it treats it as a single text node)
+ * - Empty text nodes. (it ignores them)
+ * - And virtual nodes such as `<Fragment/>` or `<MyComponent/>`
+ *
+ * So we need to encode all of that information into the VNodeData.
+ *
+ * Encoding:
+ *
+ * - First position is special and encodes state information and stores VNodeDataFlag.
+ * - Positive numbers are text node lengths. (0 is a special case for empty text node)
+ * - Negative numbers are element counts.
+ * - `OPEN_FRAGMENT` is start of virtual node.
+ *
+ *   - If `OPEN_FRAGMENT` than the previous node is an `Array` which contains the props (see
+ *       `SsrAttrs`). NOTE: The array is never going to be the last item in the VNodeData, so we can
+ *       always assume that the last item in `vNodeData` is a number.
+ * - `CLOSE_FRAGMENT` is end of virtual node.
+ *
+ * NOTE: This is how we store the information during the SSR streaming, once the SSR is complete
+ * this data needs to be serialized into a string and stored in the DOM as a script tag which has
+ * deferent serialization format.
+ */
+declare type VNodeData = [VNodeDataFlag, ...(Props | number)[]];
+
+/**
+ * Flags for VNodeData (Flags con be bitwise combined)
+ *
+ * @internal
+ */
+declare const enum VNodeDataFlag {
+    NONE = 0,
+    TEXT_DATA = 1,
+    VIRTUAL_NODE = 2,
+    ELEMENT_NODE = 4,
+    REFERENCE = 8,
+    SERIALIZE = 16
+}
+
+/**
+ * Flags for VNode.
+ *
+ * # Materialize vs Inflation
+ *
+ * - Materialized: The node has all of its children. Specifically `firstChild`/`lastChild` are NOT
+ *   `undefined`. Materialization creates lazy instantiation of the children. NOTE: Only
+ *   ElementVNode need to be materialized.
+ * - Inflation:
+ *
+ *   - If Text: It means that it is safe to write to the node. When Text nodes are first Deserialized
+ *       multiple text nodes can share the same DOM node. On write the sibling text nodes need to be
+ *       converted into separate text nodes.
+ *   - If Element: It means that the element tag attributes have not yet been read from the DOM.
+ *
+ * Inflation and materialization are not the same, they are two independent things.
+ *
+ * @internal
+ */
+export declare const enum _VNodeFlags {
+    Element = 1,
+    Virtual = 2,
+    ELEMENT_OR_VIRTUAL_MASK = 3,
+    Text = 4,
+    ELEMENT_OR_TEXT_MASK = 5,
+    TYPE_MASK = 7,
+    INFLATED_TYPE_MASK = 15,
+    Inflated = 8,
+    Resolved = 16,
+    Deleted = 32,
+    HasIterationItems = 64,
+    InflatedIterationItems = 128,
+    Cursor = 256,
+    NAMESPACE_MASK = 1536,
+    NEGATED_NAMESPACE_MASK = -1537,
+    NS_html = 0,// http://www.w3.org/1999/xhtml
+    NS_svg = 512,// http://www.w3.org/2000/svg
+    NS_math = 1024,// http://www.w3.org/1998/Math/MathML
+    HasTargetElement = 2048
+}
+
+/** @internal */
+export declare type _VNodeJournal = Array<VNodeOperation>;
+
+declare type VNodeOperation = DeleteOperation | RemoveAllChildrenOperation | SetTextOperation | InsertOrMoveOperation | SetAttributeOperation;
+
+/** @internal */
+export declare const _waitUntilRendered: (container: _Container) => Promise<void>;
+
+/** @internal */
+export declare function _walkJSX(ssr: SSRContainer, value: JSXOutput, options: SSRRenderJSXOptions): Promise<void>;
+
+/**
+ * Override the `getLocale` with `lang` within the `fn` execution.
+ *
+ * @public
+ */
+export declare function withLocale<T>(locale: string, fn: () => T): T;
+
+declare type WrappedProp<T extends object, P extends keyof T> = T extends Signal ? WrappedSignalImpl<PropType<T, P>> : PropType<T, P>;
+
+declare class WrappedSignalImpl<T> extends SignalImpl<T> {
+    $args$: any[];
+    $func$: (...args: any[]) => T;
+    $funcStr$: string | null;
+    $flags$: AllSignalFlags;
+    $hostElement$: _HostElement | undefined;
+    [_EFFECT_BACK_REF]: Map<_EffectProperty | string, EffectSubscription> | undefined;
+    constructor(container: _Container | null, fn: (...args: any[]) => T, args: any[], fnStr: string | null, flags?: AllSignalFlags);
+    invalidate(): void;
+    get untrackedValue(): T;
+    $computeIfNeeded$(): void;
+    $unwrapIfSignal$(): SignalImpl<T> | WrappedSignalImpl<T>;
+    set value(_: any);
+    get value(): any;
+}
+
+/**
+ * This wraps a property access of a possible Signal/Store into a WrappedSignal. The optimizer does
+ * this automatically when a prop is only used as a prop on JSX.
+ *
+ * When a WrappedSignal is read via the PropsProxy, it will be unwrapped. This allows forwarding the
+ * reactivity of a prop to the point of actual use.
+ *
+ * For efficiency, if you pass only one argument, the property is 'value'.
+ *
+ * @internal
+ */
+export declare const _wrapProp: <T extends object, P extends keyof T>(...args: [T, P?]) => WrappedProp<T, P>;
+
+/** @internal @deprecated v1 compat */
+export declare const _wrapSignal: <T extends object, P extends keyof T>(obj: T, prop: P) => T[P] | WrappedProp<T, P>;
+
+export { }

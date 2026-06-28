@@ -1,0 +1,1848 @@
+import { isDev as isDev$1, inlinedQrl } from '@qwik.dev/core';
+import { isDev, _deserialize, _serialize, _verifySerializable } from '@qwik.dev/core/internal';
+import { A as AbortMessage, Q as QACTION_KEY, S as ServerError, R as RedirectMessage, E as getRouteLoaderValues, G as loadRouteLoader, I as throwIfControlFlowSignal, J as isPromise, x as QDATA_KEY, K as getLoaderRequestEvent, L as resolveRouteLoaderByHash, M as getRouteLoaderResponse, N as getRouteLoaderCtx, O as setRouteLoaders, F as FULLPATH_HEADER, p as Q_ROUTE, w as QFN_KEY, P as resolveRouteConfig, _ as _asyncRequestStore } from './head.qwik.mjs';
+import { e as ensureSlash } from './pathname.mjs';
+import { r as recognizeRequest, t as trimRecognizedInternalPathname, Q as QLoaderId, c as IsQAction, d as QActionId, I as IsQLoader, a as resolveValidInternalFullPathname } from './request-path.mjs';
+
+function hash(str) {
+  let hash2 = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    hash2 ^= str.charCodeAt(i);
+    hash2 = hash2 * 16777619 | 0;
+  }
+  return (hash2 >>> 0).toString(36);
+}
+function normalizeETag(raw) {
+  let tag = raw.trim();
+  if (tag.endsWith('"') && tag.startsWith('W/"')) {
+    tag = tag.slice(3);
+  }
+  tag = tag.replace(/[^!#-~]/g, "");
+  return tag;
+}
+function setETagHeader(requestEv, normalizedETag) {
+  const headerETag = `"${normalizedETag}"`;
+  requestEv.headers.set("ETag", headerETag);
+}
+function performETagMatch(requestEv, normalizedETag) {
+  setETagHeader(requestEv, normalizedETag);
+  const ifNoneMatch = requestEv.request.headers.get("If-None-Match");
+  if (ifNoneMatch) {
+    let found = ifNoneMatch.trim() === "*";
+    if (!found) {
+      for (const entry of ifNoneMatch.split(",")) {
+        const normalizedEntry = normalizeETag(entry);
+        if (normalizedEntry === normalizedETag) {
+          found = true;
+          break;
+        }
+      }
+    }
+    if (found) {
+      requestEv.status(304);
+      requestEv.send(304, "");
+      return true;
+    }
+  }
+  return false;
+}
+
+function createCacheControl(cacheControl) {
+  const controls = [];
+  if (cacheControl === "day") {
+    cacheControl = 60 * 60 * 24;
+  } else if (cacheControl === "week") {
+    cacheControl = 60 * 60 * 24 * 7;
+  } else if (cacheControl === "month") {
+    cacheControl = 60 * 60 * 24 * 30;
+  } else if (cacheControl === "year") {
+    cacheControl = 60 * 60 * 24 * 365;
+  } else if (cacheControl === "private") {
+    cacheControl = {
+      private: true,
+      noCache: true
+    };
+  } else if (cacheControl === "immutable") {
+    cacheControl = {
+      public: true,
+      immutable: true,
+      maxAge: 60 * 60 * 24 * 365
+    };
+  } else if (cacheControl === "no-cache") {
+    cacheControl = {
+      noCache: true
+    };
+  }
+  if (typeof cacheControl === "number") {
+    cacheControl = {
+      maxAge: cacheControl,
+      sMaxAge: cacheControl
+    };
+  }
+  if (cacheControl.immutable) {
+    controls.push("immutable");
+  }
+  if (cacheControl.maxAge) {
+    controls.push(`max-age=${cacheControl.maxAge}`);
+  }
+  if (cacheControl.sMaxAge) {
+    controls.push(`s-maxage=${cacheControl.sMaxAge}`);
+  }
+  if (cacheControl.noStore) {
+    controls.push("no-store");
+  }
+  if (cacheControl.noCache) {
+    controls.push("no-cache");
+  }
+  if (cacheControl.private) {
+    controls.push("private");
+  }
+  if (cacheControl.public) {
+    controls.push("public");
+  }
+  if (cacheControl.staleWhileRevalidate) {
+    controls.push(`stale-while-revalidate=${cacheControl.staleWhileRevalidate}`);
+  }
+  if (cacheControl.staleIfError) {
+    controls.push(`stale-if-error=${cacheControl.staleIfError}`);
+  }
+  return controls.join(", ");
+}
+
+const SAMESITE = {
+  lax: "Lax",
+  Lax: "Lax",
+  None: "None",
+  none: "None",
+  strict: "Strict",
+  Strict: "Strict"
+};
+const UNIT = {
+  seconds: 1,
+  minutes: 1 * 60,
+  hours: 1 * 60 * 60,
+  days: 1 * 60 * 60 * 24,
+  weeks: 1 * 60 * 60 * 24 * 7
+};
+function tryDecodeUriComponent(str) {
+  try {
+    return decodeURIComponent(str);
+  } catch {
+    return str;
+  }
+}
+const parseCookieString = (cookieString) => {
+  const cookie = {};
+  if (typeof cookieString === "string" && cookieString !== "") {
+    const cookieSegments = cookieString.split(";");
+    for (const cookieSegment of cookieSegments) {
+      const separatorIndex = cookieSegment.indexOf("=");
+      if (separatorIndex !== -1) {
+        cookie[tryDecodeUriComponent(cookieSegment.slice(0, separatorIndex).trim())] = tryDecodeUriComponent(cookieSegment.slice(separatorIndex + 1).trim());
+      }
+    }
+  }
+  return cookie;
+};
+function resolveSameSite(sameSite) {
+  if (sameSite === true) {
+    return "Strict";
+  }
+  if (sameSite === false) {
+    return "None";
+  }
+  if (sameSite) {
+    return SAMESITE[sameSite];
+  }
+  return void 0;
+}
+const createSetCookieValue = (cookieName, cookieValue, options) => {
+  const c = [
+    `${cookieName}=${cookieValue}`
+  ];
+  if (typeof options.domain === "string") {
+    c.push(`Domain=${options.domain}`);
+  }
+  if (typeof options.maxAge === "number") {
+    c.push(`Max-Age=${options.maxAge}`);
+  } else if (Array.isArray(options.maxAge)) {
+    c.push(`Max-Age=${options.maxAge[0] * UNIT[options.maxAge[1]]}`);
+  } else if (typeof options.expires === "number" || typeof options.expires == "string") {
+    c.push(`Expires=${options.expires}`);
+  } else if (options.expires instanceof Date) {
+    c.push(`Expires=${options.expires.toUTCString()}`);
+  }
+  if (options.httpOnly) {
+    c.push("HttpOnly");
+  }
+  if (typeof options.path === "string") {
+    c.push(`Path=${options.path}`);
+  }
+  const sameSite = resolveSameSite(options.sameSite);
+  if (sameSite) {
+    c.push(`SameSite=${sameSite}`);
+  }
+  if (options.secure) {
+    c.push("Secure");
+  }
+  return c.join("; ");
+};
+const REQ_COOKIE = /* @__PURE__ */ Symbol("request-cookies");
+const RES_COOKIE = /* @__PURE__ */ Symbol("response-cookies");
+const LIVE_COOKIE = /* @__PURE__ */ Symbol("live-cookies");
+class Cookie {
+  [REQ_COOKIE];
+  [RES_COOKIE] = {};
+  [LIVE_COOKIE] = {};
+  appendCounter = 0;
+  constructor(cookieString) {
+    this[REQ_COOKIE] = parseCookieString(cookieString);
+    this[LIVE_COOKIE] = {
+      ...this[REQ_COOKIE]
+    };
+  }
+  get(cookieName, live = true) {
+    const value = this[live ? LIVE_COOKIE : REQ_COOKIE][cookieName];
+    if (!value) {
+      return null;
+    }
+    return {
+      value,
+      json() {
+        return JSON.parse(value);
+      },
+      number() {
+        return Number(value);
+      }
+    };
+  }
+  getAll(live = true) {
+    return Object.keys(this[live ? LIVE_COOKIE : REQ_COOKIE]).reduce((cookies, cookieName) => {
+      cookies[cookieName] = this.get(cookieName);
+      return cookies;
+    }, {});
+  }
+  has(cookieName, live = true) {
+    return !!this[live ? LIVE_COOKIE : REQ_COOKIE][cookieName];
+  }
+  set(cookieName, cookieValue, options = {}) {
+    this[LIVE_COOKIE][cookieName] = typeof cookieValue === "string" ? cookieValue : JSON.stringify(cookieValue);
+    const resolvedValue = typeof cookieValue === "string" ? cookieValue : encodeURIComponent(JSON.stringify(cookieValue));
+    this[RES_COOKIE][cookieName] = createSetCookieValue(cookieName, resolvedValue, options);
+  }
+  append(cookieName, cookieValue, options = {}) {
+    this[LIVE_COOKIE][cookieName] = typeof cookieValue === "string" ? cookieValue : JSON.stringify(cookieValue);
+    const resolvedValue = typeof cookieValue === "string" ? cookieValue : encodeURIComponent(JSON.stringify(cookieValue));
+    this[RES_COOKIE][++this.appendCounter] = createSetCookieValue(cookieName, resolvedValue, options);
+  }
+  delete(name, options) {
+    this.set(name, "deleted", {
+      ...options,
+      maxAge: 0
+    });
+    this[LIVE_COOKIE][name] = null;
+  }
+  headers() {
+    return Object.values(this[RES_COOKIE]);
+  }
+}
+const mergeHeadersCookies = (headers, cookies) => {
+  const cookieHeaders = cookies.headers();
+  if (cookieHeaders.length > 0) {
+    const newHeaders = new Headers(headers);
+    for (const cookie of cookieHeaders) {
+      newHeaders.append("Set-Cookie", cookie);
+    }
+    return newHeaders;
+  }
+  return headers;
+};
+
+class RewriteMessage extends AbortMessage {
+  pathname;
+  constructor(pathname) {
+    super(), this.pathname = pathname;
+  }
+}
+
+const encoder = /* @__PURE__ */ new TextEncoder();
+function getContentType(headers) {
+  return (headers.get("content-type")?.split(/[;,]/, 1)[0].trim() ?? "").toLowerCase();
+}
+function isContentType(headers, ...types) {
+  const type = getContentType(headers);
+  for (let i = 0; i < types.length; i++) {
+    if (types[i].toLowerCase() === type) {
+      return true;
+    }
+  }
+  return false;
+}
+
+const RequestEvMode = /* @__PURE__ */ Symbol("RequestEvMode");
+const RequestEvRoute = /* @__PURE__ */ Symbol("RequestEvRoute");
+const RequestRouteName = "@routeName";
+const RequestEvSharedActionId = "@actionId";
+const RequestEvSharedActionFormData = "@actionFormData";
+const RequestEvSharedNonce = "@nonce";
+const RequestEvIsRewrite = "@rewrite";
+const RequestEvShareServerTiming = "@serverTiming";
+const RequestEvETagCacheKey = "@eTagCacheKey";
+const RequestEvHttpStatusMessage = "@httpStatusMessage";
+function getRequestRoute(requestEv) {
+  return requestEv[RequestEvRoute];
+}
+function getRequestMode(requestEv) {
+  return requestEv[RequestEvMode];
+}
+const ABORT_INDEX = Number.MAX_SAFE_INTEGER;
+const isDangerousKey = (k) => k === "__proto__" || k === "constructor" || k === "prototype";
+const isArrayIndexKey = (k) => /^(0|[1-9]\d*)$/.test(k);
+const getArrayPaths = (formData) => {
+  const arrayCandidates = /* @__PURE__ */ new Map();
+  for (const [name] of formData) {
+    const keys = name.split(".");
+    let hasDangerousKey = false;
+    for (const key of keys) {
+      if (isDangerousKey(key)) {
+        hasDangerousKey = true;
+        break;
+      }
+    }
+    if (hasDangerousKey) {
+      continue;
+    }
+    let path = "";
+    for (let i = 0; i < keys.length - 1; i++) {
+      const key = keys[i];
+      if (key.endsWith("[]")) {
+        break;
+      }
+      path = path ? `${path}.${key}` : key;
+      if (!arrayCandidates.has(path)) {
+        arrayCandidates.set(path, true);
+      }
+      if (!isArrayIndexKey(keys[i + 1])) {
+        arrayCandidates.set(path, false);
+      }
+    }
+  }
+  return new Set(Array.from(arrayCandidates.entries()).filter(([, isArrayPath]) => isArrayPath).map(([path]) => path));
+};
+const formToObj = (formData) => {
+  const values = /* @__PURE__ */ Object.create(null);
+  const arrayPaths = getArrayPaths(formData);
+  for (const [name, value] of formData) {
+    const keys = name.split(".");
+    let hasDangerousKey = false;
+    for (let i = 0; i < keys.length; i++) {
+      if (isDangerousKey(keys[i])) {
+        hasDangerousKey = true;
+        break;
+      }
+    }
+    if (hasDangerousKey) {
+      continue;
+    }
+    let object = values;
+    let path = "";
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
+      if (key.endsWith("[]")) {
+        const arrayKey = key.slice(0, -2);
+        if (isDangerousKey(arrayKey)) {
+          break;
+        }
+        const existingValue = object[arrayKey];
+        if (existingValue !== void 0 && !Array.isArray(existingValue)) {
+          break;
+        }
+        object[arrayKey] = existingValue || [];
+        object[arrayKey].push(value);
+        break;
+      }
+      if (Array.isArray(object) && !isArrayIndexKey(key)) {
+        break;
+      }
+      if (i < keys.length - 1) {
+        path = path ? `${path}.${key}` : key;
+        const nextValue = object[key];
+        if (nextValue !== void 0) {
+          object = nextValue;
+          continue;
+        }
+        object = object[key] = arrayPaths.has(path) ? [] : /* @__PURE__ */ Object.create(null);
+      } else {
+        object[key] = value;
+      }
+    }
+  }
+  return values;
+};
+const parseRequest = async ({ request, method, query }, sharedMap) => {
+  const type = getContentType(request.headers);
+  if (type === "application/x-www-form-urlencoded" || type === "multipart/form-data") {
+    const formData = await request.formData();
+    sharedMap.set(RequestEvSharedActionFormData, formData);
+    return formToObj(formData);
+  } else if (type === "application/json") {
+    const data = await request.json();
+    return data;
+  } else if (type === "application/qwik-json") {
+    if (method === "GET" && query.has(QDATA_KEY)) {
+      const data = query.get(QDATA_KEY);
+      if (data) {
+        try {
+          return await _deserialize(decodeURIComponent(data));
+        } catch {
+        }
+      }
+    }
+    return await _deserialize(await request.text());
+  }
+  return void 0;
+};
+function createRequestEvent(serverRequestEv, loadedRoute, requestHandlers, basePathname, resolved) {
+  const { request, platform, env } = serverRequestEv;
+  const sharedMap = /* @__PURE__ */ new Map();
+  const cookie = new Cookie(request.headers.get("cookie"));
+  const headers = new Headers();
+  const url = new URL(request.url);
+  let internalRequest = false;
+  const recognized = recognizeRequest(url.pathname);
+  if (recognized) {
+    url.pathname = trimRecognizedInternalPathname(url.pathname, recognized);
+    sharedMap.set(recognized.type, true);
+    internalRequest = "loader";
+    if (recognized.data?.loaderId) {
+      sharedMap.set(QLoaderId, recognized.data.loaderId);
+    }
+  }
+  const actionId = url.searchParams.get(QACTION_KEY);
+  if (actionId) {
+    sharedMap.set(IsQAction, true);
+    sharedMap.set(QActionId, actionId);
+    if (request.method === "POST" && request.headers.get("accept")?.includes("application/json")) {
+      internalRequest = "action";
+    }
+  }
+  let routeModuleIndex = -1;
+  let writableStream = null;
+  let requestData = void 0;
+  let locale = serverRequestEv.locale;
+  let status = loadedRoute?.$notFound$ ? 404 : 200;
+  const next = async () => {
+    routeModuleIndex++;
+    while (routeModuleIndex < requestHandlers.length) {
+      const moduleRequestHandler = requestHandlers[routeModuleIndex];
+      const result = moduleRequestHandler(requestEv);
+      throwIfControlFlowSignal(isPromise(result) ? await result : result);
+      routeModuleIndex++;
+    }
+  };
+  const resetRoute = (_loadedRoute, _requestHandlers, _url = url) => {
+    loadedRoute = _loadedRoute;
+    status = loadedRoute?.$notFound$ ? 404 : 200;
+    requestHandlers = _requestHandlers;
+    url.pathname = _url.pathname;
+    url.search = _url.search;
+    routeModuleIndex = -1;
+  };
+  const check = () => {
+    if (writableStream !== null) {
+      throw new Error("Response already sent");
+    }
+  };
+  const send = (statusOrResponse, body) => {
+    check();
+    if (typeof statusOrResponse === "number") {
+      status = statusOrResponse;
+      const writableStream2 = requestEv.getWritableStream();
+      const writer = writableStream2.getWriter();
+      writer.write(typeof body === "string" ? encoder.encode(body) : body);
+      writer.close();
+    } else {
+      status = statusOrResponse.status;
+      statusOrResponse.headers.forEach((value, key) => {
+        if (key.toLowerCase() === "set-cookie") {
+          return;
+        }
+        headers.append(key, value);
+      });
+      statusOrResponse.headers.getSetCookie().forEach((ck) => {
+        const index = ck.indexOf("=");
+        if (index === -1) {
+          return;
+        }
+        const key = ck.slice(0, index).trim();
+        const value = ck.slice(index + 1).trim();
+        cookie.set(key, value);
+      });
+      if (statusOrResponse.body) {
+        const writableStream2 = requestEv.getWritableStream();
+        statusOrResponse.body.pipeTo(writableStream2);
+      } else {
+        requestEv.getWritableStream().getWriter().close();
+      }
+    }
+    return exit();
+  };
+  const exit = (message = new AbortMessage()) => {
+    routeModuleIndex = ABORT_INDEX;
+    return message;
+  };
+  const requestEv = {
+    [RequestEvMode]: serverRequestEv.mode,
+    get [RequestEvRoute]() {
+      return loadedRoute;
+    },
+    cookie,
+    headers,
+    env,
+    method: request.method,
+    signal: request.signal,
+    originalUrl: new URL(url),
+    get params() {
+      return loadedRoute?.$params$ ?? {};
+    },
+    get pathname() {
+      return url.pathname;
+    },
+    platform,
+    get query() {
+      return url.searchParams;
+    },
+    request,
+    url,
+    internalRequest,
+    basePathname,
+    sharedMap,
+    get headersSent() {
+      return writableStream !== null;
+    },
+    get exited() {
+      return routeModuleIndex >= ABORT_INDEX;
+    },
+    get clientConn() {
+      return serverRequestEv.getClientConn();
+    },
+    next,
+    resetRoute,
+    exit,
+    cacheControl: (cacheControl, target = "Cache-Control") => {
+      check();
+      headers.set(target, createCacheControl(cacheControl));
+    },
+    resolveValue: async (loaderOrAction) => {
+      if (loaderOrAction.__brand === "server_loader") {
+        const loaderValues = getRouteLoaderValues(requestEv);
+        if (loaderOrAction.__id in loaderValues) {
+          return loaderValues[loaderOrAction.__id];
+        }
+        return loadRouteLoader(loaderOrAction, requestEv);
+      }
+      return void 0;
+    },
+    status: (statusCode) => {
+      if (typeof statusCode === "number") {
+        check();
+        status = statusCode;
+        return statusCode;
+      }
+      return status;
+    },
+    locale: (_locale) => {
+      if (typeof _locale === "string") {
+        locale = _locale;
+      }
+      return locale || "";
+    },
+    error: (statusCode, message) => {
+      status = statusCode;
+      headers.delete("Cache-Control");
+      return new ServerError(statusCode, message);
+    },
+    redirect: (statusCode, url2) => {
+      check();
+      status = statusCode;
+      if (url2) {
+        if (
+          // //test.com
+          /^\/\//.test(url2) || // /test//path
+          /([^:])\/\/+/.test(url2)
+        ) {
+          const fixedURL = url2.replace(/^\/\/+/, "/").replace(/([^:])\/\/+/g, "$1/");
+          console.warn(`Redirect URL ${url2} is invalid, fixing to ${fixedURL}`);
+          url2 = fixedURL;
+        }
+        headers.set("Location", url2);
+      }
+      headers.delete("Cache-Control");
+      if (statusCode > 301) {
+        headers.set("Cache-Control", "no-store");
+      }
+      if (internalRequest === "loader") {
+        return new RedirectMessage();
+      }
+      return exit(new RedirectMessage());
+    },
+    rewrite: (pathname) => {
+      check();
+      if (pathname.startsWith("http")) {
+        throw new ServerError(400, isDev ? "Rewrite does not support absolute urls" : "Bad Request");
+      }
+      sharedMap.set(RequestEvIsRewrite, true);
+      return exit(new RewriteMessage(pathname.replace(/\/+/g, "/")));
+    },
+    defer: (returnData) => {
+      return typeof returnData === "function" ? returnData : () => returnData;
+    },
+    fail: (statusCode, data) => {
+      check();
+      status = statusCode;
+      headers.delete("Cache-Control");
+      return {
+        failed: true,
+        ...data
+      };
+    },
+    text: (statusCode, text) => {
+      headers.set("Content-Type", "text/plain; charset=utf-8");
+      return send(statusCode, text);
+    },
+    html: (statusCode, html) => {
+      headers.set("Content-Type", "text/html; charset=utf-8");
+      return send(statusCode, html);
+    },
+    parseBody: async () => {
+      if (requestData !== void 0) {
+        return requestData;
+      }
+      return requestData = parseRequest(requestEv, sharedMap);
+    },
+    json: (statusCode, data) => {
+      headers.set("Content-Type", "application/json; charset=utf-8");
+      return send(statusCode, JSON.stringify(data));
+    },
+    send,
+    isDirty: () => {
+      return writableStream !== null;
+    },
+    getWritableStream: () => {
+      if (writableStream === null) {
+        if (isDev) {
+          const serverTiming = sharedMap.get(RequestEvShareServerTiming);
+          if (serverTiming) {
+            headers.set("Server-Timing", serverTiming.map(([name, duration]) => `${name};dur=${duration}`).join(","));
+          }
+        }
+        writableStream = serverRequestEv.getWritableStream(status, headers, cookie, resolved, requestEv);
+      }
+      return writableStream;
+    }
+  };
+  return requestEv;
+}
+
+const MAX_CACHE_SIZE = typeof globalThis.__SSR_CACHE_SIZE__ === "number" ? globalThis.__SSR_CACHE_SIZE__ : 50;
+function createLruCache() {
+  const cache = /* @__PURE__ */ new Map();
+  return {
+    get(key) {
+      const entry = cache.get(key);
+      if (entry !== void 0) {
+        cache.delete(key);
+        cache.set(key, entry);
+      }
+      return entry;
+    },
+    set(key, entry) {
+      if (MAX_CACHE_SIZE <= 0) {
+        return;
+      }
+      if (cache.size >= MAX_CACHE_SIZE) {
+        const firstKey = cache.keys().next().value;
+        cache.delete(firstKey);
+      }
+      cache.set(key, entry);
+    },
+    clear(key) {
+      if (key != null) {
+        cache.delete(key);
+      } else {
+        cache.clear();
+      }
+    }
+  };
+}
+const ssrCache = createLruCache();
+const loaderCache = createLruCache();
+function resolveETag(eTagExport, headProps) {
+  if (eTagExport === void 0) {
+    return null;
+  }
+  if (typeof eTagExport === "function") {
+    return eTagExport(headProps);
+  }
+  return eTagExport;
+}
+function resolveCacheKey(cacheKeyExport, defaultKey, requestEv, eTag) {
+  if (cacheKeyExport === true) {
+    return defaultKey(requestEv, eTag);
+  }
+  if (typeof cacheKeyExport !== "function") {
+    return "";
+  }
+  return cacheKeyExport(requestEv, eTag) || "";
+}
+function defaultSsrCacheKey(requestEv, eTag) {
+  const status = requestEv.status();
+  const pathname = requestEv.url.pathname;
+  return eTag ? `${status}|${eTag}|${pathname}` : `${status}|${pathname}`;
+}
+function defaultLoaderCacheKey(requestEv, eTag) {
+  const loaderId = requestEv.sharedMap.get(QLoaderId);
+  const base = `${requestEv.url.pathname}|${requestEv.url.search}|${loaderId}`;
+  return eTag ? `${base}|${eTag}` : base;
+}
+function getCachedSsr(key) {
+  return ssrCache.get(key);
+}
+function setCachedSsr(key, entry) {
+  ssrCache.set(key, entry);
+}
+function getCachedLoader(key) {
+  return loaderCache.get(key);
+}
+function setCachedLoader(key, entry) {
+  loaderCache.set(key, entry);
+}
+function clearSsrCache(cacheKey) {
+  ssrCache.clear(cacheKey);
+}
+function clearLoaderCache(cacheKey) {
+  loaderCache.clear(cacheKey);
+}
+
+function createLoaderRequestEventFactory(requestEv) {
+  return (loader) => getLoaderRequestEvent(loader, requestEv);
+}
+
+function setLoaderData(requestEv, routeLoaders, loaderPaths) {
+  if (loaderPaths) {
+    Object.assign(getRouteLoaderCtx(requestEv).loaderPaths, loaderPaths);
+  }
+  setRouteLoaders(requestEv, routeLoaders);
+}
+function resolvePreETag(eTagOption, requestEv) {
+  if (typeof eTagOption === "string") {
+    return normalizeETag(eTagOption);
+  }
+  const result = eTagOption(requestEv);
+  return result ? normalizeETag(result) : "";
+}
+function addVaryHeader(requestEv, value) {
+  const vary = requestEv.headers.get("Vary");
+  if (!vary) {
+    requestEv.headers.set("Vary", value);
+    return;
+  }
+  const existing = vary.split(",").map((item) => item.trim().toLowerCase());
+  if (!existing.includes(value.toLowerCase())) {
+    requestEv.headers.set("Vary", `${vary}, ${value}`);
+  }
+}
+async function sendLoaderResponse(requestEv, data, loader) {
+  requestEv.headers.set("Content-Type", "application/json; charset=utf-8");
+  addVaryHeader(requestEv, FULLPATH_HEADER);
+  if (loader?.__expires && loader.__expires > 0) {
+    requestEv.cacheControl({
+      maxAge: Math.ceil(loader.__expires / 1e3)
+    });
+  }
+  requestEv.send(200, data);
+}
+function loaderHandler(routeLoaders, loaderPaths) {
+  return async (requestEvent) => {
+    const requestEv = requestEvent;
+    if (!requestEv.sharedMap.has(IsQLoader)) {
+      return;
+    }
+    if (requestEv.headersSent || requestEv.exited) {
+      return;
+    }
+    const loaderId = requestEv.sharedMap.get(QLoaderId);
+    const loader = resolveRouteLoaderByHash(routeLoaders, loaderId);
+    if (!loader) {
+      requestEv.json(404, {
+        error: "Loader not found"
+      });
+      return;
+    }
+    setLoaderData(requestEv, routeLoaders, loaderPaths);
+    const loaderRequestEv = createLoaderRequestEventFactory(requestEv)(loader);
+    const normalizedETag = loader.__eTag !== void 0 ? resolvePreETag(loader.__eTag, loaderRequestEv) : "";
+    if (normalizedETag && performETagMatch(loaderRequestEv, normalizedETag)) {
+      return;
+    }
+    let cacheKey = "";
+    if (loader.__cacheKey) {
+      cacheKey = resolveCacheKey(loader.__cacheKey, defaultLoaderCacheKey, loaderRequestEv, normalizedETag);
+    }
+    if (cacheKey) {
+      const cached = getCachedLoader(cacheKey);
+      if (cached) {
+        if (!normalizedETag) {
+          if (performETagMatch(loaderRequestEv, cached.eTag)) {
+            return;
+          }
+        } else {
+          setETagHeader(loaderRequestEv, cached.eTag);
+        }
+        await sendLoaderResponse(requestEv, cached.body, loader);
+        return;
+      }
+    }
+    const responseData = await getRouteLoaderResponse(loader.__qrl, loader.__validators, loaderRequestEv);
+    const data = await _serialize(responseData);
+    const failed = responseData.d && typeof responseData.d === "object" && responseData.d.failed;
+    const cacheable = cacheKey && !responseData.r && !responseData.e && !failed;
+    const finalETag = normalizedETag || (cacheable ? hash(data) : "");
+    if (cacheable && finalETag) {
+      setCachedLoader(cacheKey, {
+        eTag: finalETag,
+        body: data
+      });
+    }
+    if (!normalizedETag && finalETag && performETagMatch(loaderRequestEv, finalETag)) {
+      return;
+    }
+    await sendLoaderResponse(requestEv, data, loader);
+  };
+}
+async function sendJsonResponse(requestEv, responseData, status = 200) {
+  const data = await _serialize(responseData);
+  requestEv.headers.set("Content-Type", "application/json; charset=utf-8");
+  requestEv.send(status, data);
+}
+async function sendActionResponse(requestEv, responseData) {
+  const data = await _serialize(responseData);
+  requestEv.headers.set("Content-Type", "application/json; charset=utf-8");
+  requestEv.send(responseData.s || 200, data);
+}
+
+function jsonRequestWrapper() {
+  return async (requestEvent) => {
+    const requestEv = requestEvent;
+    const isLoader = requestEv.internalRequest === "loader";
+    const isActionJson = requestEv.internalRequest === "action";
+    if (!isLoader && !isActionJson) {
+      return;
+    }
+    if (isLoader) {
+      addVaryHeader(requestEv, FULLPATH_HEADER);
+      const pagePath = requestEv.request.headers.get(FULLPATH_HEADER);
+      const pagePathname = resolveValidInternalFullPathname(requestEv.url.pathname, pagePath);
+      if (pagePathname) {
+        requestEv.url.pathname = pagePathname;
+      }
+    }
+    try {
+      await requestEv.next();
+    } catch (err) {
+      if (requestEv.headersSent) {
+        return;
+      }
+      if (err instanceof RedirectMessage) {
+        const location = requestEv.headers.get("Location") || "/";
+        requestEv.headers.delete("Location");
+        if (isLoader) {
+          await sendJsonResponse(requestEv, {
+            r: location
+          });
+        } else {
+          await sendActionResponse(requestEv, {
+            redirect: location
+          });
+        }
+      } else if (err instanceof ServerError) {
+        if (isLoader) {
+          await sendJsonResponse(requestEv, {
+            e: err
+          });
+        } else {
+          await sendActionResponse(requestEv, {
+            e: err,
+            s: err.status
+          });
+        }
+      } else if (err instanceof Error) {
+        console.error("JSON request error:", err);
+        const message = isDev$1 ? `${err.message}
+(this is only visible in dev mode)` : "Internal Server Error";
+        const se = new ServerError(500, message);
+        if (isLoader) {
+          await sendJsonResponse(requestEv, {
+            e: se
+          });
+        } else {
+          await sendActionResponse(requestEv, {
+            e: se,
+            s: 500
+          });
+        }
+      } else {
+        throw err;
+      }
+    }
+  };
+}
+
+function verifySerializable(data, qrl) {
+  try {
+    _verifySerializable(data, void 0);
+  } catch (e) {
+    if (e instanceof Error && qrl.dev) {
+      e.loc = qrl.dev;
+    }
+    throw e;
+  }
+}
+async function measure(requestEv, name, fn) {
+  const start = performance.now();
+  try {
+    return await fn();
+  } finally {
+    const duration = performance.now() - start;
+    let measurements = requestEv.sharedMap.get("@serverTiming");
+    if (!measurements) {
+      requestEv.sharedMap.set("@serverTiming", measurements = []);
+    }
+    measurements.push([
+      name,
+      duration
+    ]);
+  }
+}
+async function runValidators(requestEv, validators, data, devMode) {
+  let lastResult = {
+    success: true,
+    data
+  };
+  if (validators) {
+    for (const validator of validators) {
+      if (devMode) {
+        lastResult = await measure(requestEv, `validator$`, () => validator.validate(requestEv, data));
+      } else {
+        lastResult = await validator.validate(requestEv, data);
+      }
+      if (!lastResult.success) {
+        return lastResult;
+      } else {
+        data = lastResult.data;
+      }
+    }
+  }
+  return lastResult;
+}
+function actionHandler(routeActions) {
+  return async (requestEvent) => {
+    const requestEv = requestEvent;
+    if (!requestEv.sharedMap.has(IsQAction)) {
+      return;
+    }
+    if (!requestEv.request.headers.get("accept")?.includes("application/json")) {
+      return;
+    }
+    if (requestEv.headersSent || requestEv.exited) {
+      return;
+    }
+    const actionId = requestEv.sharedMap.get(QActionId);
+    const method = requestEv.method;
+    const devMode = isDev;
+    if (devMode && method === "GET") {
+      console.warn('Seems like you are submitting a Qwik Action via GET request. Qwik Actions should be submitted via POST request.\nMake sure your <form> has method="POST" attribute, like this: <form method="POST">');
+    }
+    if (method !== "POST") {
+      return;
+    }
+    let action;
+    for (const routeAction of routeActions) {
+      if (routeAction.__id === actionId) {
+        action = routeAction;
+      }
+    }
+    if (!action) {
+      const serverActionsMap = globalThis._qwikActionsMap;
+      action = serverActionsMap?.get(actionId);
+    }
+    if (!action) {
+      requestEv.json(404, {
+        error: "Action not found"
+      });
+      return;
+    }
+    const data = await requestEv.parseBody();
+    if (!data || typeof data !== "object") {
+      throw new Error(`Expected request data for the action id ${actionId} to be an object`);
+    }
+    let actionResult;
+    const result = await runValidators(requestEv, action.__validators, data, devMode);
+    if (!result.success) {
+      actionResult = requestEv.fail(result.status ?? 500, result.error);
+    } else {
+      const actionResolved = devMode ? await measure(requestEv, action.__qrl.getHash(), () => action.__qrl.call(requestEv, result.data, requestEv)) : await action.__qrl.call(requestEv, result.data, requestEv);
+      throwIfControlFlowSignal(actionResolved);
+      if (devMode) {
+        verifySerializable(actionResolved, action.__qrl);
+      }
+      actionResult = actionResolved;
+    }
+    const responseData = {
+      result: actionResult
+    };
+    requestEv.sharedMap.set(RequestEvSharedActionId, actionId);
+    requestEv.sharedMap.set("@actionResult", actionResult);
+    if (action.__invalidate) {
+      responseData.loaderHashes = action.__invalidate;
+    } else if (globalThis.__STRICT_LOADERS__) {
+      responseData.loaderHashes = [];
+    }
+    const serialized = await _serialize(responseData);
+    requestEv.headers.set("Content-Type", "application/json; charset=utf-8");
+    requestEv.send(requestEv.status(), serialized);
+  };
+}
+
+var HttpStatus = /* @__PURE__ */ (function(HttpStatus2) {
+  HttpStatus2[HttpStatus2["Continue"] = 100] = "Continue";
+  HttpStatus2[HttpStatus2["SwitchingProtocols"] = 101] = "SwitchingProtocols";
+  HttpStatus2[HttpStatus2["Processing"] = 102] = "Processing";
+  HttpStatus2[HttpStatus2["Ok"] = 200] = "Ok";
+  HttpStatus2[HttpStatus2["Created"] = 201] = "Created";
+  HttpStatus2[HttpStatus2["Accepted"] = 202] = "Accepted";
+  HttpStatus2[HttpStatus2["NonAuthoritativeInformation"] = 203] = "NonAuthoritativeInformation";
+  HttpStatus2[HttpStatus2["NoContent"] = 204] = "NoContent";
+  HttpStatus2[HttpStatus2["ResetContent"] = 205] = "ResetContent";
+  HttpStatus2[HttpStatus2["PartialContent"] = 206] = "PartialContent";
+  HttpStatus2[HttpStatus2["MultiStatus"] = 207] = "MultiStatus";
+  HttpStatus2[HttpStatus2["AlreadyReported"] = 208] = "AlreadyReported";
+  HttpStatus2[HttpStatus2["ImUsed"] = 226] = "ImUsed";
+  HttpStatus2[HttpStatus2["MultipleChoices"] = 300] = "MultipleChoices";
+  HttpStatus2[HttpStatus2["MovedPermanently"] = 301] = "MovedPermanently";
+  HttpStatus2[HttpStatus2["Found"] = 302] = "Found";
+  HttpStatus2[HttpStatus2["SeeOther"] = 303] = "SeeOther";
+  HttpStatus2[HttpStatus2["NotModified"] = 304] = "NotModified";
+  HttpStatus2[HttpStatus2["UseProxy"] = 305] = "UseProxy";
+  HttpStatus2[HttpStatus2["SwitchProxy"] = 306] = "SwitchProxy";
+  HttpStatus2[HttpStatus2["TemporaryRedirect"] = 307] = "TemporaryRedirect";
+  HttpStatus2[HttpStatus2["PermanentRedirect"] = 308] = "PermanentRedirect";
+  HttpStatus2[HttpStatus2["BadRequest"] = 400] = "BadRequest";
+  HttpStatus2[HttpStatus2["Unauthorized"] = 401] = "Unauthorized";
+  HttpStatus2[HttpStatus2["PaymentRequired"] = 402] = "PaymentRequired";
+  HttpStatus2[HttpStatus2["Forbidden"] = 403] = "Forbidden";
+  HttpStatus2[HttpStatus2["NotFound"] = 404] = "NotFound";
+  HttpStatus2[HttpStatus2["MethodNotAllowed"] = 405] = "MethodNotAllowed";
+  HttpStatus2[HttpStatus2["NotAcceptable"] = 406] = "NotAcceptable";
+  HttpStatus2[HttpStatus2["ProxyAuthenticationRequired"] = 407] = "ProxyAuthenticationRequired";
+  HttpStatus2[HttpStatus2["RequestTimeout"] = 408] = "RequestTimeout";
+  HttpStatus2[HttpStatus2["Conflict"] = 409] = "Conflict";
+  HttpStatus2[HttpStatus2["Gone"] = 410] = "Gone";
+  HttpStatus2[HttpStatus2["LengthRequired"] = 411] = "LengthRequired";
+  HttpStatus2[HttpStatus2["PreconditionFailed"] = 412] = "PreconditionFailed";
+  HttpStatus2[HttpStatus2["PayloadTooLarge"] = 413] = "PayloadTooLarge";
+  HttpStatus2[HttpStatus2["UriTooLong"] = 414] = "UriTooLong";
+  HttpStatus2[HttpStatus2["UnsupportedMediaType"] = 415] = "UnsupportedMediaType";
+  HttpStatus2[HttpStatus2["RangeNotSatisfiable"] = 416] = "RangeNotSatisfiable";
+  HttpStatus2[HttpStatus2["ExpectationFailed"] = 417] = "ExpectationFailed";
+  HttpStatus2[HttpStatus2["IAmATeapot"] = 418] = "IAmATeapot";
+  HttpStatus2[HttpStatus2["MisdirectedRequest"] = 421] = "MisdirectedRequest";
+  HttpStatus2[HttpStatus2["UnprocessableEntity"] = 422] = "UnprocessableEntity";
+  HttpStatus2[HttpStatus2["Locked"] = 423] = "Locked";
+  HttpStatus2[HttpStatus2["FailedDependency"] = 424] = "FailedDependency";
+  HttpStatus2[HttpStatus2["UpgradeRequired"] = 426] = "UpgradeRequired";
+  HttpStatus2[HttpStatus2["PreconditionRequired"] = 428] = "PreconditionRequired";
+  HttpStatus2[HttpStatus2["TooManyRequests"] = 429] = "TooManyRequests";
+  HttpStatus2[HttpStatus2["RequestHeaderFieldsTooLarge"] = 431] = "RequestHeaderFieldsTooLarge";
+  HttpStatus2[HttpStatus2["UnavailableForLegalReasons"] = 451] = "UnavailableForLegalReasons";
+  HttpStatus2[HttpStatus2["InternalServerError"] = 500] = "InternalServerError";
+  HttpStatus2[HttpStatus2["NotImplemented"] = 501] = "NotImplemented";
+  HttpStatus2[HttpStatus2["BadGateway"] = 502] = "BadGateway";
+  HttpStatus2[HttpStatus2["ServiceUnavailable"] = 503] = "ServiceUnavailable";
+  HttpStatus2[HttpStatus2["GatewayTimeout"] = 504] = "GatewayTimeout";
+  HttpStatus2[HttpStatus2["HttpVersionNotSupported"] = 505] = "HttpVersionNotSupported";
+  HttpStatus2[HttpStatus2["VariantAlsoNegotiates"] = 506] = "VariantAlsoNegotiates";
+  HttpStatus2[HttpStatus2["InsufficientStorage"] = 507] = "InsufficientStorage";
+  HttpStatus2[HttpStatus2["LoopDetected"] = 508] = "LoopDetected";
+  HttpStatus2[HttpStatus2["NotExtended"] = 510] = "NotExtended";
+  HttpStatus2[HttpStatus2["NetworkAuthenticationRequired"] = 511] = "NetworkAuthenticationRequired";
+  return HttpStatus2;
+})({});
+
+function getQwikRouterServerData(requestEv) {
+  const { params, request, status, locale, originalUrl } = requestEv;
+  const requestHeaders = {};
+  request.headers.forEach((value, key) => requestHeaders[key] = value);
+  const action = requestEv.sharedMap.get(RequestEvSharedActionId);
+  const actionResult = requestEv.sharedMap.get("@actionResult");
+  const formData = requestEv.sharedMap.get(RequestEvSharedActionFormData);
+  const routeName = requestEv.sharedMap.get(RequestRouteName);
+  const nonce = requestEv.sharedMap.get(RequestEvSharedNonce);
+  const headers = requestEv.request.headers;
+  const reconstructedUrl = new URL(originalUrl.pathname + originalUrl.search, originalUrl);
+  const host = headers.get("X-Forwarded-Host");
+  const protocol = headers.get("X-Forwarded-Proto");
+  if (host) {
+    reconstructedUrl.port = "";
+    reconstructedUrl.host = host;
+  }
+  if (protocol) {
+    reconstructedUrl.protocol = protocol;
+  }
+  const routeLoaderCtx = getRouteLoaderCtx(requestEv);
+  const loaderValues = getRouteLoaderValues(requestEv);
+  return {
+    url: reconstructedUrl.href,
+    requestHeaders,
+    renderMode: getRequestMode(requestEv),
+    locale: locale(),
+    nonce,
+    containerAttributes: {
+      [Q_ROUTE]: routeName
+    },
+    qwikrouter: {
+      routeName,
+      ev: requestEv,
+      params: {
+        ...params
+      },
+      loadedRoute: getRequestRoute(requestEv),
+      routeLoaderCtx,
+      loaderValues,
+      response: {
+        status: status(),
+        statusMessage: requestEv.sharedMap.get(RequestEvHttpStatusMessage),
+        action,
+        actionResult,
+        formData
+      }
+    }
+  };
+}
+
+const loadHttpError = () => import('./http-error.qwik.mjs');
+function createResolveRequestHandlers() {
+  const resolveRequestHandlers2 = (serverPlugins, route, method, checkOrigin, renderHandler) => {
+    const routeLoaders = [];
+    const routeActions = [];
+    const requestHandlers = [];
+    const isPageRoute = !!isLastModulePageRoute2(route.$mods$);
+    if (isPageRoute) {
+      requestHandlers.push(jsonRequestWrapper());
+      requestHandlers.push(serverErrorMiddleware(route, renderHandler));
+    }
+    if (serverPlugins) {
+      _resolveRequestHandlers(routeLoaders, routeActions, requestHandlers, serverPlugins, isPageRoute, method);
+    }
+    const routeModules = route.$mods$;
+    _resolveRequestHandlers(routeLoaders, routeActions, requestHandlers, routeModules, isPageRoute, method, isPageRoute);
+    const routeName = route.$routeName$;
+    if (checkOrigin && (method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE")) {
+      if (checkOrigin === "lax-proto") {
+        requestHandlers.unshift(csrfLaxProtoCheckMiddleware);
+      } else {
+        requestHandlers.unshift(csrfCheckMiddleware);
+      }
+    }
+    if (isPageRoute) {
+      requestHandlers.push(loaderHandler(routeLoaders, route.$loaderPaths$));
+      requestHandlers.push(actionHandler(routeActions));
+      if (method === "POST" || method === "GET") {
+        requestHandlers.push(runServerFunction);
+      }
+      if (!route.$notFound$) {
+        requestHandlers.push(fixTrailingSlash2);
+      }
+    }
+    if (isPageRoute) {
+      requestHandlers.push((ev) => {
+        ev.sharedMap.set(RequestRouteName, routeName);
+      });
+      requestHandlers.push(actionsMiddleware2(routeActions));
+      requestHandlers.push(loadersMiddleware2(routeLoaders, route));
+      requestHandlers.push(eTagMiddleware(route));
+      requestHandlers.push(renderHandler);
+    }
+    return requestHandlers;
+  };
+  function _resolveRequestHandlers(routeLoaders, routeActions, requestHandlers, routeModules, collectActions, method, guardPageHandlersForLoader = false) {
+    for (let i = 0; i < routeModules.length; i++) {
+      const routeModule = routeModules[i];
+      const moduleHandlers = getModuleRequestHandlers(routeModule, method);
+      const shouldGuardPageHandlers = guardPageHandlersForLoader && i === routeModules.length - 1;
+      requestHandlers.push(...shouldGuardPageHandlers ? moduleHandlers.map((handler) => guardPageHandlerForLoader(routeModule, handler)) : moduleHandlers);
+      if (collectActions) {
+        for (const module of Object.values(routeModule)) {
+          if (typeof module === "function") {
+            if (module.__brand === "server_loader") {
+              routeLoaders.push(module);
+            } else if (module.__brand === "server_action") {
+              routeActions.push(module);
+            }
+          }
+        }
+      }
+    }
+  }
+  function getModuleRequestHandlers(routeModule, method) {
+    const handlers = [];
+    addRequestHandlers(handlers, routeModule.onRequest);
+    let methodReqHandler;
+    switch (method) {
+      case "GET": {
+        methodReqHandler = routeModule.onGet;
+        break;
+      }
+      case "POST": {
+        methodReqHandler = routeModule.onPost;
+        break;
+      }
+      case "PUT": {
+        methodReqHandler = routeModule.onPut;
+        break;
+      }
+      case "PATCH": {
+        methodReqHandler = routeModule.onPatch;
+        break;
+      }
+      case "DELETE": {
+        methodReqHandler = routeModule.onDelete;
+        break;
+      }
+      case "OPTIONS": {
+        methodReqHandler = routeModule.onOptions;
+        break;
+      }
+      case "HEAD": {
+        methodReqHandler = routeModule.onHead;
+        break;
+      }
+    }
+    addRequestHandlers(handlers, methodReqHandler);
+    return handlers;
+  }
+  function addRequestHandlers(handlers, handler) {
+    if (typeof handler === "function") {
+      handlers.push(handler);
+    } else if (Array.isArray(handler)) {
+      handlers.push(...handler);
+    }
+  }
+  function guardPageHandlerForLoader(routeModule, handler) {
+    return (requestEv) => {
+      if (requestEv.sharedMap.has(IsQLoader)) {
+        const loaderId = requestEv.sharedMap.get(QLoaderId);
+        if (!moduleHasLoader(routeModule, loaderId)) {
+          return;
+        }
+      }
+      return handler(requestEv);
+    };
+  }
+  function moduleHasLoader(routeModule, loaderId) {
+    if (typeof loaderId !== "string") {
+      return false;
+    }
+    for (const value of Object.values(routeModule)) {
+      if (checkBrand2(value, "server_loader") && value.__id === loaderId) {
+        return true;
+      }
+    }
+    return false;
+  }
+  const checkBrand2 = (obj, brand) => {
+    return obj && typeof obj === "function" && obj.__brand === brand;
+  };
+  function actionsMiddleware2(routeActions) {
+    return async (requestEvent) => {
+      const requestEv = requestEvent;
+      if (requestEv.headersSent) {
+        requestEv.exit();
+        return;
+      }
+      const { method } = requestEv;
+      if (isDev$1 && method === "GET") {
+        if (requestEv.query.has(QACTION_KEY)) {
+          console.warn('Seems like you are submitting a Qwik Action via GET request. Qwik Actions should be submitted via POST request.\nMake sure your <form> has method="POST" attribute, like this: <form method="POST">');
+        }
+      }
+      if (method === "POST") {
+        const selectedActionId = requestEv.query.get(QACTION_KEY);
+        if (selectedActionId) {
+          const serverActionsMap = globalThis._qwikActionsMap;
+          const action = routeActions.find((action2) => action2.__id === selectedActionId) ?? serverActionsMap?.get(selectedActionId);
+          if (action) {
+            requestEv.sharedMap.set(RequestEvSharedActionId, selectedActionId);
+            const data = await requestEv.parseBody();
+            if (!data || typeof data !== "object") {
+              throw new Error(`Expected request data for the action id ${selectedActionId} to be an object`);
+            }
+            const result = await runValidators(requestEv, action.__validators, data);
+            let actionResult;
+            if (!result.success) {
+              actionResult = requestEv.fail(result.status ?? 500, result.error);
+            } else {
+              const actionResolved = isDev$1 ? await measure2(requestEv, action.__qrl.getHash(), () => action.__qrl.call(requestEv, result.data, requestEv)) : await action.__qrl.call(requestEv, result.data, requestEv);
+              throwIfControlFlowSignal(actionResolved);
+              if (isDev$1) {
+                verifySerializable2(actionResolved, action.__qrl);
+              }
+              actionResult = actionResolved;
+            }
+            requestEv.sharedMap.set("@actionResult", actionResult);
+          }
+        }
+      }
+    };
+  }
+  function loadersMiddleware2(routeLoaders, route) {
+    return async (requestEvent) => {
+      const requestEv = requestEvent;
+      if (requestEv.headersSent) {
+        requestEv.exit();
+        return;
+      }
+      if (routeLoaders.length > 0) {
+        setLoaderData(requestEv, routeLoaders, route);
+        const loaderValues = getRouteLoaderValues(requestEv);
+        await Promise.all(routeLoaders.map(async (loader) => {
+          loaderValues[loader.__id] = await loadRouteLoader(loader, requestEv);
+        }));
+      }
+    };
+  }
+  function setLoaderData(requestEv, routeLoaders, route) {
+    if (routeLoaders.length === 0) {
+      return;
+    }
+    const routeLoaderCtx = getRouteLoaderCtx(requestEv);
+    if (route.$loaderPaths$) {
+      Object.assign(routeLoaderCtx.loaderPaths, route.$loaderPaths$);
+    }
+    setRouteLoaders(requestEv, routeLoaders);
+  }
+  function eTagMiddleware(route) {
+    return (requestEv) => {
+      if (requestEv.headersSent) {
+        return;
+      }
+      if (requestEv.method !== "GET") {
+        return;
+      }
+      const mods = route.$mods$;
+      const hasCachingConfig = mods.some((m) => {
+        if (!m) {
+          return false;
+        }
+        if (m.routeConfig) {
+          return typeof m.routeConfig === "function" || m.routeConfig.eTag !== void 0 || m.routeConfig.cacheKey !== void 0;
+        }
+        return m.eTag !== void 0 || m.cacheKey !== void 0;
+      });
+      if (!hasCachingConfig) {
+        return;
+      }
+      const loaderValues = getRouteLoaderValues(requestEv);
+      const getData = (loaderOrAction) => {
+        const id = loaderOrAction.__id;
+        if (loaderOrAction.__brand === "server_loader") {
+          if (!(id in loaderValues)) {
+            throw new Error("Loader not executed for this request.");
+          }
+          return loaderValues[id];
+        }
+        return requestEv.sharedMap.get(RequestEvSharedActionId) === id ? requestEv.sharedMap.get("@actionResult") : void 0;
+      };
+      const routeLocation = {
+        params: requestEv.params,
+        url: requestEv.url,
+        isNavigating: false,
+        prevUrl: void 0
+      };
+      const status = requestEv.status();
+      const config = resolveRouteConfig(getData, routeLocation, mods, "", status);
+      const headProps = {
+        head: config.head,
+        status,
+        withLocale: (fn) => fn(),
+        resolveValue: getData,
+        ...routeLocation
+      };
+      const resolvedETag = resolveETag(config.eTag, headProps);
+      const normalizedETag = resolvedETag !== null ? normalizeETag(resolvedETag) : "";
+      if (normalizedETag && performETagMatch(requestEv, normalizedETag)) {
+        return;
+      }
+      if (MAX_CACHE_SIZE <= 0) {
+        return;
+      }
+      const cacheKey = resolveCacheKey(config.cacheKey, defaultSsrCacheKey, requestEv, normalizedETag);
+      if (!cacheKey) {
+        return;
+      }
+      const cached = getCachedSsr(cacheKey);
+      if (cached) {
+        requestEv.headers.set("Content-Type", "text/html; charset=utf-8");
+        requestEv.headers.set("X-SSR-Cache", "HIT");
+        if (!normalizedETag) {
+          if (performETagMatch(requestEv, cached.eTag)) {
+            return;
+          }
+        } else {
+          setETagHeader(requestEv, cached.eTag);
+        }
+        requestEv.send(status, cached.body);
+        return;
+      }
+      requestEv.sharedMap.set(RequestEvETagCacheKey, {
+        key: cacheKey,
+        eTag: normalizedETag
+      });
+    };
+  }
+  function serverErrorMiddleware(route, renderHandler) {
+    return async (requestEv) => {
+      try {
+        await requestEv.next();
+      } catch (e) {
+        if (!(e instanceof ServerError) || requestEv.headersSent) {
+          throw e;
+        }
+        const accept = requestEv.request.headers.get("Accept");
+        if (accept && !accept.includes("text/html")) {
+          throw e;
+        }
+        const status = e.status;
+        requestEv.status(status);
+        const errorLoader = route.$errorLoader$;
+        if (Array.isArray(errorLoader)) {
+          route.$mods$ = await Promise.all(errorLoader.map((load) => load()));
+        } else {
+          const errorModule = errorLoader ? await errorLoader() : await loadHttpError();
+          route.$mods$ = [
+            errorModule
+          ];
+        }
+        requestEv.sharedMap.set(RequestEvHttpStatusMessage, typeof e.data === "string" ? e.data : "Server Error");
+        await renderHandler(requestEv);
+      }
+    };
+  }
+  async function runValidators(requestEv, validators, data) {
+    let lastResult = {
+      success: true,
+      data
+    };
+    if (validators) {
+      for (const validator of validators) {
+        if (isDev$1) {
+          lastResult = await measure2(requestEv, `validator$`, () => validator.validate(requestEv, data));
+        } else {
+          lastResult = await validator.validate(requestEv, data);
+        }
+        if (!lastResult.success) {
+          return lastResult;
+        } else {
+          data = lastResult.data;
+        }
+      }
+    }
+    return lastResult;
+  }
+  function isAsyncIterator(obj) {
+    return obj ? typeof obj === "object" && Symbol.asyncIterator in obj : false;
+  }
+  async function runServerFunction(ev) {
+    const serverFnHash = ev.query.get(QFN_KEY);
+    if (serverFnHash && ev.request.headers.get("X-QRL") === serverFnHash && ev.request.headers.get("Content-Type") === "application/qwik-json") {
+      ev.exit();
+      const data = await ev.parseBody();
+      if (!Array.isArray(data) || !(Array.isArray(data[0]) || data[0] === void 0)) {
+        throw ev.error(500, "Invalid request");
+      }
+      const qrl = inlinedQrl(null, serverFnHash, data.slice(1));
+      let result;
+      try {
+        if (isDev$1) {
+          result = await measure2(ev, `server_${serverFnHash}`, () => qrl.apply(ev, data[0]));
+        } else {
+          result = await qrl.apply(ev, data[0]);
+        }
+      } catch (err) {
+        if (err instanceof ServerError) {
+          throw ev.error(err.status, err.data);
+        }
+        console.error(`Server function ${serverFnHash} failed:`, err);
+        throw ev.error(500, "Invalid request");
+      }
+      throwIfControlFlowSignal(result);
+      if (isAsyncIterator(result)) {
+        ev.headers.set("Content-Type", "text/qwik-json-stream");
+        const writable = ev.getWritableStream();
+        const stream = writable.getWriter();
+        for await (const item of result) {
+          if (isDev$1) {
+            verifySerializable2(item, qrl);
+          }
+          const message = await _serialize(item);
+          if (ev.signal.aborted) {
+            break;
+          }
+          await stream.write(encoder.encode(`${message}
+`));
+        }
+        stream.close();
+      } else {
+        verifySerializable2(result, qrl);
+        ev.headers.set("Content-Type", "application/qwik-json");
+        const message = await _serialize(result);
+        ev.send(200, message);
+      }
+      return;
+    }
+  }
+  function fixTrailingSlash2(ev) {
+    const { basePathname, originalUrl } = ev;
+    const { pathname, search } = originalUrl;
+    if (!pathname.startsWith("/") || pathname.startsWith("//")) {
+      return;
+    }
+    if (pathname !== basePathname && !pathname.endsWith(".html")) {
+      if (!globalThis.__NO_TRAILING_SLASH__) {
+        if (!pathname.endsWith("/")) {
+          throw ev.redirect(HttpStatus.MovedPermanently, ensureSlash(pathname) + search);
+        }
+      } else {
+        if (pathname.endsWith("/")) {
+          throw ev.redirect(HttpStatus.MovedPermanently, pathname.slice(0, pathname.length - 1) + search);
+        }
+      }
+    }
+  }
+  function verifySerializable2(data, qrl) {
+    try {
+      _verifySerializable(data, void 0);
+    } catch (e) {
+      if (e instanceof Error && qrl.dev) {
+        e.loc = qrl.dev;
+      }
+      throw e;
+    }
+  }
+  const isQrl2 = (value) => {
+    return typeof value === "function" && typeof value.getSymbol === "function";
+  };
+  function isLastModulePageRoute2(routeModules) {
+    const lastRouteModule = routeModules[routeModules.length - 1];
+    return lastRouteModule && typeof lastRouteModule.default === "function";
+  }
+  function getPathname2(url) {
+    url = new URL(url);
+    if (!globalThis.__NO_TRAILING_SLASH__) {
+      if (!url.pathname.endsWith("/")) {
+        url.pathname = ensureSlash(url.pathname);
+      }
+    } else {
+      if (url.pathname.endsWith("/")) {
+        url.pathname = url.pathname.slice(0, -1);
+      }
+    }
+    const search = url.search.slice(1).replaceAll(/&?q(action|data|func|loaders)=[^&]+/g, "");
+    return `${url.pathname}${search ? `?${search}` : ""}${url.hash}`;
+  }
+  function csrfLaxProtoCheckMiddleware(requestEv) {
+    checkCSRF2(requestEv, "lax-proto");
+  }
+  function csrfCheckMiddleware(requestEv) {
+    checkCSRF2(requestEv);
+  }
+  function checkCSRF2(requestEv, laxProto) {
+    const contentType = requestEv.request.headers.get("content-type");
+    const isSimpleRequest = !contentType || isContentType(requestEv.request.headers, "application/x-www-form-urlencoded", "multipart/form-data", "text/plain");
+    if (isSimpleRequest) {
+      const inputOrigin = requestEv.request.headers.get("origin");
+      const origin = requestEv.url.origin;
+      let forbidden = inputOrigin !== origin;
+      if (forbidden && laxProto && inputOrigin?.replace(/^http(s)?/g, "") === origin.replace(/^http(s)?/g, "")) {
+        forbidden = false;
+      }
+      if (forbidden) {
+        throw requestEv.error(403, `CSRF check failed. Cross-site ${requestEv.method} form submissions are forbidden.
+The request origin "${inputOrigin}" does not match the server origin "${origin}".`);
+      }
+    }
+  }
+  function renderQwikMiddleware2(render) {
+    return async (requestEv) => {
+      if (requestEv.headersSent) {
+        return;
+      }
+      const responseHeaders = requestEv.headers;
+      if (!responseHeaders.has("Content-Type")) {
+        responseHeaders.set("Content-Type", "text/html; charset=utf-8");
+      }
+      const cachePlan = requestEv.sharedMap.get(RequestEvETagCacheKey);
+      const { readable, writable } = new TextEncoderStream();
+      const writableStream = requestEv.getWritableStream();
+      let cacheChunks;
+      let pipeSource = readable;
+      if (cachePlan) {
+        cacheChunks = [];
+        const capture = new TransformStream({
+          transform(chunk, controller) {
+            cacheChunks.push(chunk);
+            controller.enqueue(chunk);
+          }
+        });
+        pipeSource = readable.pipeThrough(capture);
+      }
+      let pipeError;
+      const pipe = pipeSource.pipeTo(writableStream, {
+        preventClose: true
+      }).catch((error) => {
+        pipeError = error;
+      });
+      const stream = writable.getWriter();
+      try {
+        const isStatic = getRequestMode(requestEv) === "static";
+        const serverData = getQwikRouterServerData(requestEv);
+        const result = await render({
+          base: requestEv.basePathname + "build/",
+          stream,
+          streaming: isStatic ? {
+            outOfOrder: false
+          } : void 0,
+          serverData,
+          containerAttributes: {
+            ["q:render"]: isStatic ? "static" : "",
+            ...serverData.containerAttributes
+          }
+        });
+        if (typeof result.html === "string") {
+          await stream.write(result.html);
+        }
+      } finally {
+        await stream.ready;
+        await stream.close();
+        await pipe;
+      }
+      if (pipeError) {
+        throw pipeError;
+      }
+      if (cachePlan && cacheChunks && cacheChunks.length > 0) {
+        const totalLength = cacheChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+        const combined = new Uint8Array(totalLength);
+        let offset = 0;
+        for (const chunk of cacheChunks) {
+          combined.set(chunk, offset);
+          offset += chunk.length;
+        }
+        const html = new TextDecoder().decode(combined);
+        const cachedETag = cachePlan.eTag || hash(html);
+        setCachedSsr(cachePlan.key, {
+          eTag: cachedETag,
+          body: html
+        });
+      }
+      await writableStream.close();
+    };
+  }
+  function now() {
+    return typeof performance !== "undefined" ? performance.now() : 0;
+  }
+  async function measure2(requestEv, name, fn) {
+    const start = now();
+    try {
+      return await fn();
+    } finally {
+      const duration = now() - start;
+      let measurements = requestEv.sharedMap.get(RequestEvShareServerTiming);
+      if (!measurements) {
+        requestEv.sharedMap.set(RequestEvShareServerTiming, measurements = []);
+      }
+      measurements.push([
+        name,
+        duration
+      ]);
+    }
+  }
+  return {
+    actionsMiddleware: actionsMiddleware2,
+    checkBrand: checkBrand2,
+    checkCSRF: checkCSRF2,
+    fixTrailingSlash: fixTrailingSlash2,
+    getPathname: getPathname2,
+    isLastModulePageRoute: isLastModulePageRoute2,
+    isQrl: isQrl2,
+    loadersMiddleware: loadersMiddleware2,
+    measure: measure2,
+    renderQwikMiddleware: renderQwikMiddleware2,
+    resolveRequestHandlers: resolveRequestHandlers2,
+    verifySerializable: verifySerializable2
+  };
+}
+const { renderQwikMiddleware, resolveRequestHandlers} = createResolveRequestHandlers();
+
+const ESCAPE_HTML = /[&<>]/g;
+const escapeHtml = (s) => {
+  return s.replace(ESCAPE_HTML, (c) => {
+    switch (c) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      default:
+        return "";
+    }
+  });
+};
+const COLOR_400 = "#006ce9";
+const COLOR_500 = "#713fc2";
+function minimalHtmlResponse(status, message) {
+  if (typeof status !== "number") {
+    status = 500;
+  }
+  if (typeof message === "string") {
+    message = escapeHtml(message);
+  } else {
+    message = "";
+  }
+  const width = typeof message === "string" ? "600px" : "300px";
+  const color = status >= 500 ? COLOR_500 : COLOR_400;
+  return `
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Status" content="${status}">
+  <title>${status} ${message}</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    body { color: ${color}; background-color: #fafafa; padding: 30px; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif; }
+    p { max-width: ${width}; margin: 60px auto 30px auto; background: white; border-radius: 4px; box-shadow: 0px 0px 50px -20px ${color}; overflow: hidden; }
+    strong { display: inline-block; padding: 15px; background: ${color}; color: white; }
+    span { display: inline-block; padding: 15px; }
+  </style>
+</head>
+<body><p><strong>${status}</strong> <span>${message}</span></p></body>
+`;
+}
+function getErrorHtml(status, e) {
+  let message = "Server Error";
+  if (e != null) {
+    if (typeof e.message === "string") {
+      message = e.message;
+    } else {
+      message = String(e);
+    }
+  }
+  return `<html>` + minimalHtmlResponse(status, message) + `</html>`;
+}
+
+const ensureError = (e) => e instanceof Error || typeof e === "object" && e !== null ? e : new Error(String(e));
+async function runNext(requestEv, rebuildRouteInfo, resolve) {
+  try {
+    const isValidURL = (url) => new URL(url.pathname + url.search, url);
+    isValidURL(requestEv.originalUrl);
+  } catch {
+    const status = 404;
+    const message = "Resource Not Found";
+    requestEv.status(status);
+    requestEv.html(status, getErrorHtml(status, message));
+    return new ServerError(status, message);
+  }
+  let rewriteAttempt = 1;
+  async function runOnce() {
+    try {
+      await requestEv.next();
+    } catch (e) {
+      if (e instanceof RedirectMessage) {
+        const stream = requestEv.getWritableStream();
+        await stream.close();
+        return e;
+      } else if (e instanceof RewriteMessage) {
+        if (rewriteAttempt > 50) {
+          return new Error(`Infinite rewrite loop`);
+        }
+        rewriteAttempt += 1;
+        const url = new URL(requestEv.url);
+        url.pathname = e.pathname;
+        const { loadedRoute, requestHandlers } = await rebuildRouteInfo(url);
+        requestEv.resetRoute(loadedRoute, requestHandlers, url);
+        return await runOnce();
+      } else if (e instanceof AbortMessage) {
+        return;
+      } else if (e instanceof ServerError && !requestEv.headersSent) {
+        const status = e.status;
+        const accept = requestEv.request.headers.get("Accept");
+        if (accept && !accept.includes("text/html")) {
+          requestEv.headers.set("Content-Type", "application/qwik-json");
+          requestEv.send(status, await _serialize(e.data));
+        } else {
+          requestEv.html(status, getErrorHtml(status, e.data));
+        }
+        return e;
+      }
+      if (!isDev) {
+        try {
+          if (!requestEv.headersSent) {
+            requestEv.headers.set("content-type", "text/html; charset=utf-8");
+            requestEv.cacheControl({
+              noCache: true
+            });
+            requestEv.status(500);
+          }
+          const stream = requestEv.getWritableStream();
+          if (!stream.locked) {
+            const writer = stream.getWriter();
+            await writer.write(encoder.encode(getErrorHtml(500, "Internal Server Error")));
+            await writer.close();
+          }
+        } catch {
+          console.error("Unable to render error page");
+        }
+      }
+      return e instanceof Error || typeof e === "object" && e !== null ? e : new Error(String(e));
+    }
+  }
+  try {
+    return await runOnce();
+  } finally {
+    if (!requestEv.isDirty()) {
+      resolve(null);
+    }
+  }
+}
+function runQwikRouter(serverRequestEv, loadedRoute, requestHandlers, rebuildRouteInfo, basePathname = "/") {
+  let resolve;
+  const responsePromise = new Promise((r) => resolve = r);
+  try {
+    const requestEv = createRequestEvent(serverRequestEv, loadedRoute, requestHandlers, basePathname, resolve);
+    return {
+      response: responsePromise,
+      requestEv,
+      completion: _asyncRequestStore ? _asyncRequestStore.run(requestEv, runNext, requestEv, rebuildRouteInfo, resolve) : runNext(requestEv, rebuildRouteInfo, resolve)
+    };
+  } catch (e) {
+    resolve(null);
+    return {
+      response: responsePromise,
+      requestEv: {
+        headersSent: false
+      },
+      completion: Promise.resolve(ensureError(e))
+    };
+  }
+}
+
+export { RewriteMessage as R, resolveRequestHandlers as a, renderQwikMiddleware as b, clearLoaderCache as c, clearSsrCache as d, getErrorHtml as g, mergeHeadersCookies as m, runQwikRouter as r };

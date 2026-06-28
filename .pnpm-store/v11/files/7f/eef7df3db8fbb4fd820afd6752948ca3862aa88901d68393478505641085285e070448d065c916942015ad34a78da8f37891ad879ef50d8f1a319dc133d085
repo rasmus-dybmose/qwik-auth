@@ -1,0 +1,4110 @@
+/**
+ * @license
+ * @qwik.dev/core/server 2.0.0-beta.37-dev+853febe
+ * Copyright QwikDev. All Rights Reserved.
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://github.com/QwikDev/qwik/blob/main/LICENSE
+ */
+
+// packages/qwik/src/server/index.ts
+import { setPlatform as setPlatform2 } from "@qwik.dev/core";
+
+// packages/qwik/src/server/platform.ts
+import { setPlatform } from "@qwik.dev/core";
+import { isDev as isDev6 } from "@qwik.dev/core/build";
+
+// packages/qwik/src/core/client/util-mapArray.ts
+import { isDev as isDev2 } from "@qwik.dev/core/build";
+
+// packages/qwik/src/core/shared/error/assert.ts
+import { isDev } from "@qwik.dev/core/build";
+
+// packages/qwik/src/core/shared/utils/qdev.ts
+var qDev = globalThis.qDev !== false;
+var qInspector = globalThis.qInspector === true;
+var qDynamicPlatform = globalThis.qDynamicPlatform !== false;
+var qTest = globalThis.qTest === true;
+var qRuntimeQrl = globalThis.qRuntimeQrl === true;
+
+// packages/qwik/src/core/shared/utils/log.ts
+var STYLE = qDev ? `background: #564CE0; color: white; padding: 2px 3px; border-radius: 2px; font-size: 0.8em;` : "";
+var throwErrorAndStop = (message, ...optionalParams) => {
+  const error = createAndLogError(false, message, ...optionalParams);
+  debugger;
+  throw error;
+};
+var logErrorAndStop = (message, ...optionalParams) => {
+  const err = createAndLogError(qDev, message, ...optionalParams);
+  debugger;
+  return err;
+};
+var createAndLogError = (asyncThrow, message, ...optionalParams) => {
+  const err = message instanceof Error ? message : new Error(message);
+  !qTest && console.error("%cQWIK ERROR", STYLE, err.message, ...optionalParams, err.stack);
+  asyncThrow && !qTest && setTimeout(() => {
+    throw err;
+  }, 0);
+  return err;
+};
+
+// packages/qwik/src/core/shared/error/assert.ts
+var ASSERT_DISCLAIMER = "Internal assert, this is likely caused by a bug in Qwik: ";
+function assertTrue(value1, text, ...parts) {
+  if (isDev) {
+    if (value1 === true) {
+      return;
+    }
+    throwErrorAndStop(ASSERT_DISCLAIMER + text, ...parts);
+  }
+}
+
+// packages/qwik/src/core/client/util-mapArray.ts
+var mapApp_findIndx = (array, key, start) => {
+  isDev2 && assertTrue(start % 2 === 0, "Expecting even number.");
+  let bottom = start >> 1;
+  let top = array.length - 2 >> 1;
+  while (bottom <= top) {
+    const mid = bottom + (top - bottom >> 1);
+    const midKey = array[mid << 1];
+    if (midKey === key) {
+      return mid << 1;
+    }
+    if (midKey < key) {
+      bottom = mid + 1;
+    } else {
+      top = mid - 1;
+    }
+  }
+  return bottom << 1 ^ -1;
+};
+var mapArray_set = (array, key, value, start, allowNullValue = false) => {
+  const indx = mapApp_findIndx(array, key, start);
+  if (indx >= 0) {
+    if (value == null && !allowNullValue) {
+      array.splice(indx, 2);
+    } else {
+      array[indx + 1] = value;
+    }
+  } else if (value != null || allowNullValue) {
+    array.splice(indx ^ -1, 0, key, value);
+  }
+};
+var mapApp_remove = (array, key, start) => {
+  const indx = mapApp_findIndx(array, key, start);
+  let value = null;
+  if (indx >= 0) {
+    value = array[indx + 1];
+    array.splice(indx, 2);
+    return value;
+  }
+  return value;
+};
+var mapArray_get = (array, key, start) => {
+  const indx = mapApp_findIndx(array, key, start);
+  if (indx >= 0) {
+    return array[indx + 1];
+  } else {
+    return null;
+  }
+};
+var mapArray_has = (array, key, start) => {
+  return mapApp_findIndx(array, key, start) >= 0;
+};
+
+// packages/qwik/src/core/shared/error/error.ts
+import { isDev as isDev3 } from "@qwik.dev/core/build";
+
+// packages/qwik/src/core/shared/utils/types.ts
+var isObject = (v) => {
+  return typeof v === "object" && v !== null;
+};
+var isArray = (v) => {
+  return Array.isArray(v);
+};
+var isString = (v) => {
+  return typeof v === "string";
+};
+
+// packages/qwik/src/core/shared/error/error.ts
+var baseUrl = "https://qwikdev-build-v2.qwik-8nx.pages.dev/docs/errors/#q";
+var codeToText = (code, ...parts) => {
+  if (isDev3) {
+    const MAP = [
+      "Error while serializing class or style attributes",
+      // 0
+      "Scheduler not found",
+      // 1
+      "track() received object, without prop to track",
+      // 2
+      "Only primitive and object literals can be serialized. {{0}}",
+      // 3
+      "You can render over a existing q:container. Skipping render().",
+      // 4
+      "QRL is not a function",
+      // 5
+      "Dynamic import {{0}} not found",
+      // 6
+      "Unknown type argument",
+      // 7
+      `Actual value for useContext({{0}}) can not be found, make sure some ancestor component has set a value using useContextProvider(). In the browser make sure that the context was used during SSR so its state was serialized.`,
+      // 8
+      "Invoking 'use*()' method outside of invocation context.",
+      // 9
+      `Calling a 'use*()' method outside 'component$(() => { HERE })' is not allowed. 'use*()' methods provide hooks to the 'component$' state and lifecycle, ie 'use' hooks can only be called synchronously within the 'component$' function or another 'use' method.
+See https://qwik.dev/docs/core/tasks/#use-method-rules`,
+      // 10
+      'The provided Context reference "{{0}}" is not a valid context created by createContextId()',
+      // 11
+      "SsrError(tag): {{0}}",
+      // 12
+      "QRLs can not be resolved because it does not have an attached container. This means that the QRL does not know where it belongs inside the DOM, so it cant dynamically import() from a relative path.",
+      // 13
+      "QRLs can not be dynamically resolved, because it does not have a chunk path",
+      // 14
+      "{{0}}\nThe JSX ref attribute must be a Signal",
+      // 15
+      "Serialization Error: Deserialization of data type {{0}} is not implemented",
+      // 16
+      "Serialization Error: Expected vnode for ref prop, but got {{0}}",
+      // 17
+      "Serialization Error: Cannot allocate data type {{0}}",
+      // 18
+      "Serialization Error: Missing root id for {{0}}",
+      // 19
+      "Serialization Error: Serialization of data type {{0}} is not implemented",
+      // 20
+      "Serialization Error: Unvisited {{0}}",
+      // 21
+      "Serialization Error: Missing QRL chunk for {{0}}",
+      // 22
+      "{{0}}\nThe value of the textarea must be a string found {{1}}",
+      // 23
+      "Unable to find q:container",
+      // 24
+      "Element must have 'q:container' attribute.",
+      // 25
+      "Unknown vnode type {{0}}.",
+      // 26
+      "Materialize error: missing element: {{0}} {{1}} {{2}}",
+      // 27
+      "Cannot coerce a Signal, use `.value` instead",
+      // 28
+      "useComputed$ QRL {{0}} {{1}} cannot return a Promise",
+      // 29
+      `===
+Qwik version {{0}} already imported while importing {{1}}.
+This can lead to issues due to duplicated shared structures.
+Verify that the Qwik libraries you're using are in "resolve.noExternal[]" and in "optimizeDeps.exclude".
+===
+`,
+      // 30
+      "WrappedSignal is read-only",
+      // 31
+      "Attribute value is unsafe for SSR {{0}}",
+      // 32
+      "SerializerSymbol function returned rejected promise",
+      // 33
+      "Serialization Error: Cannot serialize function: {{0}}",
+      // 34
+      "Cannot read .value of a clientOnly async signal during SSR. Use .loading to check state, or provide an initial value."
+      // 35
+    ];
+    let text = MAP[code] ?? "";
+    if (parts.length) {
+      text = text.replaceAll(/{{(\d+)}}/g, (_, index) => {
+        let v = parts[index];
+        if (v && isObject(v) && v.constructor === Object) {
+          v = JSON.stringify(v).slice(0, 50);
+        }
+        return v;
+      });
+    }
+    return `Code(Q${code}): ${text}`;
+  } else {
+    return `Code(Q${code}) ${baseUrl}${code}`;
+  }
+};
+var qError = (code, errorMessageArgs = []) => {
+  const text = codeToText(code, ...errorMessageArgs);
+  return logErrorAndStop(text, ...errorMessageArgs);
+};
+
+// packages/qwik/src/core/shared/qrl/qrl-utils.ts
+import { isDev as isDev4 } from "@qwik.dev/core/build";
+var SYNC_QRL = "<sync>";
+
+// packages/qwik/src/core/shared/types.ts
+var DEBUG_TYPE = "q:type";
+
+// packages/qwik/src/core/shared/vnode-data-types.ts
+var VNodeDataSeparator = {
+  REFERENCE_CH: (
+    /* ***** */
+    `~`
+  ),
+  // `~` is a reference to the node. Save it.
+  REFERENCE: (
+    /* ******** */
+    126
+  ),
+  // `~` is a reference to the node. Save it.
+  ADVANCE_1_CH: (
+    /* ***** */
+    `!`
+  ),
+  // `!` is vNodeData separator skipping 0. (ie next vNode)
+  ADVANCE_1: (
+    /* ********* */
+    33
+  ),
+  // `!` is vNodeData separator skipping 0. (ie next vNode)
+  ADVANCE_2_CH: (
+    /* ***** */
+    `"`
+  ),
+  // `"` is vNodeData separator skipping 1.
+  ADVANCE_2: (
+    /* ********* */
+    34
+  ),
+  // `"` is vNodeData separator skipping 1.
+  ADVANCE_4_CH: (
+    /* ***** */
+    `#`
+  ),
+  // `#` is vNodeData separator skipping 2.
+  ADVANCE_4: (
+    /* ********* */
+    35
+  ),
+  // `#` is vNodeData separator skipping 2.
+  ADVANCE_8_CH: (
+    /* ***** */
+    `$`
+  ),
+  // `$` is vNodeData separator skipping 4.
+  ADVANCE_8: (
+    /* ********* */
+    36
+  ),
+  // `$` is vNodeData separator skipping 4.
+  ADVANCE_16_CH: (
+    /* **** */
+    `%`
+  ),
+  // `%` is vNodeData separator skipping 8.
+  ADVANCE_16: (
+    /* ******** */
+    37
+  ),
+  // `%` is vNodeData separator skipping 8.
+  ADVANCE_32_CH: (
+    /* **** */
+    `&`
+  ),
+  // `&` is vNodeData separator skipping 16.
+  ADVANCE_32: (
+    /* ******** */
+    38
+  ),
+  // `&` is vNodeData separator skipping 16.
+  ADVANCE_64_CH: (
+    /* **** */
+    `'`
+  ),
+  // `'` is vNodeData separator skipping 32.
+  ADVANCE_64: (
+    /* ******** */
+    39
+  ),
+  // `'` is vNodeData separator skipping 32.
+  ADVANCE_128_CH: (
+    /* *** */
+    `(`
+  ),
+  // `(` is vNodeData separator skipping 64.
+  ADVANCE_128: (
+    /* ******* */
+    40
+  ),
+  // `(` is vNodeData separator skipping 64.
+  ADVANCE_256_CH: (
+    /* *** */
+    `)`
+  ),
+  // `)` is vNodeData separator skipping 128.
+  ADVANCE_256: (
+    /* ******* */
+    41
+  ),
+  // `)` is vNodeData separator skipping 128.
+  ADVANCE_512_CH: (
+    /* *** */
+    `*`
+  ),
+  // `*` is vNodeData separator skipping 256.
+  ADVANCE_512: (
+    /* ******* */
+    42
+  ),
+  // `*` is vNodeData separator skipping 256.
+  ADVANCE_1024_CH: (
+    /* ** */
+    `+`
+  ),
+  // `+` is vNodeData separator skipping 512.
+  ADVANCE_1024: (
+    /* ****** */
+    43
+  ),
+  // `+` is vNodeData separator skipping 512.
+  ADVANCE_2048_CH: (
+    /* *  */
+    ","
+  ),
+  // ',' is vNodeData separator skipping 1024.
+  ADVANCE_2048: (
+    /* ****** */
+    44
+  ),
+  // ',' is vNodeData separator skipping 1024.
+  ADVANCE_4096_CH: (
+    /* *  */
+    `-`
+  ),
+  // `-` is vNodeData separator skipping 2048.
+  ADVANCE_4096: (
+    /* ****** */
+    45
+  ),
+  // `-` is vNodeData separator skipping 2048.
+  ADVANCE_8192_CH: (
+    /* *  */
+    `.`
+  ),
+  // `.` is vNodeData separator skipping 4096.
+  ADVANCE_8192: (
+    /* ****** */
+    46
+  )
+  // `.` is vNodeData separator skipping 4096.
+};
+var VNodeDataChar = {
+  OPEN: (
+    /* ************** */
+    123
+  ),
+  // `{` is the start of the VNodeData for a virtual element.
+  OPEN_CHAR: (
+    /* ****** */
+    "{"
+  ),
+  CLOSE: (
+    /* ************* */
+    125
+  ),
+  // `}` is the end of the VNodeData for a virtual element.
+  CLOSE_CHAR: (
+    /* ***** */
+    "}"
+  ),
+  SCOPED_STYLE: (
+    /* ******* */
+    59
+  ),
+  // `;` - `q:sstyle` - Style attribute.
+  SCOPED_STYLE_CHAR: (
+    /* */
+    ";"
+  ),
+  RENDER_FN: (
+    /* ********** */
+    60
+  ),
+  // `<` - `q:renderFn' - Component QRL render function (body)
+  RENDER_FN_CHAR: (
+    /* ** */
+    "<"
+  ),
+  ID: (
+    /* ***************** */
+    61
+  ),
+  // `=` - `q:id` - ID of the element.
+  ID_CHAR: (
+    /* ********* */
+    "="
+  ),
+  PROPS: (
+    /* ************** */
+    62
+  ),
+  // `>` - `q:props' - Component Props
+  PROPS_CHAR: (
+    /* ****** */
+    ">"
+  ),
+  SLOT_PARENT: (
+    /* ******** */
+    63
+  ),
+  // `?` - `q:sparent` - Slot parent.
+  SLOT_PARENT_CHAR: (
+    /*  */
+    "?"
+  ),
+  KEY: (
+    /* **************** */
+    64
+  ),
+  // `@` - `q:key` - Element key.
+  KEY_CHAR: (
+    /* ******** */
+    "@"
+  ),
+  SEQ: (
+    /* **************** */
+    91
+  ),
+  // `[` - `q:seq' - Seq value from `useSequentialScope()`
+  SEQ_CHAR: (
+    /* ******** */
+    "["
+  ),
+  DON_T_USE: (
+    /* ********** */
+    92
+  ),
+  // `\` - SKIP because `\` is used as escaping
+  DON_T_USE_CHAR: "\\",
+  CONTEXT: (
+    /* ************ */
+    93
+  ),
+  // `]` - `q:ctx' - Component context/props
+  CONTEXT_CHAR: (
+    /* **** */
+    "]"
+  ),
+  SEQ_IDX: (
+    /* ************ */
+    94
+  ),
+  // `^` - `q:seqIdx' - Sequential scope id
+  SEQ_IDX_CHAR: (
+    /* **** */
+    "^"
+  ),
+  BACK_REFS: (
+    /* ********** */
+    96
+  ),
+  // '`' - `q:brefs' - Effect dependencies/subscriptions
+  BACK_REFS_CHAR: (
+    /* ** */
+    "`"
+  ),
+  SEPARATOR: (
+    /* ********* */
+    124
+  ),
+  // `|` - Separator char to encode any key/value pairs.
+  SEPARATOR_CHAR: (
+    /* ** */
+    "|"
+  ),
+  SLOT: (
+    /* ************** */
+    126
+  ),
+  // `~` - `q:slot' - Slot name
+  SLOT_CHAR: (
+    /* ******* */
+    "~"
+  )
+};
+var getSegmentVNodeRefId = (segmentId, localIndex) => {
+  const segmentIndex = parseInt(segmentId, 10) - 1;
+  const diagonal = segmentIndex + localIndex;
+  return -(diagonal * (diagonal + 1) / 2 + localIndex + 1);
+};
+
+// packages/qwik/src/core/shared/utils/character-escaping.ts
+function escapeHTML(html) {
+  let escapedHTML = "";
+  const length = html.length;
+  let idx = 0;
+  let lastIdx = idx;
+  for (; idx < length; idx++) {
+    const ch = html.charCodeAt(idx);
+    if (ch === 60) {
+      escapedHTML += html.substring(lastIdx, idx) + "&lt;";
+    } else if (ch === 62) {
+      escapedHTML += html.substring(lastIdx, idx) + "&gt;";
+    } else if (ch === 38) {
+      escapedHTML += html.substring(lastIdx, idx) + "&amp;";
+    } else if (ch === 34) {
+      escapedHTML += html.substring(lastIdx, idx) + "&quot;";
+    } else if (ch === 39) {
+      escapedHTML += html.substring(lastIdx, idx) + "&#39;";
+    } else {
+      continue;
+    }
+    lastIdx = idx + 1;
+  }
+  if (lastIdx === 0) {
+    return html;
+  } else {
+    return escapedHTML + html.substring(lastIdx);
+  }
+}
+function encodeVNodeDataString(str) {
+  let escapedHTML = "";
+  const length = str.length;
+  let idx = 0;
+  let lastIdx = idx;
+  for (; idx < length; idx++) {
+    const ch = str.charCodeAt(idx);
+    if (ch >= VNodeDataSeparator.ADVANCE_1 && ch <= VNodeDataSeparator.ADVANCE_8192) {
+      escapedHTML += str.substring(lastIdx, idx) + "\\" + str.charAt(idx);
+    } else {
+      continue;
+    }
+    lastIdx = idx + 1;
+  }
+  if (lastIdx === 0) {
+    return str;
+  } else {
+    return escapedHTML + str.substring(lastIdx);
+  }
+}
+function encodeVNodeDataKey(str) {
+  const encoded = encodeURI(str);
+  let encodedKey = "";
+  const length = encoded.length;
+  let idx = 0;
+  let lastIdx = idx;
+  for (; idx < length; idx++) {
+    const ch = encoded.charCodeAt(idx);
+    let replacement = null;
+    if (ch === 59) {
+      replacement = "%3B";
+    } else if (ch === 61) {
+      replacement = "%3D";
+    } else if (ch === 63) {
+      replacement = "%3F";
+    } else if (ch === 64) {
+      replacement = "%40";
+    } else if (ch === 126) {
+      replacement = "%7E";
+    } else {
+      continue;
+    }
+    encodedKey += encoded.substring(lastIdx, idx) + replacement;
+    lastIdx = idx + 1;
+  }
+  if (lastIdx === 0) {
+    return encoded;
+  } else {
+    return encodedKey + encoded.substring(lastIdx);
+  }
+}
+
+// packages/qwik/src/core/shared/utils/markers.ts
+var OnRenderProp = "q:renderFn";
+var QSlot = "q:slot";
+var QSlotParent = "q:sparent";
+var QStatePatchAttr = "q:patch";
+var QSuspenseResolved = "q:r";
+var QStyle = "q:style";
+var QStyleSelector = "style[q\\:style]";
+var QStyleSSelector = "style[q\\:sstyle]";
+var QStylesAllSelector = QStyleSelector + "," + QStyleSSelector;
+var QScopedStyle = "q:sstyle";
+var QCtxAttr = "q:ctx";
+var QBackRefs = "q:brefs";
+var QwikEvContainerReady = 0;
+var QRenderAttr = "q:render";
+var QRuntimeAttr = "q:runtime";
+var QVersionAttr = "q:version";
+var QBaseAttr = "q:base";
+var QLocaleAttr = "q:locale";
+var QManifestHashAttr = "q:manifest-hash";
+var QInstanceAttr = "q:instance";
+var QStatePrewarmAttr = "q:prewarm";
+var QContainerIsland = "q:container-island";
+var QContainerIslandEnd = "/" + QContainerIsland;
+var QIgnore = "q:ignore";
+var QIgnoreEnd = "/" + QIgnore;
+var QContainerAttr = "q:container";
+var QContainerAttrEnd = "/" + QContainerAttr;
+var QTemplate = "q:template";
+var QContainerSelector = "[q\\:container]:not([q\\:container=" + "html" /* HTML */ + "]):not([q\\:container=" + "text" /* TEXT */ + "])";
+var QDefaultSlot = "";
+var ELEMENT_ID = "q:id";
+var ELEMENT_KEY = "q:key";
+var ELEMENT_PROPS = "q:props";
+var ELEMENT_SEQ = "q:seq";
+var ELEMENT_SEQ_IDX = "q:seqIdx";
+var ELEMENT_BACKPATCH_DATA = "qwik/backpatch";
+var ITERATION_ITEM_SINGLE = "q:p";
+var ITERATION_ITEM_MULTI = "q:ps";
+var NON_SERIALIZABLE_MARKER_PREFIX = ":";
+var USE_ON_LOCAL = NON_SERIALIZABLE_MARKER_PREFIX + "on";
+var USE_ON_LOCAL_SEQ_IDX = NON_SERIALIZABLE_MARKER_PREFIX + "onIdx";
+var USE_ON_LOCAL_FLAGS = NON_SERIALIZABLE_MARKER_PREFIX + "onFlags";
+var NEAREST_CURSOR_BOUNDARY = NON_SERIALIZABLE_MARKER_PREFIX + "nearestCursorBoundary";
+var Q_PROPS_SEPARATOR = ":";
+var dangerouslySetInnerHTML = "dangerouslySetInnerHTML";
+
+// packages/qwik/src/core/shared/utils/promises.ts
+import { isDev as isDev5, isServer } from "@qwik.dev/core/build";
+var MAX_RETRY_ON_PROMISE_COUNT = 100;
+var isPromise = (value) => {
+  return !!value && typeof value == "object" && typeof value.then === "function";
+};
+var maybeThen = (valueOrPromise, thenFn) => {
+  return isPromise(valueOrPromise) ? valueOrPromise.then(thenFn) : thenFn(valueOrPromise);
+};
+var checkError = (e) => {
+  if (isServer && e instanceof ReferenceError && e.message.includes("window")) {
+    e.message = 'It seems like you forgot to add "if (isBrowser) {...}" here:' + e.message;
+  }
+};
+var justThrow = (e) => {
+  throw e;
+};
+function retryOnPromise(fn, onError = justThrow) {
+  let ok = false;
+  let result;
+  try {
+    result = fn();
+    ok = true;
+  } catch (e) {
+    result = e;
+  }
+  if (!isPromise(result)) {
+    if (ok) {
+      return result;
+    }
+    isDev5 && checkError(result);
+    return onError(result);
+  }
+  let retryCount = MAX_RETRY_ON_PROMISE_COUNT;
+  const retry = async (p) => {
+    while (isPromise(p)) {
+      try {
+        await p;
+        return await fn();
+      } catch (err) {
+        if (isPromise(err)) {
+          if (!--retryCount) {
+            p = new Error("Exceeded max retry count in retryOnPromise");
+            break;
+          } else {
+            p = err;
+          }
+        } else {
+          p = err;
+          break;
+        }
+      }
+    }
+    isDev5 && checkError(p);
+    return onError(p);
+  };
+  return ok ? result.catch(retry) : retry(result);
+}
+
+// packages/qwik/src/core/shared/utils/scoped-styles.ts
+function isClassAttr(key) {
+  return key === "class";
+}
+function convertStyleIdsToString(scopedStyleIds) {
+  return Array.from(scopedStyleIds).join(" ");
+}
+
+// packages/qwik/src/core/shared/utils/event-names.ts
+var isHtmlAttributeAnEventName = (name) => {
+  return name.charCodeAt(0) === 113 && name.charCodeAt(1) === 45 && (name.charCodeAt(3) === 58 || name.charCodeAt(3) === 112 && name.charCodeAt(4) === 58);
+};
+function isPreventDefault(key) {
+  return key.startsWith("preventdefault:");
+}
+
+// packages/qwik/src/core/shared/utils/unitless_number.ts
+var unitlessNumbers = /* @__PURE__ */ new Set([
+  "animationIterationCount",
+  "aspectRatio",
+  "borderImageOutset",
+  "borderImageSlice",
+  "borderImageWidth",
+  "boxFlex",
+  "boxFlexGroup",
+  "boxOrdinalGroup",
+  "columnCount",
+  "columns",
+  "flex",
+  "flexGrow",
+  "flexShrink",
+  "gridArea",
+  "gridRow",
+  "gridRowEnd",
+  "gridRowStart",
+  "gridColumn",
+  "gridColumnEnd",
+  "gridColumnStart",
+  "fontWeight",
+  "lineClamp",
+  "lineHeight",
+  "opacity",
+  "order",
+  "orphans",
+  "scale",
+  "tabSize",
+  "widows",
+  "zIndex",
+  "zoom",
+  "MozAnimationIterationCount",
+  // Known Prefixed Properties
+  "MozBoxFlex",
+  // TODO: Remove these since they shouldn't be used in modern code
+  "msFlex",
+  "msFlexPositive",
+  "WebkitAnimationIterationCount",
+  "WebkitBoxFlex",
+  "WebkitBoxOrdinalGroup",
+  "WebkitColumnCount",
+  "WebkitColumns",
+  "WebkitFlex",
+  "WebkitFlexGrow",
+  "WebkitFlexShrink",
+  "WebkitLineClamp"
+]);
+var isUnitlessNumber = (name) => {
+  return unitlessNumbers.has(name);
+};
+
+// packages/qwik/src/core/shared/utils/styles.ts
+var serializeClass = (obj) => {
+  if (!obj) {
+    return "";
+  }
+  if (isString(obj)) {
+    return obj.trim();
+  }
+  const classes = [];
+  if (isArray(obj)) {
+    for (let i = 0; i < obj.length; i++) {
+      const o = obj[i];
+      const classList = serializeClass(o);
+      if (classList) {
+        classes.push(classList);
+      }
+    }
+  } else {
+    for (const [key, value] of Object.entries(obj)) {
+      if (value) {
+        classes.push(key.trim());
+      }
+    }
+  }
+  return classes.join(" ");
+};
+var fromCamelToKebabCaseWithDash = (text) => {
+  return text.replace(/([A-Z])/g, "-$1").toLowerCase();
+};
+var stringifyStyle = (obj) => {
+  if (obj == null) {
+    return "";
+  }
+  if (typeof obj == "object") {
+    if (isArray(obj)) {
+      throw qError(0 /* stringifyClassOrStyle */, [obj, "style"]);
+    } else {
+      const chunks = [];
+      for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+          const value = obj[key];
+          if (value != null && typeof value !== "function") {
+            if (key.startsWith("--")) {
+              chunks.push(key + ":" + value);
+            } else {
+              chunks.push(fromCamelToKebabCaseWithDash(key) + ":" + setValueForStyle(key, value));
+            }
+          }
+        }
+      }
+      return chunks.join(";");
+    }
+  }
+  return String(obj);
+};
+var serializeBooleanOrNumberAttribute = (value) => {
+  return value != null ? String(value) : null;
+};
+function serializeAttribute(key, value, styleScopedId) {
+  if (isClassAttr(key)) {
+    const serializedClass = serializeClass(value);
+    value = styleScopedId ? styleScopedId + (serializedClass.length ? " " + serializedClass : serializedClass) : serializedClass;
+  } else if (key === "style") {
+    value = stringifyStyle(value);
+  } else if (isEnumeratedBooleanAttribute(key) || typeof value === "number") {
+    value = serializeBooleanOrNumberAttribute(value);
+  } else if (value === false || value == null) {
+    value = null;
+  } else if (value === true && isPreventDefault(key)) {
+    value = "";
+  }
+  return value;
+}
+function isEnumeratedBooleanAttribute(key) {
+  return isAriaAttribute(key) || ["spellcheck", "draggable", "contenteditable"].includes(key);
+}
+var setValueForStyle = (styleName, value) => {
+  if (typeof value === "number" && value !== 0 && !isUnitlessNumber(styleName)) {
+    return value + "px";
+  }
+  return value;
+};
+function isAriaAttribute(prop) {
+  return prop.startsWith("aria-");
+}
+
+// packages/qwik/src/core/preloader/bundle-graph.ts
+var base;
+var graph;
+var parseBundleGraph = (serialized) => {
+  const graph2 = /* @__PURE__ */ new Map();
+  let i = 0;
+  while (i < serialized.length) {
+    const name = serialized[i++];
+    const deps = [];
+    let idx;
+    let probability = 1;
+    while (idx = serialized[i], typeof idx === "number") {
+      if (idx < 0) {
+        probability = -idx / 10;
+      } else {
+        deps.push({
+          $name$: serialized[idx],
+          $importProbability$: probability,
+          $factor$: 1
+        });
+      }
+      i++;
+    }
+    graph2.set(name, deps);
+  }
+  return graph2;
+};
+var initPreloader = (serializedBundleGraph) => {
+  if (base != null || !serializedBundleGraph) {
+    return;
+  }
+  base = "";
+  graph = parseBundleGraph(serializedBundleGraph);
+};
+
+// packages/qwik/src/core/shared/utils/objects.ts
+var isObjectEmpty = (obj) => {
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      return false;
+    }
+  }
+  return true;
+};
+
+// packages/qwik/src/core/ssr/stream-writer.ts
+var stringifyRootRefPath = (path) => {
+  let text = String(path[0]);
+  for (let i = 1; i < path.length; i++) {
+    text += " " + path[i];
+  }
+  return text;
+};
+var writeStringRootRef = (writer, id) => writer.write(String(id));
+var writeStringRootRefPath = (writer, path) => writer.write(stringifyRootRefPath(path));
+var writeStringRootRefDelta = (writer, id, base2) => writer.write(String(id - base2));
+var createStringStreamWriter = (write) => ({
+  write,
+  writeRootRef(id) {
+    return writeStringRootRef(this, id);
+  },
+  writeRootRefPath(path) {
+    return writeStringRootRefPath(this, path);
+  },
+  writeRootRefDelta(id, base2) {
+    return writeStringRootRefDelta(this, id, base2);
+  }
+});
+
+// packages/qwik/src/core/shared/ssr-const.ts
+var LT = "<";
+var GT = ">";
+var CLOSE_TAG = "</";
+var SPACE = " ";
+var ATTR_EQUALS_QUOTE = '="';
+var QUOTE = '"';
+var EMPTY_ATTR = '=""';
+var BRACKET_OPEN = "[";
+var BRACKET_CLOSE = "]";
+var PAREN_CLOSE = ")";
+var COMMA = ",";
+
+// packages/qwik/src/server/platform.ts
+var getDevSegmentPath = (mapper, hash, symbolName, parent) => {
+  const existing = mapper?.[hash];
+  if (existing) {
+    return existing;
+  }
+  if (symbolName === SYNC_QRL) {
+    return [symbolName, ""];
+  }
+  if (!parent) {
+    if (symbolName.startsWith("_") && symbolName.length < 6) {
+      return [symbolName, `${import.meta.env?.BASE_URL}@qwik-handlers`];
+    }
+    console.error("qwik symbolMapper: unknown qrl requested without parent:", symbolName);
+    return [symbolName, `${import.meta.env?.BASE_URL}${symbolName}.js`];
+  }
+  const qrlFile = `${import.meta.env?.BASE_URL}${parent.startsWith("/") ? parent.slice(1) : parent}_${symbolName}.js`;
+  return [symbolName, qrlFile];
+};
+function createPlatform(opts, resolvedManifest) {
+  const mapper = resolvedManifest?.mapper;
+  const mapperFn = opts.symbolMapper ? opts.symbolMapper : (symbolName, _chunk, parent) => {
+    if (mapper || isDev6 && import.meta.env?.MODE !== "test") {
+      const hash = getSymbolHash(symbolName);
+      const result = !isDev6 ? mapper[hash] : getDevSegmentPath(mapper, hash, symbolName, parent);
+      if (!result) {
+        if (hash === SYNC_QRL) {
+          return [hash, ""];
+        }
+        const isRegistered = globalThis.__qwik_reg_symbols?.has(hash);
+        if (isRegistered) {
+          return [symbolName, "_"];
+        }
+        console.error("Cannot resolve symbol", symbolName, "in", mapper, parent);
+      }
+      return result;
+    }
+  };
+  const serverPlatform = {
+    isServer: true,
+    async importSymbol(_containerEl, url, symbolName) {
+      const hash = getSymbolHash(symbolName);
+      const regSym = globalThis.__qwik_reg_symbols?.get(hash);
+      if (regSym) {
+        return regSym;
+      }
+      throw qError(6 /* dynamicImportFailed */, [symbolName]);
+    },
+    raf: () => {
+      console.error("server can not rerender");
+      return Promise.resolve();
+    },
+    chunkForSymbol(symbolName, _chunk, parent) {
+      return mapperFn(symbolName, mapper, parent);
+    }
+  };
+  return serverPlatform;
+}
+async function setServerPlatform(opts, manifest) {
+  const platform = createPlatform(opts, manifest);
+  setPlatform(platform);
+}
+var getSymbolHash = (symbolName) => {
+  const index = symbolName.lastIndexOf("_");
+  if (index > -1) {
+    return symbolName.slice(index + 1);
+  }
+  return symbolName;
+};
+
+// packages/qwik/src/server/ssr-render.ts
+import { getClientManifest } from "@qwik.dev/core";
+
+// packages/qwik/src/server/ssr-container.ts
+import { isDev as isDev8 } from "@qwik.dev/core/build";
+import {
+  _SubscriptionData as SubscriptionData,
+  _SharedContainer,
+  _jsxSorted,
+  _jsxSplit,
+  _res,
+  _setEvent,
+  _walkJSX,
+  _createQRL as createQRL,
+  isSignal
+} from "@qwik.dev/core/internal";
+
+// packages/qwik/src/server/ooos-utils.ts
+import { _SubscriptionPatch as SubscriptionPatch } from "@qwik.dev/core/internal";
+var recordExternalRootEffect = (rootCtx, segmentCtx, storeProxyMap, records, producer, effect, prop, sourceEffects) => {
+  if (!records || prop !== null && !sourceEffects) {
+    return;
+  }
+  let rootObj = producer;
+  if (prop !== null && producer && (typeof producer === "object" || typeof producer === "function")) {
+    rootObj = storeProxyMap.get(producer) || producer;
+  }
+  const rootId = rootCtx.$hasRootId$(rootObj);
+  segmentCtx.$addRoot$(rootObj);
+  segmentCtx.$addRoot$(effect);
+  if (prop !== null && typeof prop !== "string") {
+    segmentCtx.$addRoot$(prop);
+  }
+  records.push({
+    rootObj,
+    rootId,
+    effect,
+    prop
+  });
+};
+var collectSubscriptionPatches = (rootCtx, records, rootLimit) => {
+  if (!records?.length) {
+    return;
+  }
+  const patches = [];
+  const patchesByRoot = /* @__PURE__ */ new Map();
+  for (let i = 0; i < records.length; i++) {
+    const entry = records[i];
+    const rootId = entry.rootId === void 0 ? rootCtx.$hasRootId$(entry.rootObj) : entry.rootId;
+    if (rootId === void 0 || rootId >= rootLimit) {
+      continue;
+    }
+    let patch = patchesByRoot.get(rootId);
+    if (!patch) {
+      patch = new SubscriptionPatch(
+        rootId,
+        entry.prop === null ? /* @__PURE__ */ new Set() : /* @__PURE__ */ new Map()
+      );
+      patchesByRoot.set(rootId, patch);
+      patches.push(patch);
+    }
+    const subscriptions = patch.subscriptions;
+    if (entry.prop === null) {
+      if (subscriptions instanceof Set) {
+        subscriptions.add(entry.effect);
+      }
+    } else {
+      if (subscriptions instanceof Map) {
+        let effects = subscriptions.get(entry.prop);
+        if (!effects) {
+          effects = /* @__PURE__ */ new Set();
+          subscriptions.set(entry.prop, effects);
+        }
+        effects.add(entry.effect);
+      }
+    }
+  }
+  return patches.length ? patches : void 0;
+};
+
+// packages/qwik/src/server/preload-impl.ts
+import { getPlatform } from "@qwik.dev/core";
+var simplifyPath = (base2, path) => {
+  if (path == null) {
+    return null;
+  }
+  const segments = `${base2}${path}`.split("/");
+  const simplified = [];
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i];
+    if (segment === ".." && simplified.length > 0) {
+      simplified.pop();
+    } else {
+      simplified.push(segment);
+    }
+  }
+  return simplified.join("/");
+};
+var getBase = (container) => {
+  let base2 = container.$buildBase$;
+  if (import.meta.env?.DEV && !qTest) {
+    base2 = import.meta.env?.BASE_URL;
+  }
+  return base2;
+};
+var preloaderPre = (container, options, nonce) => {
+  const { resolvedManifest } = container;
+  const base2 = getBase(container);
+  const preloaderBundle = simplifyPath(base2, resolvedManifest?.manifest?.preloader);
+  let bundleGraphPath = resolvedManifest?.manifest.bundleGraphAsset;
+  if (bundleGraphPath) {
+    bundleGraphPath = (import.meta.env?.BASE_URL || "/") + bundleGraphPath;
+  }
+  if (!(import.meta.env?.DEV && !qTest) && preloaderBundle && bundleGraphPath && options !== false) {
+    const bundleGraph = container.resolvedManifest?.manifest.bundleGraph;
+    initPreloader(bundleGraph);
+    const opts = [];
+    if (options) {
+      if (options.maxIdlePreloads) {
+        opts.push(`P:${options.maxIdlePreloads}`);
+      }
+    }
+    const optsStr = opts.length ? `,{${opts.join(",")}}` : "";
+    const preloaderLinkAttrs = {
+      rel: "modulepreload",
+      href: preloaderBundle
+    };
+    if (nonce) {
+      preloaderLinkAttrs["nonce"] = nonce;
+    }
+    container.openElement("link", null, preloaderLinkAttrs, null, null, null);
+    container.closeElement();
+    container.openElement(
+      "link",
+      null,
+      { rel: "preload", href: bundleGraphPath, as: "fetch", crossorigin: "anonymous" },
+      null,
+      null,
+      null
+    );
+    container.closeElement();
+    const script = `let b=fetch("${bundleGraphPath}");import("${preloaderBundle}").then(({l})=>l(${JSON.stringify(base2)},b${optsStr}));`;
+    const scriptAttrs = {
+      type: "module",
+      async: true,
+      crossorigin: "anonymous"
+    };
+    if (nonce) {
+      scriptAttrs["nonce"] = nonce;
+    }
+    container.writeScript(scriptAttrs, script);
+  }
+  const corePath = simplifyPath(base2, resolvedManifest?.manifest.core);
+  if (corePath) {
+    const linkAttrs = { rel: "modulepreload", href: corePath };
+    if (nonce) {
+      linkAttrs["nonce"] = nonce;
+    }
+    container.openElement("link", null, linkAttrs, null, null, null);
+    container.closeElement();
+  }
+};
+var includePreloader = (container, options, referencedBundles, nonce) => {
+  if (referencedBundles.length === 0 || options === false) {
+    return null;
+  }
+  const { ssrPreloads } = normalizePreLoaderOptions(
+    typeof options === "boolean" ? void 0 : options
+  );
+  let allowedSsrPreloads = ssrPreloads;
+  const base2 = getBase(container);
+  const links = [];
+  const { resolvedManifest } = container;
+  if (allowedSsrPreloads) {
+    const preloaderBundle2 = resolvedManifest?.manifest.preloader;
+    const coreBundle = resolvedManifest?.manifest.core;
+    for (let i = 0; i < referencedBundles.length; i++) {
+      const href = referencedBundles[i];
+      if (href === preloaderBundle2 || href === coreBundle) {
+        continue;
+      }
+      links.push(href);
+      if (--allowedSsrPreloads === 0) {
+        break;
+      }
+    }
+  }
+  const preloaderBundle = simplifyPath(base2, resolvedManifest?.manifest.preloader);
+  const insertLinks = links.length ? (
+    /**
+     * We only use modulepreload links because they behave best. Older browsers can rely on the
+     * preloader which does feature detection and which will be available soon after inserting these
+     * links.
+     */
+    `${JSON.stringify(links)}.map((l,e)=>{e=document.createElement('link');e.rel='modulepreload';e.href=${JSON.stringify(base2)}+l;document.head.appendChild(e)});`
+  ) : "";
+  let script = insertLinks;
+  if (preloaderBundle) {
+    script += `window.addEventListener('load',f=>{f=_=>import("${preloaderBundle}").then(({p})=>p(${JSON.stringify(referencedBundles)}));try{requestIdleCallback(f,{timeout:2000})}catch(e){setTimeout(f,200)}})`;
+  }
+  if (script) {
+    const attrs = { type: "module", async: "true", "q:type": "preload" };
+    if (nonce) {
+      attrs["nonce"] = nonce;
+    }
+    container.writeScript(attrs, script);
+  }
+  return null;
+};
+var preloaderPost = (ssrContainer, opts, nonce) => {
+  if (import.meta.env?.DEV && !qTest) {
+    return;
+  }
+  if (opts.preloader !== false) {
+    const qrls = Array.from(ssrContainer.serializationCtx.$eventQrls$);
+    const preloadBundles = getBundles(qrls);
+    includePreloader(ssrContainer, opts.preloader, preloadBundles, nonce);
+  }
+};
+function normalizePreLoaderOptions(input) {
+  return { ...preLoaderOptionsDefault, ...input };
+}
+var getBundles = (qrls) => {
+  const platform = getPlatform();
+  const bundles = qrls?.map((qrl) => {
+    const symbol = qrl.$symbol$;
+    const chunk = qrl.$chunk$;
+    const result = platform.chunkForSymbol(symbol, chunk, qrl.dev?.file);
+    if (result) {
+      return result[1];
+    }
+    return chunk;
+  }).filter(Boolean);
+  return [...new Set(bundles)];
+};
+var preLoaderOptionsDefault = {
+  ssrPreloads: 7,
+  maxIdlePreloads: 25
+};
+
+// packages/qwik/src/server/scripts.ts
+var QWIK_LOADER_DEFAULT_MINIFIED = 'const e=document,t=window,n="w",r="wp",o="d",s="dp",i="e",a="ep",c="capture:",l="readystatechange",p=0,u=new Set,d=new Set([e]),f=new Map,h={};let q,b,g;const m=(e,t)=>Array.from(e.querySelectorAll(t)),v=e=>{const t=[];return d.forEach(n=>t.push(...m(n,e))),t},w=(e,t,n,r=!1,o=!1)=>e.addEventListener(t,n,{capture:r,passive:o}),y=e=>{H(e);const t=m(e,"[q\\\\:shadowroot]");for(let e=0;e<t.length;e++){const n=t[e].shadowRoot;n&&y(n)}},A=e=>e&&"function"==typeof e.then,E=async e=>{for(let t=0;t<e.length;t++)await e[t]()},C=e=>{if(e.length){const t=()=>E(e);g=g?g.then(t,t):t()}},S=t=>{if(void 0===t._qwikjson_){let n=(t===e.documentElement?e.body:t).lastElementChild;for(;n;){if("SCRIPT"===n.tagName&&"qwik/json"===n.getAttribute("type")){t._qwikjson_=JSON.parse(n.textContent.replace(/\\\\x3C(\\/?script)/gi,"<$1"));break}n=n.previousElementSibling}}},_=e=>{h[e]=1,I(l)},k=t=>{const n=t.getAttribute("q:instance");return"paused"===t.getAttribute("q:container")&&"loading"===e.readyState&&!h[n]&&new Promise(t=>{w(e,l,()=>{("loading"!==e.readyState||h[n])&&t()})})},$=(e,t)=>new CustomEvent(e,{detail:t}),I=(t,n)=>{e.dispatchEvent($(t,n))},N=e=>e.replace(/([A-Z-])/g,e=>"-"+e.toLowerCase()),R=e=>e.replace(/-./g,e=>e[1].toUpperCase()),T=e=>{const t=e.indexOf(":");return{scope:e.slice(0,t),eventName:R(e.slice(t+1))}},x=e=>2===e.length,B=e=>e.charAt(0),L=e=>!!e&&1===e.nodeType,U=(e,t,n)=>e.hasAttribute(n)&&(!!e._qDispatch?.[t]||e.hasAttribute("q-"+t)),j=(t,n,r,o,s,i,a,c=!0)=>{const l={qBase:r,symbol:i,element:n,reqTime:a};if(!s){const n=(e["qFuncs_"+t.getAttribute("q:instance")]||[])[+i];if(!n&&c){const e=Error("sym:"+i);I("qerror",{importError:"sync",error:e,...l}),console.error(e)}return n}const p=`${i}|${r}|${s}`,u=f.get(p);if(u)return u;const d=new URL(s,o).href,h=import(d);return S(t),h.then(e=>{const t=e[i];if(t)f.set(p,t),I("qsymbol",l);else{const e=Error(`${i} not in ${d}`);I("qerror",{importError:"no-symbol",error:e,...l}),console.error(e)}return t},e=>{I("qerror",{importError:"async",error:e,...l}),console.error(e)})},D=(t,n,r,o,s,i=!0)=>{let a=!1;s&&(i&&t.hasAttribute("preventdefault:"+s)&&n.preventDefault(),t.hasAttribute("stoppropagation:"+s)&&n.stopPropagation());const c=t._qDispatch?.[r];if(c){if("function"==typeof c){const e=()=>c(n,t);if(a)o.push(async()=>{const t=e();A(t)&&await t});else{const t=e();A(t)&&(a=!0,o.push(()=>t))}}else if(c.length)for(let e=0;e<c.length;e++){const r=c[e];if(r){const e=()=>r(n,t);if(a)o.push(async()=>{const t=e();A(t)&&await t});else{const t=e();A(t)&&(a=!0,o.push(()=>t))}}}return}const l=t.getAttribute("q-"+r);if(l){const r=t.closest("[q\\\\:container]:not([q\\\\:container=html]):not([q\\\\:container=text])"),s=r.getAttribute("q:base"),i=new URL(s,e.baseURI),c=l.split("|"),p=k(r);for(let e=0;e<c.length;e++){const l=c[e],u=performance.now(),[d,f,h]=l.split("#"),q=e=>{if(e&&t.isConnected){const r=e=>{I("qerror",{error:e,qBase:s,symbol:f,element:t,reqTime:u})};try{const o=e.call(h,n,t);if(A(o))return o.catch(r)}catch(e){return r(e)}}},b=(e=!0)=>j(r,t,s,i,d,f,u,e),g=p?void 0:b();if(p)a=!0,o.push(async()=>{await p,await q(await b(!1)||await b())});else if(A(g))a=!0,o.push(()=>g.then(q));else if(a)a=!0,o.push(async()=>{await q(g||await b())});else{const e=q(g);A(e)&&(a=!0,o.push(()=>e))}}}},O=(e,t=i,n=!0)=>{const r=N(e.type),o=t+":"+r,s=c+r,a=[],l=[],p=[];let u=e.target;for(;u;)L(u)?(a.push(u),l.push(U(u,o,s)),u=u.parentElement):u=u.parentElement;for(let t=a.length-1;t>=0;t--)if(l[t]&&(D(a[t],e,o,p,r,n),e.cancelBubble))return void C(p);for(let t=0;t<a.length;t++)if(!l[t]&&(D(a[t],e,o,p,r,n),!e.bubbles||e.cancelBubble))return void C(p);C(p)},P=e=>O(e,a,!1),F=(e,t,n=!0)=>{const r=N(t.type),o=e+":"+r,s=v("[q-"+e+"\\\\:"+r+"]"),i=[];for(let e=0;e<s.length;e++){const a=s[e];D(a,t,o,i,r,n)}C(i)},J=e=>{F(o,e)},M=e=>{F(s,e,!1)},Z=e=>{F(n,e)},z=e=>{F(r,e,!1)},G=()=>{const n=e.readyState;if("interactive"==n||"complete"==n){if(b=1,d.forEach(y),u.has("d:qinit")){u.delete("d:qinit");const e=$("qinit"),t=v("[q-d\\\\:qinit]"),n=[];for(let r=0;r<t.length;r++){const o=t[r];D(o,e,"d:qinit",n),o.removeAttribute("q-d:qinit")}C(n)}if(u.has("d:qidle")&&(u.delete("d:qidle"),(t.requestIdleCallback??t.setTimeout).bind(t)(()=>{const e=$("qidle"),t=v("[q-d\\\\:qidle]"),n=[];for(let r=0;r<t.length;r++){const o=t[r];D(o,e,"d:qidle",n),o.removeAttribute("q-d:qidle")}C(n)})),u.has("e:qvisible")){q||(q=new IntersectionObserver(e=>{const t=[];for(let n=0;n<e.length;n++){const r=e[n];r.isIntersecting&&(q.unobserve(r.target),D(r.target,$("qvisible",r),"e:qvisible",t))}C(t)}));const e=v("[q-e\\\\:qvisible]:not([q\\\\:observed])");for(let t=0;t<e.length;t++){const n=e[t];q.observe(n),n.setAttribute("q:observed","true")}}}},H=(...e)=>{for(let r=0;r<e.length;r++){const s=e[r];if(0===s)_(e[++r]);else if("string"==typeof s){if(!u.has(s)){u.add(s);const{scope:e,eventName:r}=T(s),i=x(e),a=B(e);a===n?w(t,r,i?z:Z,!0,i):d.forEach(e=>w(e,r,a===o?i?M:J:i?P:O,!0,i)),1!==b||"e:qvisible"!==s&&"d:qinit"!==s&&"d:qidle"!==s||G()}}else d.has(s)||(u.forEach(e=>{const{scope:t,eventName:r}=T(e),i=x(t),a=B(t);a!==n&&w(s,r,a===o?i?M:J:i?P:O,!0,i)}),d.add(s))}},K=t._qwikEv;K?.roots||(Array.isArray(K)?H(...K):H("e:click","e:input"),t._qwikEv={events:u,roots:d,push:H},w(e,l,G),G())';
+var QWIK_LOADER_DEFAULT_DEBUG = 'const doc = document;\nconst win = window;\nconst windowPrefix = "w";\nconst passiveWindowPrefix = "wp";\nconst documentPrefix = "d";\nconst passiveDocumentPrefix = "dp";\nconst elementPrefix = "e";\nconst passiveElementPrefix = "ep";\nconst capturePrefix = "capture:";\nconst readyStateChange = "readystatechange";\nconst QwikEvContainerReady = 0;\nconst events = /* @__PURE__ */ new Set();\nconst roots = /* @__PURE__ */ new Set([doc]);\nconst symbols = /* @__PURE__ */ new Map();\nconst readyContainers = {};\nlet observer;\nlet hasInitialized;\nlet queuedTasks;\nconst nativeQuerySelectorAll = (root, selector) => Array.from(root.querySelectorAll(selector));\nconst querySelectorAll = (query) => {\n  const elements = [];\n  roots.forEach((root) => elements.push(...nativeQuerySelectorAll(root, query)));\n  return elements;\n};\nconst addEventListener = (el, eventName, handler, capture = false, passive = false) => el.addEventListener(eventName, handler, { capture, passive });\nconst findShadowRoots = (fragment) => {\n  addEventOrRoot(fragment);\n  const shadowRoots = nativeQuerySelectorAll(fragment, "[q\\\\:shadowroot]");\n  for (let i = 0; i < shadowRoots.length; i++) {\n    const parent = shadowRoots[i];\n    const shadowRoot = parent.shadowRoot;\n    shadowRoot && findShadowRoots(shadowRoot);\n  }\n};\nconst isPromise = (promise) => promise && typeof promise.then === "function";\nconst runTasks = async (tasks) => {\n  for (let i = 0; i < tasks.length; i++) {\n    await tasks[i]();\n  }\n};\nconst queueTasks = (tasks) => {\n  if (tasks.length) {\n    const run = () => runTasks(tasks);\n    queuedTasks = queuedTasks ? queuedTasks.then(run, run) : run();\n  }\n};\nconst resolveContainer = (containerEl) => {\n  if (containerEl._qwikjson_ === void 0) {\n    const parentJSON = containerEl === doc.documentElement ? doc.body : containerEl;\n    let script = parentJSON.lastElementChild;\n    while (script) {\n      if (script.tagName === "SCRIPT" && script.getAttribute("type") === "qwik/json") {\n        containerEl._qwikjson_ = JSON.parse(\n          script.textContent.replace(/\\\\x3C(\\/?script)/gi, "<$1")\n        );\n        break;\n      }\n      script = script.previousElementSibling;\n    }\n  }\n};\nconst markContainerReady = (hash) => {\n  readyContainers[hash] = 1;\n  emitEvent(readyStateChange);\n};\nconst waitForContainerReady = (container) => {\n  const hash = container.getAttribute("q:instance");\n  return container.getAttribute("q:container") === "paused" && doc.readyState === "loading" && !readyContainers[hash] && new Promise((resolve) => {\n    const ready = () => {\n      if (doc.readyState !== "loading" || readyContainers[hash]) {\n        resolve();\n      }\n    };\n    addEventListener(doc, readyStateChange, ready);\n  });\n};\nconst createEvent = (eventName, detail) => new CustomEvent(eventName, { detail });\nconst emitEvent = (eventName, detail) => {\n  doc.dispatchEvent(createEvent(eventName, detail));\n};\nconst camelToKebab = (str) => str.replace(/([A-Z-])/g, (a) => "-" + a.toLowerCase());\nconst kebabToCamel = (eventName) => eventName.replace(/-./g, (a) => a[1].toUpperCase());\nconst parseKebabEvent = (event) => {\n  const separatorIndex = event.indexOf(":");\n  const scope = event.slice(0, separatorIndex);\n  return {\n    scope,\n    eventName: kebabToCamel(event.slice(separatorIndex + 1))\n  };\n};\nconst isPassiveScope = (scope) => scope.length === 2;\nconst getRootScope = (scope) => scope.charAt(0);\nconst isElementNode = (node) => !!node && node.nodeType === 1;\nconst isCaptureHandlerElement = (element, scopedKebabName, captureAttribute) => element.hasAttribute(captureAttribute) && (!!element._qDispatch?.[scopedKebabName] || element.hasAttribute("q-" + scopedKebabName));\nconst resolveHandler = (container, element, qBase, base, chunk, symbol, reqTime, reportSyncError = true) => {\n  const eventData = {\n    qBase,\n    symbol,\n    element,\n    reqTime\n  };\n  if (!chunk) {\n    const handler2 = (doc["qFuncs_" + container.getAttribute("q:instance")] || [])[+symbol];\n    if (!handler2 && reportSyncError) {\n      const error = new Error("sym:" + symbol);\n      emitEvent("qerror", {\n        importError: "sync",\n        error,\n        ...eventData\n      });\n      console.error(error);\n    }\n    return handler2;\n  }\n  const key = `${symbol}|${qBase}|${chunk}`;\n  const handler = symbols.get(key);\n  if (handler) {\n    return handler;\n  }\n  const href = new URL(chunk, base).href;\n  const module = import(\n        href\n  );\n  resolveContainer(container);\n  return module.then(\n    (module2) => {\n      const handler2 = module2[symbol];\n      if (!handler2) {\n        const error = new Error(`${symbol} not in ${href}`);\n        emitEvent("qerror", {\n          importError: "no-symbol",\n          error,\n          ...eventData\n        });\n        console.error(error);\n      } else {\n        symbols.set(key, handler2);\n        emitEvent("qsymbol", eventData);\n      }\n      return handler2;\n    },\n    (error) => {\n      emitEvent("qerror", {\n        importError: "async",\n        error,\n        ...eventData\n      });\n      console.error(error);\n      return void 0;\n    }\n  );\n};\nconst dispatch = (element, ev, scopedKebabName, tasks, kebabName, allowPreventDefault = true) => {\n  let defer = false;\n  if (kebabName) {\n    if (allowPreventDefault && element.hasAttribute("preventdefault:" + kebabName)) {\n      ev.preventDefault();\n    }\n    if (element.hasAttribute("stoppropagation:" + kebabName)) {\n      ev.stopPropagation();\n    }\n  }\n  const handlers = element._qDispatch?.[scopedKebabName];\n  if (handlers) {\n    if (typeof handlers === "function") {\n      const run = () => handlers(ev, element);\n      if (defer) {\n        tasks.push(async () => {\n          const result = run();\n          if (isPromise(result)) {\n            await result;\n          }\n        });\n      } else {\n        const result = run();\n        if (isPromise(result)) {\n          defer = true;\n          tasks.push(() => result);\n        }\n      }\n    } else if (handlers.length) {\n      for (let i = 0; i < handlers.length; i++) {\n        const handler = handlers[i];\n        if (handler) {\n          const run = () => handler(ev, element);\n          if (defer) {\n            tasks.push(async () => {\n              const result = run();\n              if (isPromise(result)) {\n                await result;\n              }\n            });\n          } else {\n            const result = run();\n            if (isPromise(result)) {\n              defer = true;\n              tasks.push(() => result);\n            }\n          }\n        }\n      }\n    }\n    return;\n  }\n  const attrValue = element.getAttribute("q-" + scopedKebabName);\n  if (attrValue) {\n    const container = element.closest(\n      "[q\\\\:container]:not([q\\\\:container=html]):not([q\\\\:container=text])"\n    );\n    const qBase = container.getAttribute("q:base");\n    const base = new URL(qBase, doc.baseURI);\n    const qrls = attrValue.split("|");\n    const waitForReady = waitForContainerReady(container);\n    for (let i = 0; i < qrls.length; i++) {\n      const qrl = qrls[i];\n      const reqTime = performance.now();\n      const [chunk, symbol, capturedIds] = qrl.split("#");\n      const run = (handler2) => {\n        if (handler2 && element.isConnected) {\n          const onError = (error) => {\n            emitEvent("qerror", {\n              error,\n              qBase,\n              symbol,\n              element,\n              reqTime\n            });\n          };\n          try {\n            const result = handler2.call(capturedIds, ev, element);\n            if (isPromise(result)) {\n              return result.catch(onError);\n            }\n          } catch (error) {\n            return onError(error);\n          }\n        }\n      };\n      const resolve = (reportSyncError = true) => resolveHandler(container, element, qBase, base, chunk, symbol, reqTime, reportSyncError);\n      const handler = waitForReady ? void 0 : resolve();\n      if (waitForReady) {\n        defer = true;\n        tasks.push(async () => {\n          await waitForReady;\n          await run(await resolve(false) || await resolve());\n        });\n      } else if (isPromise(handler)) {\n        defer = true;\n        tasks.push(() => handler.then(run));\n      } else if (defer) {\n        defer = true;\n        tasks.push(async () => {\n          await run(handler || await resolve());\n        });\n      } else {\n        const result = run(handler);\n        if (isPromise(result)) {\n          defer = true;\n          tasks.push(() => result);\n        }\n      }\n    }\n  }\n};\nconst processElementEvent = (ev, scope = elementPrefix, allowPreventDefault = true) => {\n  const kebabName = camelToKebab(ev.type);\n  const scopedKebabName = scope + ":" + kebabName;\n  const captureAttribute = capturePrefix + kebabName;\n  const elements = [];\n  const captureHandlers = [];\n  const tasks = [];\n  let current = ev.target;\n  while (current) {\n    if (isElementNode(current)) {\n      elements.push(current);\n      captureHandlers.push(isCaptureHandlerElement(current, scopedKebabName, captureAttribute));\n      current = current.parentElement;\n    } else {\n      current = current.parentElement;\n    }\n  }\n  for (let i = elements.length - 1; i >= 0; i--) {\n    if (captureHandlers[i]) {\n      dispatch(elements[i], ev, scopedKebabName, tasks, kebabName, allowPreventDefault);\n      if (ev.cancelBubble) {\n        queueTasks(tasks);\n        return;\n      }\n    }\n  }\n  for (let i = 0; i < elements.length; i++) {\n    if (!captureHandlers[i]) {\n      dispatch(elements[i], ev, scopedKebabName, tasks, kebabName, allowPreventDefault);\n      if (!ev.bubbles || ev.cancelBubble) {\n        queueTasks(tasks);\n        return;\n      }\n    }\n  }\n  queueTasks(tasks);\n};\nconst processPassiveElementEvent = (ev) => processElementEvent(ev, passiveElementPrefix, false);\nconst broadcast = (scope, ev, allowPreventDefault = true) => {\n  const kebabName = camelToKebab(ev.type);\n  const scopedKebabName = scope + ":" + kebabName;\n  const elements = querySelectorAll("[q-" + scope + "\\\\:" + kebabName + "]");\n  const tasks = [];\n  for (let i = 0; i < elements.length; i++) {\n    const el = elements[i];\n    dispatch(el, ev, scopedKebabName, tasks, kebabName, allowPreventDefault);\n  }\n  queueTasks(tasks);\n};\nconst processDocumentEvent = (ev) => {\n  broadcast(documentPrefix, ev);\n};\nconst processPassiveDocumentEvent = (ev) => {\n  broadcast(passiveDocumentPrefix, ev, false);\n};\nconst processWindowEvent = (ev) => {\n  broadcast(windowPrefix, ev);\n};\nconst processPassiveWindowEvent = (ev) => {\n  broadcast(passiveWindowPrefix, ev, false);\n};\nconst processReadyStateChange = () => {\n  const readyState = doc.readyState;\n  if (readyState == "interactive" || readyState == "complete") {\n    hasInitialized = 1;\n    roots.forEach(findShadowRoots);\n    if (events.has("d:qinit")) {\n      events.delete("d:qinit");\n      const ev = createEvent("qinit");\n      const elements = querySelectorAll("[q-d\\\\:qinit]");\n      const tasks = [];\n      for (let i = 0; i < elements.length; i++) {\n        const el = elements[i];\n        dispatch(el, ev, "d:qinit", tasks);\n        el.removeAttribute("q-d:qinit");\n      }\n      queueTasks(tasks);\n    }\n    if (events.has("d:qidle")) {\n      events.delete("d:qidle");\n      const riC = win.requestIdleCallback ?? win.setTimeout;\n      riC.bind(win)(() => {\n        const ev = createEvent("qidle");\n        const elements = querySelectorAll("[q-d\\\\:qidle]");\n        const tasks = [];\n        for (let i = 0; i < elements.length; i++) {\n          const el = elements[i];\n          dispatch(el, ev, "d:qidle", tasks);\n          el.removeAttribute("q-d:qidle");\n        }\n        queueTasks(tasks);\n      });\n    }\n    if (events.has("e:qvisible")) {\n      observer || (observer = new IntersectionObserver((entries) => {\n        const tasks = [];\n        for (let i = 0; i < entries.length; i++) {\n          const entry = entries[i];\n          if (entry.isIntersecting) {\n            observer.unobserve(entry.target);\n            dispatch(\n              entry.target,\n              createEvent("qvisible", entry),\n              "e:qvisible",\n              tasks\n            );\n          }\n        }\n        queueTasks(tasks);\n      }));\n      const elements = querySelectorAll("[q-e\\\\:qvisible]:not([q\\\\:observed])");\n      for (let i = 0; i < elements.length; i++) {\n        const el = elements[i];\n        observer.observe(el);\n        el.setAttribute("q:observed", "true");\n      }\n    }\n  }\n};\nconst addEventOrRoot = (...eventNames) => {\n  for (let i = 0; i < eventNames.length; i++) {\n    const eventNameOrRoot = eventNames[i];\n    if (eventNameOrRoot === QwikEvContainerReady) {\n      markContainerReady(eventNames[++i]);\n    } else if (typeof eventNameOrRoot === "string") {\n      if (!events.has(eventNameOrRoot)) {\n        events.add(eventNameOrRoot);\n        const { scope, eventName } = parseKebabEvent(eventNameOrRoot);\n        const passive = isPassiveScope(scope);\n        const rootScope = getRootScope(scope);\n        if (rootScope === windowPrefix) {\n          addEventListener(\n            win,\n            eventName,\n            passive ? processPassiveWindowEvent : processWindowEvent,\n            true,\n            passive\n          );\n        } else {\n          roots.forEach(\n            (root) => addEventListener(\n              root,\n              eventName,\n              rootScope === documentPrefix ? passive ? processPassiveDocumentEvent : processDocumentEvent : passive ? processPassiveElementEvent : processElementEvent,\n              true,\n              passive\n            )\n          );\n        }\n        if (hasInitialized === 1 && (eventNameOrRoot === "e:qvisible" || eventNameOrRoot === "d:qinit" || eventNameOrRoot === "d:qidle")) {\n          processReadyStateChange();\n        }\n      }\n    } else {\n      if (!roots.has(eventNameOrRoot)) {\n        events.forEach((kebabEventName) => {\n          const { scope, eventName } = parseKebabEvent(kebabEventName);\n          const passive = isPassiveScope(scope);\n          const rootScope = getRootScope(scope);\n          if (rootScope !== windowPrefix) {\n            addEventListener(\n              eventNameOrRoot,\n              eventName,\n              rootScope === documentPrefix ? passive ? processPassiveDocumentEvent : processDocumentEvent : passive ? processPassiveElementEvent : processElementEvent,\n              true,\n              passive\n            );\n          }\n        });\n        roots.add(eventNameOrRoot);\n      }\n    }\n  }\n};\nconst _qwikEv = win._qwikEv;\nif (!_qwikEv?.roots) {\n  if (Array.isArray(_qwikEv)) {\n    addEventOrRoot(..._qwikEv);\n  } else {\n    addEventOrRoot("e:click", "e:input");\n  }\n  win._qwikEv = {\n    events,\n    roots,\n    push: addEventOrRoot\n  };\n  addEventListener(doc, readyStateChange, processReadyStateChange);\n  processReadyStateChange();\n}';
+var QWIK_BACKPATCH_EXECUTOR_MINIFIED = `const t='script[type="qwik/backpatch"]';function e(e,n){const o=n||e.querySelector("[q\\\\:container]:not([q\\\\:container=html]):not([q\\\\:container=text])");if(o){const n=o.querySelectorAll(t),r=n[n.length-1];if(r){const t=JSON.parse(r.textContent||"[]"),n=e.createTreeWalker(o,NodeFilter.SHOW_ELEMENT);let c=n.currentNode,i=c.hasAttribute(":")?0:-1;for(let e=0;e<t.length;e+=3){const o=t[e],r=t[e+1];let l=t[e+2];for(;i<o&&(c=n.nextNode(),c);)c.hasAttribute(":")&&i++;const s=c;null==l||!1===l?s.removeAttribute(r):("boolean"==typeof l&&(l=""),s.setAttribute(r,l))}}}}const n=document.currentScript;if(n){const t=n.closest("[q\\\\:container]:not([q\\\\:container=html]):not([q\\\\:container=text])");t&&e(document,t)}`;
+var QWIK_BACKPATCH_EXECUTOR_DEBUG = `const BACKPATCH_DATA_SELECTOR = 'script[type="qwik/backpatch"]';
+function executeBackpatch(doc, containerElement) {
+  const container = containerElement || doc.querySelector("[q\\\\:container]:not([q\\\\:container=html]):not([q\\\\:container=text])");
+  if (container) {
+    const scripts = container.querySelectorAll(BACKPATCH_DATA_SELECTOR);
+    const script = scripts[scripts.length - 1];
+    if (script) {
+      const data = JSON.parse(script.textContent || "[]");
+      const walker = doc.createTreeWalker(container, NodeFilter.SHOW_ELEMENT);
+      let currentNode = walker.currentNode;
+      let currentNodeIdx = currentNode.hasAttribute(":") ? 0 : -1;
+      for (let i = 0; i < data.length; i += 3) {
+        const elementIdx = data[i];
+        const attrName = data[i + 1];
+        let value = data[i + 2];
+        while (currentNodeIdx < elementIdx) {
+          currentNode = walker.nextNode();
+          if (!currentNode) {
+            break;
+          }
+          if (currentNode.hasAttribute(":")) {
+            currentNodeIdx++;
+          }
+        }
+        const element = currentNode;
+        if (value == null || value === false) {
+          element.removeAttribute(attrName);
+        } else {
+          if (typeof value === "boolean") {
+            value = "";
+          }
+          element.setAttribute(attrName, value);
+        }
+      }
+    }
+  }
+}
+const executorScript = document.currentScript;
+if (executorScript) {
+  const container = executorScript.closest(
+    "[q\\\\:container]:not([q\\\\:container=html]):not([q\\\\:container=text])"
+  );
+  if (container) {
+    executeBackpatch(document, container);
+  }
+}`;
+var QWIK_OUT_OF_ORDER_EXECUTOR_MINIFIED = `const t='template[q\\\\:r="',e="q:r",n='[q\\\\:rp="',r="q:g",l="q:i",o="q:o",s="[q\\\\:container]:not([q\\\\:container=html]):not([q\\\\:container=text])",u=u=>{const i=new WeakMap,c=()=>{const t=u.currentScript;return t&&t.closest(s)||u},f=(t,e,n,r)=>{let l=i.get(t);return l||i.set(t,l={}),l[e]||(l[e]={r:{},n:0,t:n,o:r})},a=(t,e)=>t?(e&&e.style&&(e.style.display="none"),t.style&&(t.style.display="contents"),1):0,q=t=>{const e=t.o;let n,r,l=0;if("p"===e)for(const e in t.r)n=t.r[e],n[0]&&a(n[0],n[1])&&(n[0]=0,l++);else if("s"===e)for(r=t.n;(n=t.r[r])&&n[0]&&a(n[0],n[1]);r++)n[0]=0,l++,t.n=r+1;else if("r"===e){if(t.t<0)return 0;for(t.n<0&&(t.n=t.t-1),r=t.n;(n=t.r[r])&&n[0]&&a(n[0],n[1]);r--)n[0]=0,l++,t.n=r-1}else{if(t.t<0)return 0;for(r=0;r<t.t;r++)if(n=t.r[r],!n)return 0;for(r=0;r<t.t;r++)n=t.r[r],n[0]&&a(n[0],n[1])&&(n[0]=0,l++)}return l},p=s=>{const i=c(),p=((n,r)=>{const l=u.currentScript,o=l?l.previousElementSibling:null;if(o&&"template"===o.localName&&o.getAttribute(e)===r+"")return o;const s=n.querySelectorAll(t+r+'"]');return s.length?s[s.length-1]:null})(i,s);if(!p)return;const g=((e,r,l)=>{if(!l)return null;const o=((t,e)=>t.querySelector(n+e+'"]'))(e,r),s=o?((e,n)=>e.querySelector(t+n+'"]'))(o,r):null,u=s?s.parentNode:null;return s&&o&&u?(u.insertBefore(l.content,s),s.remove(),l.remove(),[o,o.previousElementSibling]):null})(i,s,p);if(!g)return;((t,e)=>{var n;const r=u;null==(n=r.qProcessOOOS)||n.call(r,t,e)})(s,g[0]||null);const m=p.getAttribute(r);if(m){const t=+(p.getAttribute(l)||0),e=f(i,m,-1,p.getAttribute(o)||"p");return e.r[t]=g,void q(e)}a(g[0]||null,g[1])};p.g=(t,e,n)=>{const r=f(c(),t,e,n);r.t=e,r.o=n,"r"===r.o&&0===r.n&&(r.n=e-1),q(r)},p.d=u,globalThis.qO=p};u(document)`;
+var QWIK_OUT_OF_ORDER_EXECUTOR_DEBUG = `const Q_RESOLVED_SELECTOR = 'template[q\\\\:r="';
+const Q_RESOLVED_ATTR = "q:r";
+const Q_RESULT_PARENT_SELECTOR = '[q\\\\:rp="';
+const Q_GROUP_ATTR = "q:g";
+const Q_INDEX_ATTR = "q:i";
+const Q_ORDER_ATTR = "q:o";
+const Q_CONTAINER_SELECTOR = "[q\\\\:container]:not([q\\\\:container=html]):not([q\\\\:container=text])";
+const installOutOfOrderExecutor = (doc) => {
+  const groups = /* @__PURE__ */ new WeakMap();
+  const process = (boundaryId, content) => {
+    var _a;
+    const executorDoc = doc;
+    (_a = executorDoc.qProcessOOOS) == null ? void 0 : _a.call(executorDoc, boundaryId, content);
+  };
+  const getScope = () => {
+    const script = doc.currentScript;
+    return script ? script.closest(Q_CONTAINER_SELECTOR) || doc : doc;
+  };
+  const group = (scope, groupId, total, order) => {
+    let scopedGroups = groups.get(scope);
+    if (!scopedGroups) {
+      groups.set(scope, scopedGroups = {});
+    }
+    return scopedGroups[groupId] || (scopedGroups[groupId] = {
+      r: {},
+      n: 0,
+      t: total,
+      o: order
+    });
+  };
+  const getResolvedTemplate = (scope, boundaryId) => {
+    const currentScript = doc.currentScript;
+    const previousElement = currentScript ? currentScript.previousElementSibling : null;
+    if (previousElement && previousElement.localName === "template" && previousElement.getAttribute(Q_RESOLVED_ATTR) === String(boundaryId)) {
+      return previousElement;
+    }
+    const templates = scope.querySelectorAll(Q_RESOLVED_SELECTOR + boundaryId + '"]');
+    return templates.length ? templates[templates.length - 1] : null;
+  };
+  const getPlaceholderTemplate = (content, boundaryId) => {
+    return content.querySelector(Q_RESOLVED_SELECTOR + boundaryId + '"]');
+  };
+  const getResultParent = (scope, boundaryId) => {
+    return scope.querySelector(Q_RESULT_PARENT_SELECTOR + boundaryId + '"]');
+  };
+  const reveal = (content, fallback) => {
+    if (!content) {
+      return 0;
+    }
+    if (fallback && fallback.style) {
+      fallback.style.display = "none";
+    }
+    if (content.style) {
+      content.style.display = "contents";
+    }
+    return 1;
+  };
+  const move = (scope, boundaryId, resolved) => {
+    if (!resolved) {
+      return null;
+    }
+    const content = getResultParent(scope, boundaryId);
+    const placeholder = content ? getPlaceholderTemplate(content, boundaryId) : null;
+    const parent = placeholder ? placeholder.parentNode : null;
+    if (!placeholder || !content || !parent) {
+      return null;
+    }
+    parent.insertBefore(resolved.content, placeholder);
+    placeholder.remove();
+    resolved.remove();
+    return [content, content.previousElementSibling];
+  };
+  const flush = (group2) => {
+    const order = group2.o;
+    let entry;
+    let index;
+    let swapped = 0;
+    if (order === "p") {
+      for (const key in group2.r) {
+        entry = group2.r[key];
+        if (entry[0] && reveal(entry[0], entry[1])) {
+          entry[0] = 0;
+          swapped++;
+        }
+      }
+    } else if (order === "s") {
+      for (index = group2.n; (entry = group2.r[index]) && entry[0]; index++) {
+        if (!reveal(entry[0], entry[1])) {
+          break;
+        }
+        entry[0] = 0;
+        swapped++;
+        group2.n = index + 1;
+      }
+    } else if (order === "r") {
+      if (group2.t < 0) {
+        return 0;
+      }
+      if (group2.n < 0) {
+        group2.n = group2.t - 1;
+      }
+      for (index = group2.n; (entry = group2.r[index]) && entry[0]; index--) {
+        if (!reveal(entry[0], entry[1])) {
+          break;
+        }
+        entry[0] = 0;
+        swapped++;
+        group2.n = index - 1;
+      }
+    } else {
+      if (group2.t < 0) {
+        return 0;
+      }
+      for (index = 0; index < group2.t; index++) {
+        entry = group2.r[index];
+        if (!entry) {
+          return 0;
+        }
+      }
+      for (index = 0; index < group2.t; index++) {
+        entry = group2.r[index];
+        if (entry[0] && reveal(entry[0], entry[1])) {
+          entry[0] = 0;
+          swapped++;
+        }
+      }
+    }
+    return swapped;
+  };
+  const qO = ((boundaryId) => {
+    const scope = getScope();
+    const resolved = getResolvedTemplate(scope, boundaryId);
+    if (!resolved) {
+      return;
+    }
+    const entry = move(scope, boundaryId, resolved);
+    if (!entry) {
+      return;
+    }
+    process(boundaryId, entry[0] || null);
+    const groupId = resolved.getAttribute(Q_GROUP_ATTR);
+    if (groupId) {
+      const index = +(resolved.getAttribute(Q_INDEX_ATTR) || 0);
+      const currentGroup = group(scope, groupId, -1, resolved.getAttribute(Q_ORDER_ATTR) || "p");
+      currentGroup.r[index] = entry;
+      flush(currentGroup);
+      return;
+    }
+    reveal(entry[0] || null, entry[1]);
+  });
+  qO.g = (groupId, total, order) => {
+    const currentGroup = group(getScope(), groupId, total, order);
+    currentGroup.t = total;
+    currentGroup.o = order;
+    if (currentGroup.o === "r" && currentGroup.n === 0) {
+      currentGroup.n = total - 1;
+    }
+    flush(currentGroup);
+  };
+  qO.d = doc;
+  globalThis.qO = qO;
+};
+installOutOfOrderExecutor(document)`;
+function getQwikLoaderScript(opts = {}) {
+  return opts.debug ? QWIK_LOADER_DEFAULT_DEBUG : QWIK_LOADER_DEFAULT_MINIFIED;
+}
+var QWIK_PREFETCH_MINIFIED = globalThis.QWIK_PREFETCH_MINIFIED;
+var QWIK_PREFETCH_DEBUG = globalThis.QWIK_PREFETCH_DEBUG;
+function getQwikPrefetchWorkerScript(opts = {}) {
+  return opts.debug ? QWIK_PREFETCH_DEBUG : QWIK_PREFETCH_MINIFIED;
+}
+function getQwikBackpatchExecutorScript(opts = {}) {
+  return opts.debug ? QWIK_BACKPATCH_EXECUTOR_DEBUG : QWIK_BACKPATCH_EXECUTOR_MINIFIED;
+}
+function getQwikOutOfOrderExecutorScript(opts = {}) {
+  if (!__EXPERIMENTAL__.suspense) {
+    return "";
+  }
+  const script = opts.debug ? QWIK_OUT_OF_ORDER_EXECUTOR_DEBUG : QWIK_OUT_OF_ORDER_EXECUTOR_MINIFIED;
+  return `if(!globalThis.qO||globalThis.qO.d!==document){${script}}`;
+}
+
+// packages/qwik/src/server/ssr-node.ts
+import {
+  _isJSXNode as isJSXNode,
+  _EMPTY_OBJ,
+  _EFFECT_BACK_REF
+} from "@qwik.dev/core/internal";
+import { isDev as isDev7 } from "@qwik.dev/core/build";
+var SsrNode = class {
+  constructor(parentComponent, id, attributesIndex, cleanupQueue, vnodeData, currentFile) {
+    this.parentComponent = parentComponent;
+    this.attributesIndex = attributesIndex;
+    this.cleanupQueue = cleanupQueue;
+    this.vnodeData = vnodeData;
+    this.currentFile = currentFile;
+    this.id = id;
+    this.flags = 1 /* Updatable */;
+    this.attrs = this.attributesIndex >= 0 ? this.vnodeData[this.attributesIndex] : _EMPTY_OBJ;
+    this.parentComponent?.addChild(this);
+    if (isDev7 && id.indexOf("undefined") != -1) {
+      throw new Error(`Invalid SSR node id: ${id}`);
+    }
+  }
+  __brand__ = "SsrNode";
+  /**
+   * ID which the deserialize will use to retrieve the node.
+   *
+   * @param id - Unique id for the node.
+   */
+  id;
+  flags;
+  dirty = 0 /* NONE */;
+  children = null;
+  attrs;
+  /** Local props which don't serialize; */
+  localProps = null;
+  get [_EFFECT_BACK_REF]() {
+    return this.getProp(QBackRefs);
+  }
+  setProp(name, value) {
+    if (this.attrs === _EMPTY_OBJ) {
+      this.setEmptyArrayAsVNodeDataAttributes();
+    }
+    if (name.startsWith(NON_SERIALIZABLE_MARKER_PREFIX)) {
+      (this.localProps ||= {})[name] = value;
+    } else {
+      this.attrs[name] = value;
+    }
+    if (name == ELEMENT_SEQ && value) {
+      this.cleanupQueue.push(value);
+    }
+  }
+  setEmptyArrayAsVNodeDataAttributes() {
+    if (this.attributesIndex >= 0) {
+      this.vnodeData[this.attributesIndex] = {};
+      this.attrs = this.vnodeData[this.attributesIndex];
+    } else {
+      const newAttributesIndex = this.vnodeData.length > 1 ? 1 : 0;
+      this.vnodeData.splice(newAttributesIndex, 0, {});
+      this.attributesIndex = newAttributesIndex;
+      this.attrs = this.vnodeData[this.attributesIndex];
+    }
+  }
+  getProp(name) {
+    if (name.startsWith(NON_SERIALIZABLE_MARKER_PREFIX)) {
+      return this.localProps ? this.localProps[name] ?? null : null;
+    } else {
+      return this.attrs[name] ?? null;
+    }
+  }
+  removeProp(name) {
+    if (name.startsWith(NON_SERIALIZABLE_MARKER_PREFIX)) {
+      if (this.localProps) {
+        delete this.localProps[name];
+      }
+    } else {
+      delete this.attrs[name];
+    }
+  }
+  addChild(child) {
+    if (!this.children) {
+      this.children = [];
+    }
+    this.children.push(child);
+  }
+  setTreeNonUpdatable() {
+    if (this.flags & 1 /* Updatable */) {
+      this.flags &= ~1 /* Updatable */;
+      if (this.children) {
+        for (let i = 0; i < this.children.length; i++) {
+          const child = this.children[i];
+          child.setTreeNonUpdatable();
+        }
+      }
+    }
+  }
+  toString() {
+    if (isDev7) {
+      let stringifiedAttrs = "";
+      for (const key in this.attrs) {
+        const value = this.attrs[key];
+        stringifiedAttrs += `${key}=`;
+        stringifiedAttrs += `${typeof value === "string" || typeof value === "number" ? JSON.stringify(value) : "*"}`;
+        stringifiedAttrs += ", ";
+      }
+      return `<SSRNode id="${this.id}" ${stringifiedAttrs} />`;
+    } else {
+      return `<SSRNode id="${this.id}" />`;
+    }
+  }
+};
+var DomRef = class {
+  constructor($ssrNode$) {
+    this.$ssrNode$ = $ssrNode$;
+  }
+  __brand__ = "DomRef";
+};
+var SsrComponentFrame = class {
+  constructor(componentNode) {
+    this.componentNode = componentNode;
+  }
+  slots = [];
+  projectionDepth = 0;
+  scopedStyleIds = /* @__PURE__ */ new Set();
+  projectionScopedStyle = null;
+  projectionComponentFrame = null;
+  distributeChildrenIntoSlots(children, projectionScopedStyle, projectionComponentFrame) {
+    this.projectionScopedStyle = projectionScopedStyle;
+    this.projectionComponentFrame = projectionComponentFrame;
+    if (isJSXNode(children)) {
+      const slotName = this.getSlotName(children);
+      mapArray_set(this.slots, slotName, children, 0);
+    } else if (Array.isArray(children) && children.length > 0) {
+      const defaultSlot = [];
+      for (let i = 0; i < children.length; i++) {
+        const child = children[i];
+        if (isJSXNode(child)) {
+          const slotName = this.getSlotName(child);
+          if (slotName === QDefaultSlot) {
+            defaultSlot.push(child);
+          } else {
+            this.updateSlot(slotName, child);
+          }
+        } else {
+          defaultSlot.push(child);
+        }
+      }
+      defaultSlot.length > 0 && mapArray_set(this.slots, QDefaultSlot, defaultSlot, 0);
+    } else {
+      mapArray_set(this.slots, QDefaultSlot, children, 0);
+    }
+  }
+  updateSlot(slotName, child) {
+    let existingSlots = mapArray_get(this.slots, slotName, 0);
+    if (existingSlots === null) {
+      existingSlots = child;
+    } else if (Array.isArray(existingSlots)) {
+      existingSlots.push(child);
+    } else {
+      existingSlots = [existingSlots, child];
+    }
+    mapArray_set(this.slots, slotName, existingSlots, 0);
+  }
+  getSlotName(jsx) {
+    if (jsx.props[QSlot]) {
+      return jsx.props[QSlot];
+    }
+    return QDefaultSlot;
+  }
+  hasSlot(slotName) {
+    return mapArray_has(this.slots, slotName, 0);
+  }
+  claimChildrenForSlot(slotName) {
+    return mapApp_remove(this.slots, slotName, 0);
+  }
+  consumeChildrenForSlot(projectionNode, slotName) {
+    const children = this.claimChildrenForSlot(slotName);
+    this.componentNode.setProp(slotName, projectionNode.id);
+    projectionNode.setProp(QSlotParent, this.componentNode.id);
+    return children;
+  }
+};
+
+// packages/qwik/src/server/ssr-stream-writer.ts
+var renderSSRChunks = (chunks, remap) => {
+  let out = "";
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    if (typeof chunk === "string") {
+      out += chunk;
+    } else if (chunk.type === "root-ref-delta") {
+      const id = remap ? remap[chunk.localId] ?? chunk.localId : chunk.localId;
+      const base2 = remap ? remap[chunk.localBaseId] ?? chunk.localBaseId : chunk.localBaseId;
+      out += String(id - base2);
+    } else {
+      const localId = chunk.type === "root-ref" ? chunk.localId : chunk.localPath[0];
+      out += String(remap ? remap[localId] ?? localId : localId);
+      if (chunk.type !== "root-ref-path") {
+        continue;
+      }
+      const path = chunk.localPath;
+      for (let j = 1; j < path.length; j++) {
+        out += " " + path[j];
+      }
+    }
+  }
+  return out;
+};
+var StringSSRWriter = class {
+  buffer = [];
+  write(text) {
+    this.buffer.push(text);
+  }
+  writeRootRef(id) {
+    writeStringRootRef(this, id);
+  }
+  writeRootRefPath(path) {
+    writeStringRootRefPath(this, path);
+  }
+  writeRootRefDelta(id, base2) {
+    writeStringRootRefDelta(this, id, base2);
+  }
+  clear() {
+    this.buffer.length = 0;
+  }
+  toString(_) {
+    return this.buffer.join("");
+  }
+};
+var StringBufferSegmentWriter = class {
+  chunks = [];
+  write(text) {
+    this.chunks.push(text);
+  }
+  writeRootRef(id) {
+    this.chunks.push({ type: "root-ref", localId: id });
+  }
+  writeRootRefPath(path) {
+    this.chunks.push({ type: "root-ref-path", localPath: path });
+  }
+  writeRootRefDelta(id, base2) {
+    this.chunks.push({ type: "root-ref-delta", localId: id, localBaseId: base2 });
+  }
+  clear() {
+    this.chunks.length = 0;
+  }
+  extract() {
+    const chunks = this.chunks;
+    this.chunks = [];
+    return chunks;
+  }
+  toString(remap) {
+    return renderSSRChunks(this.chunks, remap);
+  }
+};
+
+// packages/qwik/src/server/tag-nesting.ts
+var allowedContent = (state) => {
+  switch (state) {
+    case 2 /* TEXT */:
+      return ["text content", null];
+    case 0 /* NOT_ALLOWED */:
+      return ["no content", null];
+    case 32 /* HTML */:
+      return ["html content", "<head>, <body>"];
+    case 64 /* HEAD */:
+      return [
+        "head content",
+        "<title>, <script>, <noscript>, <style>, <meta>, <link>, <base>, <template>"
+      ];
+    case 130 /* BODY */:
+      return ["body content", "all tags allowed here"];
+    case 4 /* EMPTY */:
+      return ["no-content element", null];
+    case 10 /* ANYTHING */:
+      return ["any content", null];
+    case 4096 /* TABLE */:
+      return ["table", "<caption>, <colgroup>, <tbody>, <thead>, <tfoot>"];
+    case 8192 /* TABLE_BODY */:
+      return ["table body", "<tr>"];
+    case 16384 /* TABLE_ROW */:
+      return ["table row", "<td>, <th>"];
+    case 32768 /* TABLE_COLGROUP */:
+      return ["table column group", "<col>"];
+    case 258 /* PHRASING_ANY */:
+    case 514 /* PHRASING_INSIDE_INPUT */:
+    case 1026 /* PHRASING_CONTAINER */:
+      return ["phrasing content", "<a>, <b>, <img>, <input> ... (no <div>, <p> ...)"];
+    case 2050 /* PICTURE */:
+      return ["picture content", "<source>, <img>"];
+    case 4098 /* BUTTON */:
+      return ["button content", "phrasing content except interactive elements"];
+    case 1 /* DOCUMENT */:
+      return ["document", "<html>"];
+  }
+};
+var initialTag = (tag) => {
+  switch (tag) {
+    case "html":
+      return 32 /* HTML */;
+    case "head":
+      return 64 /* HEAD */;
+    case "body":
+      return 130 /* BODY */;
+    default:
+      return isTagAllowed(10 /* ANYTHING */, tag);
+  }
+};
+function isTagAllowed(state, tag) {
+  switch (state) {
+    case 2 /* TEXT */:
+    case 0 /* NOT_ALLOWED */:
+      return 0 /* NOT_ALLOWED */;
+    case 32 /* HTML */:
+      return isInHtml(tag);
+    case 64 /* HEAD */:
+      return isInHead(tag);
+    case 130 /* BODY */:
+    case 10 /* ANYTHING */:
+    case 1026 /* PHRASING_CONTAINER */:
+      return isInAnything(tag);
+    case 4096 /* TABLE */:
+      return isInTable(tag);
+    case 8192 /* TABLE_BODY */:
+      return isInTableBody(tag);
+    case 16384 /* TABLE_ROW */:
+      return isInTableRow(tag);
+    case 32768 /* TABLE_COLGROUP */:
+      return isInTableColGroup(tag);
+    case 258 /* PHRASING_ANY */:
+      return isInPhrasing(tag, true);
+    case 514 /* PHRASING_INSIDE_INPUT */:
+      return isInPhrasing(tag, false);
+    case 2050 /* PICTURE */:
+      return isInPicture(tag);
+    case 4098 /* BUTTON */:
+      return isInButton(tag);
+    case 1 /* DOCUMENT */:
+      if (tag === "html") {
+        return 32 /* HTML */;
+      }
+  }
+  return 0 /* NOT_ALLOWED */;
+}
+function isInHtml(text) {
+  switch (text) {
+    case "head":
+      return 64 /* HEAD */;
+    case "body":
+      return 130 /* BODY */;
+    default:
+      return 0 /* NOT_ALLOWED */;
+  }
+}
+function isInHead(text) {
+  switch (text) {
+    case "title":
+    case "script":
+    case "noscript":
+    case "style":
+      return 2 /* TEXT */;
+    case "meta":
+    case "link":
+    case "base":
+      return 4 /* EMPTY */;
+    case "template":
+      return 10 /* ANYTHING */;
+    default:
+      return 0 /* NOT_ALLOWED */;
+  }
+}
+function isSelfClosingTag(text) {
+  switch (text) {
+    case "area":
+    case "base":
+    case "basefont":
+    case "bgsound":
+    case "br":
+    case "col":
+    case "embed":
+    case "frame":
+    case "hr":
+    case "img":
+    case "input":
+    case "keygen":
+    case "link":
+    case "meta":
+    case "param":
+    case "source":
+    case "track":
+    case "wbr":
+      return true;
+    default:
+      return false;
+  }
+}
+function isInAnything(text) {
+  if (isSelfClosingTag(text)) {
+    return 4 /* EMPTY */;
+  }
+  switch (text) {
+    case "script":
+    case "style":
+    case "noscript":
+    case "noframes":
+      return 2 /* TEXT */;
+    case "p":
+    case "pre":
+      return 258 /* PHRASING_ANY */;
+    case "table":
+      return 4096 /* TABLE */;
+    case "html":
+    case "head":
+    case "body":
+      return 0 /* NOT_ALLOWED */;
+    case "button":
+      return 4098 /* BUTTON */;
+    case "input":
+    case "textarea":
+      return 514 /* PHRASING_INSIDE_INPUT */;
+    case "picture":
+      return 2050 /* PICTURE */;
+    default:
+      return 10 /* ANYTHING */;
+  }
+}
+function isInTable(text) {
+  switch (text) {
+    case "caption":
+      return 10 /* ANYTHING */;
+    case "colgroup":
+      return 32768 /* TABLE_COLGROUP */;
+    case "thead":
+    case "tbody":
+    case "tfoot":
+      return 8192 /* TABLE_BODY */;
+    case "script":
+      return 2 /* TEXT */;
+    default:
+      return 0 /* NOT_ALLOWED */;
+  }
+}
+function isInTableBody(text) {
+  switch (text) {
+    case "tr":
+      return 16384 /* TABLE_ROW */;
+    case "script":
+      return 2 /* TEXT */;
+    default:
+      return 0 /* NOT_ALLOWED */;
+  }
+}
+function isInTableRow(text) {
+  switch (text) {
+    case "td":
+    case "th":
+      return 10 /* ANYTHING */;
+    case "script":
+      return 2 /* TEXT */;
+    default:
+      return 0 /* NOT_ALLOWED */;
+  }
+}
+function isInTableColGroup(text) {
+  switch (text) {
+    case "col":
+      return 4 /* EMPTY */;
+    case "script":
+      return 2 /* TEXT */;
+    default:
+      return 0 /* NOT_ALLOWED */;
+  }
+}
+function isInPicture(text) {
+  switch (text) {
+    case "source":
+      return 4 /* EMPTY */;
+    case "img":
+      return 4 /* EMPTY */;
+    case "script":
+      return 2 /* TEXT */;
+    default:
+      return 0 /* NOT_ALLOWED */;
+  }
+}
+function isInButton(text) {
+  switch (text) {
+    case "button":
+    case "input":
+    case "textarea":
+    case "select":
+    case "a":
+      return 0 /* NOT_ALLOWED */;
+    case "picture":
+      return 2050 /* PICTURE */;
+    default:
+      return isInPhrasing(text, false);
+  }
+}
+function isInPhrasing(text, allowInput) {
+  switch (text) {
+    case "svg":
+    case "math":
+      return 1026 /* PHRASING_CONTAINER */;
+    case "input":
+    case "textarea":
+      return allowInput ? 514 /* PHRASING_INSIDE_INPUT */ : 0 /* NOT_ALLOWED */;
+    case "a":
+    case "abbr":
+    case "area":
+    case "audio":
+    case "b":
+    case "bdi":
+    case "bdo":
+    case "br":
+    case "button":
+    case "canvas":
+    case "cite":
+    case "code":
+    case "command":
+    case "data":
+    case "datalist":
+    case "del":
+    case "dfn":
+    case "em":
+    case "embed":
+    case "i":
+    case "iframe":
+    case "img":
+    case "ins":
+    case "itemprop":
+    case "kbd":
+    case "keygen":
+    case "label":
+    case "link":
+    case "map":
+    case "mark":
+    case "meta":
+    case "meter":
+    case "noscript":
+    case "object":
+    case "option":
+    case "output":
+    case "progress":
+    case "q":
+    case "ruby":
+    case "s":
+    case "samp":
+    case "select":
+    case "slot":
+    case "small":
+    case "span":
+    case "strong":
+    case "sub":
+    case "sup":
+    case "template":
+    case "time":
+    case "u":
+    case "var":
+    case "video":
+    case "wbr":
+      return allowInput ? 258 /* PHRASING_ANY */ : 514 /* PHRASING_INSIDE_INPUT */;
+    case "script":
+    case "style":
+      return 2 /* TEXT */;
+    case "picture":
+      return 2050 /* PICTURE */;
+    default:
+      return 0 /* NOT_ALLOWED */;
+  }
+}
+
+// packages/qwik/src/server/utils.ts
+function createTimer() {
+  if (typeof performance === "undefined") {
+    return () => 0;
+  }
+  const start = performance.now();
+  return () => {
+    const end = performance.now();
+    const delta = end - start;
+    return delta / 1e6;
+  };
+}
+function getBuildBase(opts) {
+  let base2 = opts.base;
+  if (typeof opts.base === "function") {
+    base2 = opts.base(opts);
+  }
+  if (typeof base2 === "string") {
+    if (!base2.endsWith("/")) {
+      base2 += "/";
+    }
+    return base2;
+  }
+  return `${import.meta.env?.BASE_URL || "/"}build/`;
+}
+var versions = {
+  qwik: "2.0.0-beta.37-dev+853febe",
+  qwikDom: "2.1.19"
+};
+
+// packages/qwik/src/server/vnode-data.ts
+var OPEN_FRAGMENT = Number.MAX_SAFE_INTEGER;
+var CLOSE_FRAGMENT = Number.MAX_SAFE_INTEGER - 1;
+var WRITE_ELEMENT_ATTRS = Number.MAX_SAFE_INTEGER - 2;
+function vNodeData_incrementElementCount(vNodeData) {
+  const length = vNodeData.length;
+  const lastValue = length > 1 ? vNodeData[length - 1] : 0;
+  if (lastValue >= 0) {
+    vNodeData.push(-1);
+  } else {
+    vNodeData[length - 1] = lastValue - 1;
+  }
+}
+function vNodeData_addTextSize(vNodeData, size) {
+  const length = vNodeData.length;
+  const lastValue = length > 1 ? vNodeData[length - 1] : 0;
+  if (length > 1 && lastValue >= 0) {
+    vNodeData[0] |= 1 /* TEXT_DATA */;
+  }
+  vNodeData.push(size);
+  if (size == 0) {
+    vNodeData[0] |= 1 /* TEXT_DATA */;
+  }
+}
+function vNodeData_openFragment(vNodeData, attrs) {
+  vNodeData.push(attrs, OPEN_FRAGMENT);
+  vNodeData[0] |= 2 /* VIRTUAL_NODE */;
+}
+function vNodeData_closeFragment(vNodeData) {
+  vNodeData.push(CLOSE_FRAGMENT);
+}
+function vNodeData_openElement(vNodeData) {
+  vNodeData.push({}, WRITE_ELEMENT_ATTRS);
+  vNodeData[0] |= 4 /* ELEMENT_NODE */;
+}
+function vNodeData_createSsrNodeReference(currentComponentNode, vNodeData, depthFirstElementIdx, cleanupQueue, currentFile) {
+  vNodeData[0] |= 8 /* REFERENCE */;
+  const stack = [-1];
+  let attributesIndex = -1;
+  for (let i = 1; i < vNodeData.length; i++) {
+    const value = vNodeData[i];
+    if (typeof value === "object" && value !== null) {
+      attributesIndex = i;
+      i++;
+      if (vNodeData[i] !== WRITE_ELEMENT_ATTRS) {
+        stack[stack.length - 1]++;
+        stack.push(-1);
+      }
+    } else if (value === CLOSE_FRAGMENT) {
+      stack.pop();
+    } else if (value < 0) {
+      const numberOfElements = 0 - value;
+      stack[stack.length - 1] += numberOfElements;
+    } else {
+      stack[stack.length - 1]++;
+    }
+  }
+  let refId = String(depthFirstElementIdx);
+  if (vNodeData[0] & (2 /* VIRTUAL_NODE */ | 1 /* TEXT_DATA */)) {
+    for (let i = 0; i < stack.length; i++) {
+      const childCount = stack[i];
+      if (childCount >= 0) {
+        refId += encodeAsAlphanumeric(childCount);
+      }
+    }
+  }
+  return new SsrNode(
+    currentComponentNode,
+    refId,
+    attributesIndex,
+    cleanupQueue,
+    vNodeData,
+    currentFile
+  );
+}
+var ALPHANUMERIC = [];
+function encodeAsAlphanumeric(value) {
+  while (ALPHANUMERIC.length <= value) {
+    let value2 = ALPHANUMERIC.length;
+    let text = "";
+    do {
+      text = String.fromCharCode(
+        (text.length === 0 ? 65 : 97) + value2 % 26
+        /* A-Z */
+      ) + text;
+      value2 = Math.floor(
+        value2 / 26
+        /* A-Z */
+      );
+    } while (value2 !== 0);
+    ALPHANUMERIC.push(text);
+  }
+  return ALPHANUMERIC[value];
+}
+
+// packages/qwik/src/server/ssr-container.ts
+var NO_SCRIPT_HERE_ELEMENTS = /* @__PURE__ */ new Set([
+  "script",
+  "style",
+  "textarea",
+  "title",
+  "iframe",
+  "noframes",
+  "noscript",
+  "xmp",
+  "template",
+  "svg",
+  "math"
+]);
+function ssrCreateContainer(opts) {
+  opts.renderOptions ||= {};
+  return new SSRContainer({
+    tagName: opts.tagName || "div",
+    writer: opts.writer || new StringSSRWriter(),
+    streamHandler: opts.streamHandler,
+    locale: opts.locale || "",
+    timing: opts.timing || {
+      firstFlush: 0,
+      render: 0,
+      snapshot: 0
+    },
+    buildBase: opts.buildBase || "/build/",
+    resolvedManifest: opts.resolvedManifest || {
+      mapper: {},
+      manifest: {
+        manifestHash: "dev",
+        mapping: {}
+      }
+    },
+    renderOptions: opts.renderOptions
+  });
+}
+var noopStreamHandler = {
+  flush() {
+  },
+  waitForPendingFlush() {
+  },
+  streamBlockStart() {
+  },
+  streamBlockEnd() {
+  }
+};
+var QTemplateProps = {
+  hidden: true,
+  "aria-hidden": true
+};
+var SSRContainer = class extends _SharedContainer {
+  tag;
+  isHtml;
+  writer;
+  streamHandler;
+  timing;
+  size = 0;
+  resolvedManifest;
+  symbolToChunkResolver;
+  renderOptions;
+  outOfOrderStreaming;
+  serializationCtx;
+  // Sometimes there is no app state, but framework metadata still points to a vnode id.
+  // For example, an OOOS segment can point outside the segment to a root vnode through
+  // q:sparent, so root vnode data must still be emitted for the client ref table.
+  hasVNodeRefsForSerialization = false;
+  /**
+   * We use this to append additional nodes in the head node
+   *
+   * - From manifest injections
+   * - From useStyles and useScopedStyles hooks
+   */
+  additionalHeadNodes = new Array();
+  /**
+   * We use this to append additional nodes in the body node
+   *
+   * - From manifest injections
+   */
+  additionalBodyNodes = new Array();
+  lastNode = null;
+  currentComponentNode = null;
+  styleIds = /* @__PURE__ */ new Set();
+  isBackpatchExecutorEmitted = false;
+  isOutOfOrderExecutorEmitted = false;
+  backpatchMap = /* @__PURE__ */ new Map();
+  currentElementFrame = null;
+  renderTimer;
+  /**
+   * Current element index.
+   *
+   * This number must match the depth-first traversal of the DOM elements as returned by the
+   * https://developer.mozilla.org/en-US/docs/Web/API/TreeWalker
+   */
+  depthFirstElementCount = -1;
+  vNodeDatas = [];
+  vNodeDataOffset = 0;
+  componentStack = [];
+  cleanupQueue = [];
+  emitContainerDataFrame = null;
+  $instanceHash$ = randomStr();
+  // Temporary flag to find missing roots after the state was serialized
+  $noMoreRoots$ = false;
+  qlInclude;
+  promiseAttributes = null;
+  vnodeSegment = null;
+  $containerState$ = 0 /* NotReady */;
+  // OOOS related fields
+  outOfOrderId = 0;
+  outOfOrderUsed = false;
+  outOfOrderPendingSegments = [];
+  outOfOrderSegments = [];
+  rootContainerReadyPromise = null;
+  resolveRootContainerReady = null;
+  renderQueue = Promise.resolve();
+  emittedQwikEventNames = /* @__PURE__ */ new Set();
+  emittedSyncFnCount = 0;
+  rootContainerSerializedRootCount = 0;
+  emittedVNodeDataOwners = null;
+  constructor(opts) {
+    super(opts.renderOptions.serverData ?? {}, opts.locale);
+    this.symbolToChunkResolver = (symbol) => {
+      const idx = symbol.lastIndexOf("_");
+      const chunk = this.resolvedManifest.mapper[idx == -1 ? symbol : symbol.substring(idx + 1)];
+      return chunk ? chunk[1] : "";
+    };
+    this.serializationCtx = this.serializationCtxFactory(
+      SsrNode,
+      DomRef,
+      this.symbolToChunkResolver,
+      opts.writer
+    );
+    this.renderTimer = createTimer();
+    this.tag = opts.tagName;
+    this.isHtml = opts.tagName === "html";
+    this.writer = opts.writer;
+    this.streamHandler = opts.streamHandler;
+    this.timing = opts.timing;
+    this.$buildBase$ = opts.buildBase;
+    this.resolvedManifest = opts.resolvedManifest;
+    this.renderOptions = opts.renderOptions;
+    const outOfOrderStreaming = this.renderOptions.streaming?.outOfOrder === true;
+    if (!__EXPERIMENTAL__.suspense) {
+      if (outOfOrderStreaming) {
+        throw new Error(
+          'Out-of-order Suspense streaming requires `experimental: ["suspense"]` in the `qwikVite` plugin.'
+        );
+      }
+      this.outOfOrderStreaming = false;
+    } else {
+      this.outOfOrderStreaming = outOfOrderStreaming;
+    }
+    this.$currentUniqueId$ = 1e5;
+    const qlOpt = this.renderOptions.qwikLoader;
+    this.qlInclude = qlOpt ? typeof qlOpt === "object" ? qlOpt.include === "never" ? 2 /* Done */ : 0 /* Module */ : qlOpt === "inline" ? 1 /* Inline */ : qlOpt === "never" ? 2 /* Done */ : 0 /* Module */ : 0 /* Module */;
+    if (this.qlInclude === 0 /* Module */) {
+      const qwikLoaderChunk = this.resolvedManifest?.manifest.qwikLoader;
+      if (!qwikLoaderChunk) {
+        this.qlInclude = 1 /* Inline */;
+      }
+    }
+    this.$processInjectionsFromManifest$();
+  }
+  ensureProjectionResolved(_host) {
+  }
+  handleError(err, _$host$) {
+    throw err;
+  }
+  addBackpatchEntry(ssrNodeId, attrName, serializedValue) {
+    const elementIndex = parseInt(ssrNodeId, 10);
+    const entry = {
+      attrName,
+      value: serializedValue
+    };
+    const entries = this.backpatchMap.get(elementIndex) || [];
+    entries.push(entry);
+    this.backpatchMap.set(elementIndex, entries);
+  }
+  async render(jsx) {
+    this.openContainer();
+    await this.renderJSX(jsx, {
+      currentStyleScoped: null,
+      parentComponentFrame: this.getComponentFrame()
+    });
+    await this.closeContainer();
+  }
+  async renderJSX(jsx, options) {
+    await _walkJSX(this, jsx, options);
+  }
+  $isReadyForOOOS$() {
+    return this.$containerState$ === 2 /* OOOSReady */;
+  }
+  /** Queue OOOS serialization/write work that must not overlap with root state serialization. */
+  $runQueuedRender$(render) {
+    if (!__EXPERIMENTAL__.suspense || !this.outOfOrderStreaming) {
+      return render();
+    }
+    if (this.$containerState$ === 0 /* NotReady */) {
+      return render();
+    }
+    const result = this.$containerState$ === 1 /* DataStreamStarted */ ? this.renderQueue.then(() => this.$waitForRootContainerReady$()).then(render) : this.renderQueue.then(render);
+    this.renderQueue = result.catch(() => {
+    });
+    return result;
+  }
+  $waitForRootContainerReady$() {
+    if (!__EXPERIMENTAL__.suspense || !this.outOfOrderStreaming || this.$isReadyForOOOS$()) {
+      return;
+    }
+    return this.rootContainerReadyPromise ||= new Promise((resolve) => {
+      this.resolveRootContainerReady = resolve;
+    });
+  }
+  $markRootContainerReady$() {
+    if (!__EXPERIMENTAL__.suspense || !this.outOfOrderStreaming || this.$isReadyForOOOS$()) {
+      return;
+    }
+    this.rootContainerSerializedRootCount = this.serializationCtx.$roots$.length;
+    this.$containerState$ = 2 /* OOOSReady */;
+    this.resolveRootContainerReady?.();
+    this.resolveRootContainerReady = null;
+    this.rootContainerReadyPromise = null;
+  }
+  nextOutOfOrderId() {
+    if (!__EXPERIMENTAL__.suspense || !this.outOfOrderStreaming) {
+      return 0;
+    }
+    this.outOfOrderUsed = true;
+    return ++this.outOfOrderId;
+  }
+  emitOutOfOrderSegmentScripts(scripts) {
+    if (!__EXPERIMENTAL__.suspense || !this.outOfOrderStreaming || !scripts) {
+      return;
+    }
+    this.write(scripts);
+  }
+  async segment(segmentId, jsx, options) {
+    if (!__EXPERIMENTAL__.suspense) {
+      throw new Error(
+        'Out-of-order Suspense streaming requires `experimental: ["suspense"]` in the `qwikVite` plugin.'
+      );
+    }
+    if (!this.outOfOrderStreaming) {
+      throw new Error(
+        "Out-of-order Suspense streaming requires `streaming.outOfOrder` to be `true`."
+      );
+    }
+    this.markVNodeRefForSerialization(options.parentComponentFrame?.componentNode);
+    const writer = new StringBufferSegmentWriter();
+    const segmentContainer = this.createSegmentContainer(segmentId, writer);
+    this.outOfOrderSegments.push(segmentContainer);
+    try {
+      await segmentContainer.renderJSX(jsx, options);
+      await segmentContainer.resolvePromiseAttributes();
+      const htmlChunks = writer.extract();
+      return {
+        container: segmentContainer,
+        writer,
+        htmlChunks
+      };
+    } catch (error) {
+      this.removeOutOfOrderSegment(segmentContainer);
+      throw error;
+    }
+  }
+  $getRootContainer$() {
+    let rootContainer = this;
+    while (rootContainer instanceof SSRSegmentContainer) {
+      rootContainer = rootContainer.$rootContainer$;
+    }
+    return rootContainer;
+  }
+  createSegmentContainer(segmentId, writer) {
+    const rootContainer = this.$getRootContainer$();
+    const contentHostNode = this.getOrCreateLastNode();
+    this.addRoot(contentHostNode);
+    this.markVNodeRefForSerialization(contentHostNode);
+    const rootFrame = {
+      tagNesting: 10 /* ANYTHING */,
+      parent: null,
+      elementName: "#segment",
+      depthFirstElementIdx: -1,
+      // OOOS inserts this synthetic root under the Suspense content host on the client.
+      vNodeData: [16 /* SERIALIZE */],
+      currentFile: null,
+      refBase: contentHostNode.id
+    };
+    const segmentContainer = new SSRSegmentContainer(
+      {
+        tagName: this.tag,
+        writer,
+        streamHandler: noopStreamHandler,
+        locale: this.$locale$,
+        timing: this.timing,
+        buildBase: this.$buildBase$ || "/build/",
+        resolvedManifest: this.resolvedManifest,
+        renderOptions: this.renderOptions
+      },
+      rootContainer
+    );
+    const innerSegmentContainer = segmentContainer;
+    innerSegmentContainer.$isOutOfOrderSegment$ = true;
+    innerSegmentContainer.$storeProxyMap$ = this.$storeProxyMap$;
+    segmentContainer.serializationCtx = segmentContainer.serializationCtxFactory(
+      SsrNode,
+      DomRef,
+      this.symbolToChunkResolver,
+      writer
+    );
+    segmentContainer.serializationCtx.$addSyncFn$ = this.serializationCtx.$addSyncFn$.bind(
+      this.serializationCtx
+    );
+    segmentContainer.currentElementFrame = rootFrame;
+    segmentContainer.currentComponentNode = this.currentComponentNode;
+    segmentContainer.depthFirstElementCount = 0;
+    segmentContainer.vNodeDatas = [rootFrame.vNodeData];
+    segmentContainer.componentStack = this.componentStack.slice();
+    segmentContainer.vnodeSegment = segmentId;
+    segmentContainer.styleIds = this.styleIds;
+    segmentContainer.emittedQwikEventNames = this.emittedQwikEventNames;
+    segmentContainer.qlInclude = 2 /* Done */;
+    segmentContainer.$instanceHash$ = this.$instanceHash$;
+    innerSegmentContainer._didAddQwikLoader = true;
+    return segmentContainer;
+  }
+  queueOutOfOrderSegment(segment) {
+    if (!__EXPERIMENTAL__.suspense || !this.outOfOrderStreaming) {
+      return;
+    }
+    this.outOfOrderPendingSegments.push(segment);
+  }
+  removeOutOfOrderSegment(segment) {
+    const segments = this.outOfOrderSegments;
+    for (let i = 0; i < segments.length; i++) {
+      if (segments[i] === segment) {
+        segments.splice(i, 1);
+        return;
+      }
+    }
+  }
+  setContext(host, context, value) {
+    const ssrNode = host;
+    let ctx = ssrNode.getProp(QCtxAttr);
+    if (ctx == null) {
+      ssrNode.setProp(QCtxAttr, ctx = []);
+    }
+    mapArray_set(ctx, context.id, value, 0, true);
+    this.addRoot(ssrNode);
+  }
+  resolveContext(host, contextId) {
+    let ssrNode = host;
+    while (ssrNode) {
+      const ctx = ssrNode.getProp(QCtxAttr);
+      if (ctx != null && mapArray_has(ctx, contextId.id, 0)) {
+        return mapArray_get(ctx, contextId.id, 0);
+      }
+      ssrNode = ssrNode.parentComponent;
+    }
+    return void 0;
+  }
+  getParentHost(host) {
+    const ssrNode = host;
+    return ssrNode.parentComponent;
+  }
+  setHostProp(host, name, value) {
+    const ssrNode = host;
+    return ssrNode.setProp(name, value);
+  }
+  getHostProp(host, name) {
+    const ssrNode = host;
+    return ssrNode.getProp(name);
+  }
+  /**
+   * Renders opening tag for container. It could be a html tag for regular apps or custom element
+   * for micro-frontends
+   */
+  openContainer() {
+    if (this.tag == "html") {
+      this.write("<!DOCTYPE html>");
+    }
+    const containerAttributes = this.renderOptions.containerAttributes || {};
+    const qRender = containerAttributes[QRenderAttr];
+    containerAttributes[QContainerAttr] = "paused" /* PAUSED */;
+    containerAttributes[QRuntimeAttr] = "2";
+    containerAttributes[QVersionAttr] = this.$version$ ?? "dev";
+    containerAttributes[QRenderAttr] = (qRender ? qRender + "-" : "") + (isDev8 ? "ssr-dev" : "ssr");
+    containerAttributes[QBaseAttr] = this.$buildBase$ || "";
+    containerAttributes[QLocaleAttr] = this.$locale$;
+    containerAttributes[QManifestHashAttr] = this.resolvedManifest.manifest.manifestHash;
+    containerAttributes[QInstanceAttr] = this.$instanceHash$;
+    const statePrewarm = this.renderOptions.statePrewarm;
+    if (typeof statePrewarm === "number") {
+      containerAttributes[QStatePrewarmAttr] = String(statePrewarm);
+    } else {
+      delete containerAttributes[QStatePrewarmAttr];
+    }
+    this.$serverData$.containerAttributes = containerAttributes;
+    this.openElement(this.tag, null, containerAttributes);
+    if (!this.isHtml) {
+      this.emitContainerDataFrame = this.currentElementFrame;
+    }
+  }
+  /** Renders closing tag for current container */
+  closeContainer() {
+    return this.closeElement();
+  }
+  $noScriptHere$ = 0;
+  /** Renders opening tag for DOM element */
+  openElement(elementName, key, varAttrs, constAttrs = null, styleScopedId = null, currentFile = null, hasMovedCaptures = true) {
+    const isQwikStyle = isQwikStyleElement(elementName, varAttrs) || isQwikStyleElement(elementName, constAttrs);
+    if (NO_SCRIPT_HERE_ELEMENTS.has(elementName)) {
+      this.$noScriptHere$++;
+    }
+    if (
+      // don't append qwik loader before qwik style elements
+      // it will confuse the resuming, because styles are expected to be the first nodes in subtree
+      !isQwikStyle && this.qlInclude === 1 /* Inline */
+    ) {
+      if (this.$noScriptHere$ === 0 && this.size > 30 * 1024 && elementName !== "body") {
+        this.emitQwikLoaderInline();
+      }
+    }
+    let innerHTML = void 0;
+    this.lastNode = null;
+    if (!isQwikStyle && this.currentElementFrame) {
+      vNodeData_incrementElementCount(this.currentElementFrame.vNodeData);
+    }
+    this.createAndPushFrame(elementName, this.depthFirstElementCount++, currentFile);
+    if (this.isHtml && elementName === "body" && this.emitContainerDataFrame === null) {
+      this.emitContainerDataFrame = this.currentElementFrame;
+    }
+    vNodeData_openElement(this.currentElementFrame.vNodeData);
+    this.write(LT);
+    this.write(elementName);
+    const lastNode = this.getOrCreateLastNode();
+    if (varAttrs) {
+      innerHTML = this.writeAttrs(
+        elementName,
+        varAttrs,
+        false,
+        styleScopedId,
+        currentFile,
+        hasMovedCaptures
+      );
+    }
+    this.write(" " + Q_PROPS_SEPARATOR);
+    if (key !== null) {
+      this.write(`="${key}"`);
+    } else if (qTest) {
+      this.write(EMPTY_ATTR);
+    }
+    if (constAttrs && !isObjectEmpty(constAttrs)) {
+      innerHTML = this.writeAttrs(
+        elementName,
+        constAttrs,
+        true,
+        styleScopedId,
+        currentFile,
+        hasMovedCaptures
+      ) || innerHTML;
+    }
+    this.write(GT);
+    if (lastNode) {
+      lastNode.setTreeNonUpdatable();
+    }
+    return innerHTML;
+  }
+  /** Renders closing tag for DOM element */
+  closeElement() {
+    if (this.currentElementFrame === this.emitContainerDataFrame) {
+      this.emitContainerDataFrame = null;
+      this.onRenderDone();
+      const snapshotTimer = createTimer();
+      return maybeThen(
+        maybeThen(this.emitContainerData(), () => this._closeElement()),
+        () => {
+          this.timing.snapshot = snapshotTimer();
+        }
+      );
+    }
+    this._closeElement();
+  }
+  onRenderDone() {
+    this.drainCleanupQueue();
+    this.timing.render = this.renderTimer();
+  }
+  /** Drain cleanup queue and cleanup tasks etc. */
+  drainCleanupQueue() {
+    let sequences = this.cleanupQueue.pop();
+    while (sequences) {
+      for (let j = 0; j < sequences.length; j++) {
+        const item = sequences[j];
+        if (hasDestroy(item)) {
+          item.$destroy$();
+        }
+      }
+      sequences = this.cleanupQueue.pop();
+    }
+  }
+  _closeElement() {
+    const currentFrame = this.popFrame();
+    const elementName = currentFrame.elementName;
+    if (!isSelfClosingTag(elementName)) {
+      this.write(CLOSE_TAG);
+      this.write(elementName);
+      this.write(GT);
+    }
+    this.lastNode = null;
+    if (NO_SCRIPT_HERE_ELEMENTS.has(elementName)) {
+      this.$noScriptHere$--;
+    }
+  }
+  /** Writes opening data to vNodeData for fragment boundaries */
+  openFragment(attrs) {
+    this.lastNode = null;
+    vNodeData_openFragment(this.currentElementFrame.vNodeData, attrs);
+    this.getOrCreateLastNode();
+  }
+  /** Writes closing data to vNodeData for fragment boundaries */
+  closeFragment() {
+    vNodeData_closeFragment(this.currentElementFrame.vNodeData);
+    if (this.currentComponentNode) {
+      this.currentComponentNode.setTreeNonUpdatable();
+    }
+    this.lastNode = null;
+  }
+  openProjection(attrs) {
+    this.openFragment(attrs);
+    const componentFrame = this.getComponentFrame();
+    if (componentFrame) {
+      const projectionNode = this.getOrCreateLastNode();
+      this.markVNodeRefForSerialization(projectionNode);
+      if (!this.vnodeSegment) {
+        this.addRoot(componentFrame.componentNode);
+      } else {
+        this.markVNodeRefForSerialization(componentFrame.componentNode);
+      }
+      componentFrame.projectionDepth++;
+    }
+  }
+  closeProjection() {
+    const componentFrame = this.getComponentFrame();
+    if (componentFrame) {
+      componentFrame.projectionDepth--;
+    }
+    this.closeFragment();
+  }
+  /** Writes opening data to vNodeData for component boundaries */
+  openComponent(attrs) {
+    this.openFragment(attrs);
+    this.currentComponentNode = this.getOrCreateLastNode();
+    this.componentStack.push(new SsrComponentFrame(this.currentComponentNode));
+  }
+  /**
+   * Returns the current component frame.
+   *
+   * @param projectionDepth - How many levels of projection to skip. This is needed when projections
+   *   are nested inside other projections we need to have a way to read from a frame above.
+   * @returns
+   */
+  getComponentFrame(projectionDepth = 0) {
+    const length = this.componentStack.length;
+    const idx = length - projectionDepth - 1;
+    return idx >= 0 ? this.componentStack[idx] : null;
+  }
+  getParentComponentFrame() {
+    const localProjectionDepth = this.getComponentFrame()?.projectionDepth || 0;
+    return this.getComponentFrame(localProjectionDepth);
+  }
+  /** Writes closing data to vNodeData for component boundaries and emit unclaimed projections inline */
+  async closeComponent() {
+    const componentFrame = this.componentStack.pop();
+    await this.emitUnclaimedProjectionForComponent(componentFrame);
+    this.closeFragment();
+    this.currentComponentNode = this.currentComponentNode?.parentComponent || null;
+  }
+  async emitUnclaimedProjectionForComponent(componentFrame) {
+    if (componentFrame.slots.length === 0) {
+      return;
+    }
+    this.openElement(QTemplate, null, QTemplateProps, null);
+    const scopedStyleId = componentFrame.projectionScopedStyle;
+    for (let i = 0; i < componentFrame.slots.length; i += 2) {
+      const slotName = componentFrame.slots[i];
+      const children = componentFrame.slots[i + 1];
+      if (this.vnodeSegment) {
+        this.markVNodeRefForSerialization(componentFrame.componentNode);
+      }
+      this.openFragment(
+        isDev8 ? {
+          [DEBUG_TYPE]: "P" /* Projection */,
+          [QSlotParent]: componentFrame.componentNode.id,
+          [QSlot]: slotName
+        } : { [QSlotParent]: componentFrame.componentNode.id, [QSlot]: slotName }
+      );
+      const lastNode = this.getOrCreateLastNode();
+      lastNode.vnodeData[0] |= 16 /* SERIALIZE */;
+      componentFrame.componentNode.setProp(slotName, lastNode.id);
+      await this.renderJSX(children, {
+        currentStyleScoped: scopedStyleId,
+        parentComponentFrame: componentFrame.projectionComponentFrame
+      });
+      this.closeFragment();
+    }
+    this.closeElement();
+  }
+  /** Write a text node with correct escaping. Save the length of the text node in the vNodeData. */
+  textNode(text) {
+    this.write(escapeHTML(text));
+    vNodeData_addTextSize(this.currentElementFrame.vNodeData, text.length);
+    this.lastNode = null;
+  }
+  htmlNode(rawHtml) {
+    this.write(rawHtml);
+  }
+  commentNode(text) {
+    this.write("<!--" + text + "-->");
+  }
+  addRoot(obj) {
+    if (this.$noMoreRoots$) {
+      const rootId = this.serializationCtx.$hasRootId$(obj);
+      return rootId;
+    }
+    return this.serializationCtx.$addRoot$(obj);
+  }
+  getOrCreateLastNode() {
+    if (!this.lastNode) {
+      const currentFrame = this.currentElementFrame;
+      const elementIndex = currentFrame.depthFirstElementIdx + 1;
+      const refBase = currentFrame.refBase ?? (this.vnodeSegment ? getSegmentVNodeRefId(this.vnodeSegment, elementIndex) : elementIndex + this.vNodeDataOffset);
+      this.lastNode = vNodeData_createSsrNodeReference(
+        this.currentComponentNode,
+        currentFrame.vNodeData,
+        refBase,
+        this.cleanupQueue,
+        currentFrame.currentFile
+      );
+    }
+    return this.lastNode;
+  }
+  addUnclaimedProjection(frame, name, children) {
+    frame.slots.push(name, children);
+  }
+  $processInjectionsFromManifest$() {
+    const injections = this.resolvedManifest.manifest.injections;
+    if (!injections) {
+      return;
+    }
+    for (let i = 0; i < injections.length; i++) {
+      const injection = injections[i];
+      const jsxNode = _jsxSplit(injection.tag, null, injection.attributes || {}, null, 0, null);
+      if (injection.location === "head") {
+        this.additionalHeadNodes.push(jsxNode);
+      } else {
+        this.additionalBodyNodes.push(jsxNode);
+      }
+    }
+  }
+  $appendStyle$(content, styleId, host, scoped) {
+    if (scoped) {
+      const componentFrame = this.getComponentFrame(0);
+      componentFrame.scopedStyleIds.add(styleId);
+      const scopedStyleIds = convertStyleIdsToString(componentFrame.scopedStyleIds);
+      this.setHostProp(host, QScopedStyle, scopedStyleIds);
+    }
+    if (!this.styleIds.has(styleId)) {
+      this.styleIds.add(styleId);
+      if (this.currentElementFrame?.elementName === "html") {
+        this.additionalHeadNodes.push(
+          _jsxSorted(
+            "style",
+            null,
+            { dangerouslySetInnerHTML: content, [QStyle]: styleId },
+            null,
+            0,
+            styleId
+          )
+        );
+      } else {
+        this._styleNode(styleId, content);
+      }
+    }
+  }
+  _styleNode(styleId, content) {
+    this.openElement("style", null, {
+      [QStyle]: styleId
+    });
+    this.write(content);
+    this.closeElement();
+  }
+  $deferRootPlaceholder$(scriptNode) {
+    if (this.isHtml && this.currentElementFrame?.elementName === "html") {
+      this.additionalHeadNodes.push(scriptNode);
+      return true;
+    }
+    return false;
+  }
+  ////////////////////////////////////
+  emitContainerData() {
+    const isStreamingDisabled = this.renderOptions.streaming?.inOrder?.strategy === "disabled";
+    const shouldFlushShell = !isStreamingDisabled || __EXPERIMENTAL__.suspense && this.outOfOrderStreaming && this.outOfOrderUsed;
+    return maybeThen(
+      maybeThen(
+        shouldFlushShell ? this.streamHandler.flush() : void 0,
+        () => this.resolvePromiseAttributes()
+      ),
+      () => {
+        this.$containerState$ = 1 /* DataStreamStarted */;
+        return maybeThen(this.emitStateData(), () => {
+          this.$noMoreRoots$ = true;
+          return maybeThen(this.emitRestStateData(), () => this.emitOutOfOrderSegmentsAndData());
+        });
+      }
+    );
+  }
+  emitRestStateData() {
+    this.emitVNodeData();
+    this.emitDelayedOutOfOrderSegmentVNodeData();
+    if (!isDev8) {
+      preloaderPost(this, this.renderOptions, this.$serverData$?.nonce);
+    }
+    this.emitSyncFnsData();
+    this.emitPatchDataIfNeeded();
+    this.emitExecutorIfNeeded();
+    this.emitQwikLoaderAtBottomIfNeeded();
+  }
+  emitDelayedOutOfOrderSegmentVNodeData() {
+    if (!__EXPERIMENTAL__.suspense || !this.outOfOrderStreaming || !this.outOfOrderUsed) {
+      return;
+    }
+    for (let i = 0; i < this.outOfOrderSegments.length; i++) {
+      const segment = this.outOfOrderSegments[i];
+      if (segment.$outOfOrderState$ === 1 /* EarlyFinalized */) {
+        segment.$emitDelayedOutOfOrderVNodeData$();
+        i--;
+      }
+    }
+  }
+  emitOutOfOrderSegmentsAndData() {
+    if (!__EXPERIMENTAL__.suspense || !this.outOfOrderStreaming || !this.outOfOrderUsed) {
+      return;
+    }
+    this.emitOutOfOrderExecutorIfNeeded();
+    return maybeThen(this.streamHandler.flush(), async () => {
+      this.$markRootContainerReady$();
+      if (this.outOfOrderPendingSegments.length) {
+        await Promise.all(this.outOfOrderPendingSegments);
+      }
+    });
+  }
+  /**
+   * Serialize the vNodeData into a string and emit it as a script tag.
+   *
+   * ## Encoding:
+   *
+   * - Alphabetical characters are text node lengths.
+   * - Numbers are element counts.
+   * - `{` is start of virtual node.
+   * - `}` is end of virtual node.
+   * - `~` Store as reference for data deserialization.
+   * - `!"#$%&'()*+'-./` are separators (sequential characters in ASCII table)
+   *
+   * Attribute and separators encoding described here:
+   * `packages/qwik/src/core/v2/shared/vnode-data-types.ts`
+   *
+   * NOTE: Not every element will need vNodeData. So we need to encode how many elements should be
+   * skipped. By choosing different separators we can encode different numbers of elements to skip.
+   */
+  emitVNodeData(segmentId) {
+    this.$getRootContainer$().markVNodeDataOwnerEmitted(segmentId);
+    if (!segmentId && !this.serializationCtx.$roots$.length && !this.hasVNodeRefsForSerialization) {
+      return;
+    }
+    this.emitVNodeDataScript(segmentId, this.vNodeDatas.entries());
+  }
+  emitVNodeDataScript(segmentId, entries, patch = false) {
+    const attrs = { type: "qwik/vnode" };
+    if (__EXPERIMENTAL__.suspense && this.outOfOrderStreaming && segmentId) {
+      attrs[QSuspenseResolved] = segmentId;
+    }
+    if (patch) {
+      attrs[QStatePatchAttr] = true;
+    }
+    this.openScript(attrs);
+    const vNodeAttrsStack = [];
+    let lastSerializedIdx = 0;
+    for (const [elementIdx, vNode] of entries) {
+      const flag = vNode[0];
+      if (flag & 16 /* SERIALIZE */) {
+        lastSerializedIdx = this.emitVNodeSeparators(lastSerializedIdx, elementIdx);
+        if (flag & 8 /* REFERENCE */) {
+          this.write(VNodeDataSeparator.REFERENCE_CH);
+        }
+        if (flag & (1 /* TEXT_DATA */ | 2 /* VIRTUAL_NODE */ | 4 /* ELEMENT_NODE */)) {
+          let fragmentAttrs = null;
+          let depth = 0;
+          for (let i = 1; i < vNode.length; i++) {
+            const value = vNode[i];
+            if (typeof value === "object" && value !== null) {
+              vNodeAttrsStack.push(fragmentAttrs);
+              fragmentAttrs = value;
+            } else if (value === OPEN_FRAGMENT) {
+              depth++;
+              this.write(VNodeDataChar.OPEN_CHAR);
+            } else if (value === CLOSE_FRAGMENT) {
+              if (fragmentAttrs) {
+                this.writeFragmentAttrs(fragmentAttrs);
+                fragmentAttrs = vNodeAttrsStack.pop();
+              }
+              depth--;
+              this.write(VNodeDataChar.CLOSE_CHAR);
+            } else if (value === WRITE_ELEMENT_ATTRS) {
+              if (fragmentAttrs && !isObjectEmpty(fragmentAttrs)) {
+                this.write(VNodeDataChar.SEPARATOR_CHAR);
+                this.write(VNodeDataChar.SEPARATOR_CHAR);
+                this.writeFragmentAttrs(fragmentAttrs);
+                this.write(VNodeDataChar.SEPARATOR_CHAR);
+                this.write(VNodeDataChar.SEPARATOR_CHAR);
+                fragmentAttrs = vNodeAttrsStack.pop();
+              }
+            } else if (value >= 0) {
+              this.write(encodeAsAlphanumeric(value));
+            } else {
+              this.write(String(0 - value));
+            }
+          }
+          while (depth-- > 0) {
+            if (fragmentAttrs) {
+              this.writeFragmentAttrs(fragmentAttrs);
+              fragmentAttrs = vNodeAttrsStack.pop();
+            }
+            this.write(VNodeDataChar.CLOSE_CHAR);
+          }
+        }
+      }
+    }
+    this.closeScript();
+    if (patch && !segmentId) {
+      this.emitInlineScript(
+        "document.qProcessVNodeDataPatch&&document.qProcessVNodeDataPatch(document.currentScript.previousElementSibling)"
+      );
+    }
+  }
+  markVNodeRefForSerialization(node) {
+    if (node) {
+      this.hasVNodeRefsForSerialization = true;
+      node.vnodeData[0] |= 16 /* SERIALIZE */ | 8 /* REFERENCE */;
+    }
+  }
+  markVNodeDataOwnerEmitted(segmentId) {
+    if (!__EXPERIMENTAL__.suspense || !this.outOfOrderStreaming) {
+      return;
+    }
+    (this.emittedVNodeDataOwners ||= /* @__PURE__ */ new Set()).add(segmentId);
+  }
+  isVNodeDataOwnerEmitted(owner) {
+    return this.emittedVNodeDataOwners?.has(owner) === true;
+  }
+  getVNodeDataOwnerFromNodeId(id) {
+    const refBase = parseInt(id, 10);
+    if (refBase >= 0) {
+      return { owner: void 0, localIndex: refBase };
+    }
+    const pair = -refBase - 1;
+    const diagonal = Math.floor((Math.sqrt(8 * pair + 1) - 1) / 2);
+    const diagonalStart = diagonal * (diagonal + 1) / 2;
+    const localIndex = pair - diagonalStart;
+    const segmentIndex = diagonal - localIndex;
+    return { owner: String(segmentIndex + 1), localIndex };
+  }
+  writeFragmentAttrs(fragmentAttrs) {
+    for (const key in fragmentAttrs) {
+      const rawValue = fragmentAttrs[key];
+      let value = rawValue;
+      let rootId;
+      let encodeValue = null;
+      if (key === ELEMENT_ID && typeof rawValue === "number") {
+        rootId = rawValue;
+        value = String(rawValue);
+      } else if (typeof rawValue !== "string") {
+        rootId = this.addRoot(rawValue);
+        if (rootId === void 0) {
+          continue;
+        }
+        value = String(rootId);
+      }
+      switch (key) {
+        case QScopedStyle:
+          this.write(VNodeDataChar.SCOPED_STYLE_CHAR);
+          break;
+        case OnRenderProp:
+          this.write(VNodeDataChar.RENDER_FN_CHAR);
+          break;
+        case ELEMENT_ID:
+          this.write(VNodeDataChar.ID_CHAR);
+          break;
+        case ELEMENT_PROPS:
+          this.write(VNodeDataChar.PROPS_CHAR);
+          break;
+        case ELEMENT_KEY:
+          encodeValue = encodeVNodeDataKey;
+          this.write(VNodeDataChar.KEY_CHAR);
+          break;
+        case ELEMENT_SEQ:
+          this.write(VNodeDataChar.SEQ_CHAR);
+          break;
+        case ELEMENT_SEQ_IDX:
+          this.write(VNodeDataChar.SEQ_IDX_CHAR);
+          break;
+        case QBackRefs:
+          this.write(VNodeDataChar.BACK_REFS_CHAR);
+          break;
+        case QSlotParent:
+          this.write(VNodeDataChar.SLOT_PARENT_CHAR);
+          break;
+        // Skipping `\` character for now because it is used for escaping.
+        case QCtxAttr:
+          this.write(VNodeDataChar.CONTEXT_CHAR);
+          break;
+        case QSlot:
+          this.write(VNodeDataChar.SLOT_CHAR);
+          break;
+        default: {
+          encodeValue = encodeURI;
+          this.write(VNodeDataChar.SEPARATOR_CHAR);
+          this.write(encodeVNodeDataString(key));
+          this.write(VNodeDataChar.SEPARATOR_CHAR);
+        }
+      }
+      const encodedValue = encodeVNodeDataString(encodeValue ? encodeValue(value) : value);
+      const isEncoded = encodeValue ? encodedValue !== value : false;
+      if (isEncoded) {
+        this.write(VNodeDataChar.SEPARATOR_CHAR);
+        this.write(encodedValue);
+        this.write(VNodeDataChar.SEPARATOR_CHAR);
+      } else if (typeof rootId === "number") {
+        this.writeRootRef(rootId);
+      } else {
+        this.write(value);
+      }
+    }
+  }
+  emitStateData() {
+    if (!this.serializationCtx.$roots$.length) {
+      return;
+    }
+    const attrs = this.stateScriptAttrs();
+    this.openScript(attrs);
+    this.serializationCtx.$setWriter$(this.writer);
+    return maybeThen(this.serializationCtx.$serialize$(), () => {
+      this.closeScript();
+    });
+  }
+  /** Add q-d:qidle attribute to eagerly resume some state if needed */
+  stateScriptAttrs() {
+    const attrs = { type: "qwik/state", [QInstanceAttr]: this.$instanceHash$ };
+    const eagerResume = this.serializationCtx.$eagerResume$;
+    if (eagerResume.size > 0) {
+      attrs["q-d:qidle"] = createQRL(null, "_res", _res, null, [...eagerResume]);
+    }
+    return attrs;
+  }
+  emitSyncFnsData(append = false) {
+    const fns = this.serializationCtx.$syncFns$;
+    const start = append ? this.emittedSyncFnCount : 0;
+    if (fns.length > start) {
+      const scriptAttrs = { "q:func": "qwik/json" };
+      if (this.renderOptions.serverData?.nonce) {
+        scriptAttrs["nonce"] = this.renderOptions.serverData.nonce;
+      }
+      this.openScript(scriptAttrs);
+      if (append) {
+        const qFuncsExpr = Q_FUNCS_PREFIX.replace("HASH", this.$instanceHash$).slice(0, -1);
+        this.write(`(${qFuncsExpr}||(${qFuncsExpr}=[])).push(`);
+      } else {
+        this.write(Q_FUNCS_PREFIX.replace("HASH", this.$instanceHash$));
+      }
+      if (!append) {
+        this.write(BRACKET_OPEN);
+      }
+      this.writeArray(append ? fns.slice(start) : fns, COMMA);
+      if (!append) {
+        this.write(BRACKET_CLOSE);
+      }
+      if (append) {
+        this.write(")");
+      }
+      this.closeScript();
+      this.emittedSyncFnCount = fns.length;
+    }
+  }
+  emitPatchDataIfNeeded() {
+    const patches = [];
+    for (const [elementIndex, backpatchEntries] of this.backpatchMap) {
+      for (let i = 0; i < backpatchEntries.length; i++) {
+        const backpatchEntry = backpatchEntries[i];
+        patches.push(
+          elementIndex,
+          backpatchEntry.attrName,
+          isSignal(backpatchEntry.value) ? backpatchEntry.value.untrackedValue : backpatchEntry.value
+        );
+      }
+    }
+    this.backpatchMap.clear();
+    if (patches.length > 0) {
+      this.isBackpatchExecutorEmitted = true;
+      const scriptAttrs = { type: ELEMENT_BACKPATCH_DATA };
+      if (this.renderOptions.serverData?.nonce) {
+        scriptAttrs["nonce"] = this.renderOptions.serverData.nonce;
+      }
+      this.writeScript(scriptAttrs, JSON.stringify(patches));
+    }
+  }
+  emitBackpatchDataAndExecutorIfNeeded() {
+    if (this.backpatchMap.size === 0) {
+      return;
+    }
+    this.emitPatchDataIfNeeded();
+    this.emitExecutorIfNeeded();
+  }
+  emitExecutorIfNeeded() {
+    if (!this.isBackpatchExecutorEmitted) {
+      return;
+    }
+    this.isBackpatchExecutorEmitted = false;
+    const scriptAttrs = { type: "text/javascript" };
+    if (this.renderOptions.serverData?.nonce) {
+      scriptAttrs["nonce"] = this.renderOptions.serverData.nonce;
+    }
+    const backpatchScript = getQwikBackpatchExecutorScript({ debug: isDev8 });
+    this.writeScript(scriptAttrs, backpatchScript);
+  }
+  emitOutOfOrderExecutorIfNeeded() {
+    if (!__EXPERIMENTAL__.suspense || !this.outOfOrderStreaming || !this.outOfOrderUsed || this.isOutOfOrderExecutorEmitted) {
+      return;
+    }
+    this.isOutOfOrderExecutorEmitted = true;
+    this.writeScript(
+      { type: "text/javascript", nonce: this.renderOptions.serverData?.nonce },
+      getQwikOutOfOrderExecutorScript({ debug: isDev8 })
+    );
+  }
+  emitInlineScript(script) {
+    const scriptAttrs = { type: "text/javascript" };
+    if (this.renderOptions.serverData?.nonce) {
+      scriptAttrs["nonce"] = this.renderOptions.serverData.nonce;
+    }
+    this.writeScript(scriptAttrs, script);
+  }
+  writeScript(attrs, body) {
+    this.openScript(attrs);
+    if (body) {
+      this.write(body);
+    }
+    this.closeScript();
+  }
+  openScript(attrs) {
+    this.write("<script");
+    this.writeAttrs("script", attrs, true, null, null, true);
+    this.write(GT);
+  }
+  closeScript() {
+    this.write("</script>");
+  }
+  emitPreloaderPre() {
+    if (!isDev8) {
+      preloaderPre(this, this.renderOptions.preloader, this.renderOptions.serverData?.nonce);
+    }
+  }
+  isStatic() {
+    return !(__EXPERIMENTAL__.suspense && this.outOfOrderStreaming && this.outOfOrderUsed) && this.serializationCtx.$eventQrls$.size === 0;
+  }
+  emitQwikLoaderAtTopIfNeeded() {
+    if (this.qlInclude === 0 /* Module */) {
+      this.qlInclude = 2 /* Done */;
+      const qwikLoaderBundle = this.$buildBase$ + this.resolvedManifest.manifest.qwikLoader;
+      const linkAttrs = { rel: "modulepreload", href: qwikLoaderBundle };
+      const nonce = this.renderOptions.serverData?.nonce;
+      if (nonce) {
+        linkAttrs["nonce"] = nonce;
+      }
+      this.openElement("link", null, linkAttrs);
+      this.closeElement();
+      const scriptAttrs = {
+        async: true,
+        type: "module",
+        src: qwikLoaderBundle
+      };
+      if (nonce) {
+        scriptAttrs["nonce"] = nonce;
+      }
+      this.writeScript(scriptAttrs);
+    }
+  }
+  emitQwikLoaderInline() {
+    this.qlInclude = 2 /* Done */;
+    const qwikLoaderScript = getQwikLoaderScript({ debug: this.renderOptions.debug });
+    const scriptAttrs = {
+      id: "qwikloader",
+      async: true,
+      type: "module"
+    };
+    if (this.renderOptions.serverData?.nonce) {
+      scriptAttrs["nonce"] = this.renderOptions.serverData.nonce;
+    }
+    this.writeScript(scriptAttrs, qwikLoaderScript);
+  }
+  emitQwikLoaderAtBottomIfNeeded() {
+    if (!this.isStatic()) {
+      if (this.qlInclude !== 2 /* Done */) {
+        this.emitQwikLoaderInline();
+      }
+      this.emitNewQwikEvents(true);
+    }
+  }
+  emitNewQwikEvents(includeContainerReady = false) {
+    const qwikEventItems = [];
+    for (const eventName of this.serializationCtx.$eventNames$) {
+      if (!this.emittedQwikEventNames.has(eventName)) {
+        this.emittedQwikEventNames.add(eventName);
+        qwikEventItems.push(JSON.stringify(eventName));
+      }
+    }
+    if (includeContainerReady) {
+      qwikEventItems.push(`${QwikEvContainerReady}`, JSON.stringify(this.$instanceHash$));
+    }
+    this.emitQwikEvents(qwikEventItems);
+  }
+  emitQwikEvents(qwikEventItems) {
+    if (qwikEventItems.length > 0) {
+      const scriptAttrs = {};
+      const nonce = this.renderOptions.serverData?.nonce;
+      if (nonce) {
+        scriptAttrs["nonce"] = nonce;
+      }
+      this.openScript(scriptAttrs);
+      this.write(`(window._qwikEv||(window._qwikEv=[])).push(`);
+      this.writeArray(qwikEventItems, COMMA);
+      this.write(PAREN_CLOSE);
+      this.closeScript();
+    }
+  }
+  // Keep in sync with process-vnode-data.unit.ts
+  emitVNodeSeparators(lastSerializedIdx, elementIdx) {
+    let skipCount = elementIdx - lastSerializedIdx;
+    while (skipCount != 0) {
+      if (skipCount >= 8192) {
+        this.write(VNodeDataSeparator.ADVANCE_8192_CH);
+        skipCount -= 8192;
+      } else {
+        skipCount & 4096 && this.write(VNodeDataSeparator.ADVANCE_4096_CH);
+        skipCount & 2048 && this.write(VNodeDataSeparator.ADVANCE_2048_CH);
+        skipCount & 1024 && this.write(VNodeDataSeparator.ADVANCE_1024_CH);
+        skipCount & 512 && this.write(VNodeDataSeparator.ADVANCE_512_CH);
+        skipCount & 256 && this.write(VNodeDataSeparator.ADVANCE_256_CH);
+        skipCount & 128 && this.write(VNodeDataSeparator.ADVANCE_128_CH);
+        skipCount & 64 && this.write(VNodeDataSeparator.ADVANCE_64_CH);
+        skipCount & 32 && this.write(VNodeDataSeparator.ADVANCE_32_CH);
+        skipCount & 16 && this.write(VNodeDataSeparator.ADVANCE_16_CH);
+        skipCount & 8 && this.write(VNodeDataSeparator.ADVANCE_8_CH);
+        skipCount & 4 && this.write(VNodeDataSeparator.ADVANCE_4_CH);
+        skipCount & 2 && this.write(VNodeDataSeparator.ADVANCE_2_CH);
+        skipCount & 1 && this.write(VNodeDataSeparator.ADVANCE_1_CH);
+        skipCount = 0;
+      }
+    }
+    return elementIdx;
+  }
+  createAndPushFrame(elementName, depthFirstElementIdx, currentFile) {
+    let tagNesting = 10 /* ANYTHING */;
+    if (isDev8) {
+      if (!this.currentElementFrame) {
+        tagNesting = initialTag(elementName);
+      } else {
+        let frame2 = this.currentElementFrame;
+        const previousTagNesting = frame2.tagNesting;
+        tagNesting = isTagAllowed(previousTagNesting, elementName);
+        if (tagNesting === 0 /* NOT_ALLOWED */) {
+          const frames = [];
+          while (frame2) {
+            frames.unshift(frame2);
+            frame2 = frame2.parent;
+          }
+          const text = [];
+          if (currentFile) {
+            text.push(`Error found in file: ${currentFile}`);
+          }
+          text.push(
+            `HTML rules do not allow '<${elementName}>' at this location.`,
+            `  (The HTML parser will try to recover by auto-closing or inserting additional tags which will confuse Qwik when it resumes.)`,
+            `  Offending tag: <${elementName}>`,
+            `  Existing tag context:`
+          );
+          let indent = "    ";
+          let lastName = "";
+          for (let i = 0; i < frames.length; i++) {
+            const frame3 = frames[i];
+            const [name, example] = allowedContent(frame3.tagNesting);
+            text.push(
+              `${indent}<${frame3.elementName}>${lastName !== name ? ` [${name}]${example ? ` -> ${example}` : ""}` : ""}`
+            );
+            lastName = name;
+            indent += " ";
+          }
+          text.push(
+            `${indent}<${elementName}> <= is not allowed as a child of ${allowedContent(previousTagNesting)[0]}.`
+          );
+          throw newTagError(text.join("\n"));
+        }
+      }
+    }
+    const frame = {
+      tagNesting,
+      parent: this.currentElementFrame,
+      elementName,
+      depthFirstElementIdx,
+      vNodeData: [0 /* NONE */],
+      currentFile: isDev8 ? currentFile || null : null,
+      refBase: null
+    };
+    this.currentElementFrame = frame;
+    this.vNodeDatas.push(frame.vNodeData);
+  }
+  popFrame() {
+    const closingFrame = this.currentElementFrame;
+    this.currentElementFrame = closingFrame.parent;
+    return closingFrame;
+  }
+  ////////////////////////////////////
+  write(text) {
+    this.size += text.length;
+    this.writer.write(text);
+  }
+  writeRootRef(id) {
+    this.size += String(id).length;
+    this.writer.writeRootRef(id);
+  }
+  writeRootRefPath(path) {
+    this.size += String(path[0]).length;
+    this.writer.writeRootRefPath(path);
+    for (let i = 1; i < path.length; i++) {
+      this.size += 1 + String(path[i]).length;
+    }
+  }
+  writeRootRefDelta(id, base2) {
+    const delta = id - base2;
+    this.size += String(delta).length;
+    this.writer.writeRootRefDelta(id, base2);
+  }
+  writeArray(array, separator) {
+    for (let i = 0; i < array.length; i++) {
+      const element = array[i];
+      if (i > 0) {
+        this.write(separator);
+      }
+      this.write(element);
+    }
+  }
+  writeAttrs(tag, attrs, isConst, styleScopedId, currentFile, hasMovedCaptures) {
+    let innerHTML = void 0;
+    for (let key in attrs) {
+      let value = attrs[key];
+      if (isSSRUnsafeAttr(key)) {
+        if (isDev8) {
+          throw qError(32 /* unsafeAttr */, [key]);
+        }
+        continue;
+      }
+      if (isHtmlAttributeAnEventName(key)) {
+        value = _setEvent(this.serializationCtx, key, value, hasMovedCaptures);
+      } else if (key === "ref") {
+        const lastNode = this.getOrCreateLastNode();
+        if (isSignal(value)) {
+          value.$untrackedValue$ = new DomRef(lastNode);
+          continue;
+        } else if (typeof value === "function") {
+          value(new DomRef(lastNode));
+          continue;
+        } else if (value == null) {
+          continue;
+        } else {
+          throw qError(15 /* invalidRefValue */, [currentFile]);
+        }
+      } else if (key === ITERATION_ITEM_SINGLE || key === ITERATION_ITEM_MULTI) {
+        const rootId = this.addRoot(value);
+        if (rootId === void 0) {
+          continue;
+        }
+        value = typeof rootId === "number" ? [rootId] : String(rootId);
+      } else if (isSignal(value)) {
+        const lastNode = this.getOrCreateLastNode();
+        const signalData = new SubscriptionData({
+          $scopedStyleIdPrefix$: styleScopedId,
+          $isConst$: isConst
+        });
+        const signal = value;
+        value = retryOnPromise(
+          () => this.trackSignalValue(signal, lastNode, key, signalData)
+        );
+      }
+      if (isPromise(value)) {
+        const lastNode = this.getOrCreateLastNode();
+        this.addPromiseAttribute(value);
+        value.then((resolvedValue) => {
+          this.addBackpatchEntry(
+            lastNode.id,
+            key,
+            serializeAttribute(key, resolvedValue, styleScopedId)
+          );
+        });
+        continue;
+      }
+      if (key === dangerouslySetInnerHTML) {
+        if (value) {
+          innerHTML = String(value);
+          key = QContainerAttr;
+          value = "html" /* HTML */;
+        }
+        if (tag === "style") {
+          continue;
+        }
+      } else if (isPreventDefault(key)) {
+        addPreventDefaultEventToSerializationContext(this.serializationCtx, key);
+      }
+      if (tag === "textarea" && key === "value") {
+        if (value && typeof value !== "string") {
+          if (isDev8) {
+            throw qError(23 /* wrongTextareaValue */, [currentFile, value]);
+          }
+          continue;
+        }
+        innerHTML = escapeHTML(value || "");
+        key = QContainerAttr;
+        value = "text" /* TEXT */;
+      }
+      const serializedValue = serializeAttribute(key, value, styleScopedId);
+      if (serializedValue != null && serializedValue !== false) {
+        this.write(SPACE);
+        this.write(key);
+        if (serializedValue !== true) {
+          this.write(ATTR_EQUALS_QUOTE);
+          if (Array.isArray(serializedValue)) {
+            this.writeEscapedChunks(serializedValue);
+          } else {
+            const strValue = escapeHTML(String(serializedValue));
+            this.write(strValue);
+          }
+          this.write(QUOTE);
+        }
+      }
+    }
+    return innerHTML;
+  }
+  writeEscapedChunks(chunks) {
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      if (typeof chunk === "string") {
+        this.write(escapeHTML(chunk));
+      } else if (typeof chunk === "number") {
+        this.writeRootRef(chunk);
+      } else if ("base" in chunk) {
+        this.writeRootRefDelta(chunk.id, chunk.base);
+      } else {
+        this.writeRootRefPath(chunk.path);
+      }
+    }
+  }
+  addPromiseAttribute(promise) {
+    this.promiseAttributes ||= [];
+    this.promiseAttributes.push(promise);
+  }
+  async resolvePromiseAttributes() {
+    if (this.promiseAttributes) {
+      await Promise.all(this.promiseAttributes);
+      this.promiseAttributes = null;
+    }
+  }
+};
+var SSRSegmentContainer = class extends SSRContainer {
+  constructor(opts, $rootContainer$) {
+    super(opts);
+    this.$rootContainer$ = $rootContainer$;
+  }
+  $outOfOrderState$ = 0 /* Rendering */;
+  $outOfOrderRootIdMap$ = null;
+  subscriptionPatchRecords = [];
+  pendingVNodeDataPatches = null;
+  nextOutOfOrderId() {
+    return this.$rootContainer$.nextOutOfOrderId();
+  }
+  $runQueuedRender$(render) {
+    return this.$rootContainer$.$runQueuedRender$(render);
+  }
+  queueOutOfOrderSegment(segment) {
+    this.$rootContainer$.queueOutOfOrderSegment(segment);
+  }
+  emitOutOfOrderSegmentScripts(scripts) {
+    this.$rootContainer$.emitOutOfOrderSegmentScripts(scripts);
+  }
+  emitOutOfOrderExecutorIfNeeded() {
+    this.$rootContainer$.emitOutOfOrderExecutorIfNeeded();
+  }
+  $recordExternalRootEffect$(producer, effect, prop, sourceEffects) {
+    recordExternalRootEffect(
+      this.$rootContainer$.serializationCtx,
+      this.serializationCtx,
+      this.$rootContainer$.$storeProxyMap$,
+      this.subscriptionPatchRecords,
+      producer,
+      effect,
+      prop,
+      sourceEffects
+    );
+  }
+  async $finalizeOutOfOrderSegment$(segmentId, segment) {
+    const rootContainer = this.$rootContainer$;
+    const rootReadyAtSegment = rootContainer.$isReadyForOOOS$();
+    const segmentSerializationCtx = this.serializationCtx;
+    try {
+      const commit = this.$commitRoots$(rootContainer, segmentSerializationCtx);
+      this.$mergeSegmentEventData$(rootContainer, segmentSerializationCtx);
+      this.$mergeSegmentSyncFns$(rootContainer, segmentSerializationCtx);
+      const subscriptionPatchRootId = this.$addSubscriptionsToRoots$(
+        rootContainer,
+        rootReadyAtSegment,
+        segmentSerializationCtx
+      );
+      if (rootReadyAtSegment && (commit.newRootLocalIds.length > 0 || subscriptionPatchRootId !== void 0)) {
+        segmentSerializationCtx.$forwardRefOffset$ = rootContainer.serializationCtx.$serializedForwardRefCount$;
+        await this.emitStatePatchData(
+          segmentId,
+          commit.newRootStart,
+          commit.newRootLocalIds,
+          subscriptionPatchRootId
+        );
+        rootContainer.serializationCtx.$serializedRootCount$ = rootContainer.serializationCtx.$roots$.length + (rootContainer.serializationCtx.$hasRootStateForwardRefs$ ? 1 : 0);
+        rootContainer.serializationCtx.$serializedForwardRefCount$ += segmentSerializationCtx.$serializedForwardRefCount$;
+      }
+      this.emitPendingVNodeDataPatches();
+      if (rootReadyAtSegment) {
+        this.$noMoreRoots$ = true;
+        this.emitVNodeData(segmentId);
+        const segmentCtx = this.serializationCtx;
+        this.serializationCtx = rootContainer.serializationCtx;
+        this.emittedSyncFnCount = rootContainer.emittedSyncFnCount;
+        this.emitSyncFnsData(true);
+        rootContainer.emittedSyncFnCount = this.emittedSyncFnCount;
+        this.serializationCtx = segmentCtx;
+        this.emitNewQwikEvents();
+      }
+      this.emitPatchDataIfNeeded();
+      this.drainCleanupQueue();
+      const rootIdMap = commit.rootIdMap;
+      if (rootReadyAtSegment) {
+        this.$outOfOrderState$ = 2 /* Done */;
+      } else {
+        this.$outOfOrderRootIdMap$ = rootIdMap;
+        this.$outOfOrderState$ = 1 /* EarlyFinalized */;
+      }
+      return {
+        html: renderSSRChunks(segment.htmlChunks, rootIdMap),
+        scripts: segment.writer.toString(rootIdMap)
+      };
+    } finally {
+      if (this.$outOfOrderState$ !== 1 /* EarlyFinalized */) {
+        segmentSerializationCtx.$onAddRoot$ = void 0;
+        rootContainer.removeOutOfOrderSegment(this);
+      }
+      rootContainer.serializationCtx.$setWriter$(rootContainer.writer);
+    }
+  }
+  $emitDelayedOutOfOrderVNodeData$() {
+    try {
+      this.emitVNodeData(this.vnodeSegment);
+      this.emitPendingVNodeDataPatches();
+      this.$rootContainer$.emitOutOfOrderSegmentScripts(
+        this.writer.toString(this.$outOfOrderRootIdMap$)
+      );
+      this.$outOfOrderState$ = 2 /* Done */;
+      this.$rootContainer$.removeOutOfOrderSegment(this);
+    } finally {
+      this.serializationCtx.$onAddRoot$ = void 0;
+    }
+  }
+  markVNodeDataForSerialization(node, flags = 16 /* SERIALIZE */) {
+    const previousFlags = node.vnodeData[0];
+    const nextFlags = previousFlags | flags;
+    if (nextFlags !== previousFlags) {
+      node.vnodeData[0] = nextFlags;
+      this.queueLateVNodeDataPatch(node, nextFlags & ~previousFlags);
+    }
+  }
+  queueLateVNodeDataPatch(node, addedFlags) {
+    if (!__EXPERIMENTAL__.suspense || !this.outOfOrderStreaming || !(addedFlags & (16 /* SERIALIZE */ | 8 /* REFERENCE */))) {
+      return;
+    }
+    const owner = this.getVNodeDataOwnerFromNodeId(node.id);
+    if (!this.$getRootContainer$().isVNodeDataOwnerEmitted(owner.owner)) {
+      return;
+    }
+    let ownerPatches = (this.pendingVNodeDataPatches ||= /* @__PURE__ */ new Map()).get(owner.owner);
+    if (!ownerPatches) {
+      this.pendingVNodeDataPatches.set(owner.owner, ownerPatches = /* @__PURE__ */ new Map());
+    }
+    ownerPatches.set(owner.localIndex, node.vnodeData);
+  }
+  emitPendingVNodeDataPatches() {
+    const pendingPatches = this.pendingVNodeDataPatches;
+    this.pendingVNodeDataPatches = null;
+    if (!pendingPatches) {
+      return;
+    }
+    for (const [owner, entries] of pendingPatches) {
+      if (entries.size === 0) {
+        continue;
+      }
+      const sortedEntries = Array.from(entries).sort((a, b) => a[0] - b[0]);
+      this.emitVNodeDataScript(owner, sortedEntries, true);
+    }
+  }
+  $commitRoots$(rootContainer, segmentSerializationCtx) {
+    const commit = this.commitSegmentRoots(rootContainer, segmentSerializationCtx);
+    segmentSerializationCtx.$onAddRoot$ = (localId, root, obj) => {
+      this.commitSegmentRoot(rootContainer, localId, root, obj, commit);
+    };
+    return commit;
+  }
+  $addSubscriptionsToRoots$(rootContainer, rootReadyAtSegment, segmentSerializationCtx) {
+    let subscriptionPatchRootId = void 0;
+    const subscriptionPatches = rootReadyAtSegment ? this.collectSubscriptionPatches(
+      rootContainer,
+      rootContainer.rootContainerSerializedRootCount
+    ) : void 0;
+    if (subscriptionPatches) {
+      subscriptionPatchRootId = segmentSerializationCtx.$addRoot$(subscriptionPatches);
+    }
+    return subscriptionPatchRootId;
+  }
+  commitSegmentRoots(rootContainer, segmentSerializationCtx) {
+    const rootIdMap = [];
+    const newRootStart = rootContainer.$isReadyForOOOS$() ? rootContainer.serializationCtx.$serializedRootCount$ : rootContainer.serializationCtx.$roots$.length;
+    const newRootLocalIds = [];
+    const commit = {
+      rootIdMap,
+      newRootStart,
+      newRootLocalIds
+    };
+    this.promoteSharedSegmentRoots(rootContainer, segmentSerializationCtx, commit);
+    const segmentRoots = segmentSerializationCtx.$roots$;
+    const segmentRootObjs = segmentSerializationCtx.$rootObjs$;
+    for (let i = 0; i < segmentRoots.length; i++) {
+      const rootObj = segmentRootObjs[i];
+      this.commitSegmentRoot(rootContainer, i, segmentRoots[i], rootObj, commit);
+    }
+    return commit;
+  }
+  promoteSharedSegmentRoots(rootContainer, segmentSerializationCtx, commit) {
+    const segmentRoots = segmentSerializationCtx.$roots$;
+    const segmentRootObjs = segmentSerializationCtx.$rootObjs$;
+    for (let i = 0; i < segmentRootObjs.length; i++) {
+      const rootObj = segmentRootObjs[i];
+      if (this.isRootOrUsedByOtherLiveSegment(rootContainer, rootObj)) {
+        this.commitSegmentRoot(rootContainer, i, segmentRoots[i], rootObj, commit);
+      }
+    }
+  }
+  isRootOrUsedByOtherLiveSegment(rootContainer, obj) {
+    if (rootContainer.serializationCtx.$hasRootId$(obj) !== void 0) {
+      return true;
+    }
+    const segments = rootContainer.outOfOrderSegments;
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i];
+      if (segment === this) {
+        continue;
+      }
+      const rootObjs = segment.serializationCtx.$rootObjs$;
+      for (let j = 0; j < rootObjs.length; j++) {
+        if (rootObjs[j] === obj) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+  commitSegmentRoot(rootContainer, localId, root, rootObj, commit) {
+    if (commit.rootIdMap[localId] !== void 0) {
+      return;
+    }
+    let rootId = rootContainer.serializationCtx.$hasRootId$(rootObj);
+    if (rootId === void 0) {
+      rootId = rootContainer.serializationCtx.$commitRoot$(root, rootObj);
+      commit.newRootLocalIds.push(localId);
+      this.seedCommittedRootForLiveSegments(rootContainer, rootObj);
+    }
+    const rootCtx = rootContainer.serializationCtx;
+    commit.rootIdMap[localId] = rootContainer.$isReadyForOOOS$() && rootId >= rootCtx.$rootStateRootCount$ ? rootId + (rootCtx.$hasRootStateForwardRefs$ ? 1 : 0) : rootId;
+  }
+  seedCommittedRootForLiveSegments(rootContainer, rootObj) {
+    const segments = rootContainer.outOfOrderSegments;
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i];
+      if (segment !== this && segment.$outOfOrderState$ === 0 /* Rendering */) {
+        segment.serializationCtx.$addRoot$(rootObj);
+      }
+    }
+  }
+  $mergeSegmentEventData$(rootContainer, segmentSerializationCtx) {
+    for (const eventName of segmentSerializationCtx.$eventNames$) {
+      rootContainer.serializationCtx.$eventNames$.add(eventName);
+    }
+    for (const qrl of segmentSerializationCtx.$eventQrls$) {
+      rootContainer.serializationCtx.$eventQrls$.add(qrl);
+    }
+  }
+  $mergeSegmentSyncFns$(rootContainer, segmentSerializationCtx) {
+    rootContainer.serializationCtx.$syncFns$.push(...segmentSerializationCtx.$syncFns$);
+  }
+  collectSubscriptionPatches(rootContainer, rootLimit) {
+    if (!__EXPERIMENTAL__.suspense || !this.outOfOrderStreaming) {
+      return;
+    }
+    return collectSubscriptionPatches(
+      rootContainer.serializationCtx,
+      this.subscriptionPatchRecords,
+      rootLimit
+    );
+  }
+  emitStatePatchData(segmentId, rootStart, rootIds, subscriptionPatchRootId) {
+    const attrs = this.statePatchScriptAttrs(segmentId);
+    this.openScript(attrs);
+    this.serializationCtx.$setWriter$(this.writer);
+    this.serializationCtx.$markSsrNodeForSerialization$ = this.markVNodeDataForSerialization.bind(this);
+    return maybeThen(
+      this.serializationCtx.$serializePatch$(rootStart, rootIds, subscriptionPatchRootId, 0),
+      () => {
+        this.closeScript();
+      }
+    );
+  }
+  statePatchScriptAttrs(segmentId) {
+    const attrs = this.stateScriptAttrs();
+    attrs[QStatePatchAttr] = true;
+    if (segmentId) {
+      attrs[QSuspenseResolved] = segmentId;
+    }
+    return attrs;
+  }
+};
+var isQwikStyleElement = (tag, attrs) => {
+  if (tag === "style" && attrs != null) {
+    return Object.prototype.hasOwnProperty.call(attrs, QStyle) || Object.prototype.hasOwnProperty.call(attrs, QScopedStyle);
+  }
+  return false;
+};
+function newTagError(text) {
+  return qError(12 /* tagError */, [text]);
+}
+function hasDestroy(obj) {
+  return obj && typeof obj === "object" && typeof obj.$destroy$ === "function";
+}
+function isSSRUnsafeAttr(name) {
+  for (let idx = 0; idx < name.length; idx++) {
+    const ch = name.charCodeAt(idx);
+    if (ch === 62 || ch === 47 || ch === 61 || ch === 34 || ch === 39 || ch === 9 || ch === 10 || ch === 12 || ch === 32) {
+      return true;
+    }
+  }
+  return false;
+}
+function randomStr() {
+  return (Math.random().toString(36) + "000000").slice(2, 8);
+}
+function addPreventDefaultEventToSerializationContext(serializationCtx, key) {
+  const eventName = "e" + key.substring(14);
+  if (eventName) {
+    serializationCtx.$eventNames$.add(eventName);
+  }
+}
+
+// packages/qwik/src/server/ssr-stream-handler.ts
+var StreamHandler = class {
+  constructor(opts, timing) {
+    this.opts = opts;
+    this.timing = timing;
+    this.inOrderStreaming = opts.streaming?.inOrder ?? {
+      strategy: "auto",
+      maximumInitialChunk: 2e4,
+      maximumChunk: 1e4
+    };
+    this.nativeStream = opts.stream;
+    this.stream = this.setupStreamWriter();
+  }
+  bufferSize = 0;
+  buffer = "";
+  networkFlushes = 0;
+  inOrderStreaming;
+  streamBlockDepth = 0;
+  streamBlockBuffer = "";
+  streamBlockBufferSize = 0;
+  nativeStream;
+  firstFlushTimer = createTimer();
+  pendingFlush;
+  flushQueued = false;
+  stream;
+  setupStreamWriter() {
+    const handler = this;
+    let stream;
+    switch (this.inOrderStreaming.strategy) {
+      case "disabled":
+        stream = createStringStreamWriter((chunk) => {
+          if (chunk === void 0 || chunk === null) {
+            return;
+          }
+          handler.enqueue(chunk);
+        });
+        break;
+      case "direct": {
+        const originalStream = this.nativeStream;
+        stream = createStringStreamWriter((chunk) => {
+          if (chunk === void 0 || chunk === null) {
+            return;
+          }
+          if (handler.pendingFlush) {
+            const queued = handler.pendingFlush.then(() => originalStream.write(chunk));
+            return handler.trackPendingFlush(queued);
+          }
+          return handler.trackPendingFlush(originalStream.write(chunk));
+        });
+        break;
+      }
+      default:
+      case "auto": {
+        const minimumChunkSize = this.inOrderStreaming.maximumChunk ?? 0;
+        const initialChunkSize = this.inOrderStreaming.maximumInitialChunk ?? 0;
+        stream = createStringStreamWriter((chunk) => {
+          if (chunk === void 0 || chunk === null) {
+            return;
+          }
+          handler.enqueue(chunk);
+          if (handler.streamBlockDepth === 0) {
+            const maxBufferSize = handler.networkFlushes === 0 ? initialChunkSize : minimumChunkSize;
+            if (handler.bufferSize >= maxBufferSize) {
+              return handler.flush();
+            }
+          }
+        });
+        break;
+      }
+    }
+    return stream;
+  }
+  enqueue(chunk) {
+    const len = chunk.length;
+    if (this.streamBlockDepth > 0) {
+      this.streamBlockBuffer += chunk;
+      this.streamBlockBufferSize += len;
+    } else {
+      this.bufferSize += len;
+      this.buffer += chunk;
+    }
+  }
+  trackPendingFlush(result) {
+    if (!isPromise(result)) {
+      return;
+    }
+    const pending = Promise.resolve(result).finally(() => {
+      if (this.pendingFlush === pending) {
+        this.pendingFlush = void 0;
+      }
+    });
+    this.pendingFlush = pending;
+    return pending;
+  }
+  flushBuffer() {
+    const chunk = this.buffer;
+    this.buffer = "";
+    this.bufferSize = 0;
+    this.networkFlushes++;
+    if (this.networkFlushes === 1) {
+      this.timing.firstFlush = this.firstFlushTimer();
+    }
+    return this.trackPendingFlush(this.nativeStream.write(chunk));
+  }
+  flush() {
+    if (!this.buffer) {
+      return this.waitForPendingFlush();
+    }
+    if (this.pendingFlush) {
+      if (!this.flushQueued) {
+        this.flushQueued = true;
+        const queued = this.pendingFlush.then(() => {
+          this.flushQueued = false;
+          this.pendingFlush = void 0;
+          return this.flush();
+        });
+        this.pendingFlush = queued.finally(() => {
+          if (this.pendingFlush === queued) {
+            this.pendingFlush = void 0;
+          }
+        });
+      }
+      return this.pendingFlush;
+    }
+    return this.flushBuffer();
+  }
+  waitForPendingFlush() {
+    return this.pendingFlush;
+  }
+  streamBlockStart() {
+    this.streamBlockDepth++;
+  }
+  streamBlockEnd() {
+    this.streamBlockDepth--;
+    if (this.streamBlockDepth === 0 && this.streamBlockBuffer) {
+      this.buffer += this.streamBlockBuffer;
+      this.bufferSize += this.streamBlockBufferSize;
+      this.streamBlockBuffer = "";
+      this.streamBlockBufferSize = 0;
+      return this.flush();
+    }
+  }
+};
+
+// packages/qwik/src/server/ssr-render.ts
+var renderToString = async (jsx, opts = {}) => {
+  const stream = new StringSSRWriter();
+  const result = await renderToStream(jsx, { ...opts, stream });
+  return {
+    isStatic: result.isStatic,
+    timing: result.timing,
+    manifest: result.manifest,
+    snapshotResult: result.snapshotResult,
+    html: stream.toString()
+  };
+};
+var renderToStream = async (jsx, opts) => {
+  if (__EXPERIMENTAL__.suspense && opts.streaming?.outOfOrder === void 0) {
+    opts = {
+      ...opts,
+      streaming: {
+        ...opts.streaming,
+        outOfOrder: true
+      }
+    };
+  }
+  const timing = {
+    firstFlush: 0,
+    render: 0,
+    snapshot: 0
+  };
+  const containerTagName = opts.containerTagName ?? "html";
+  const buildBase = getBuildBase(opts);
+  const resolvedManifest = resolveManifest(opts.manifest);
+  const locale = typeof opts.locale === "function" ? opts.locale(opts) : opts.serverData?.locale || opts.locale || opts.containerAttributes?.locale || "";
+  const streamHandler = new StreamHandler(opts, timing);
+  const ssrContainer = ssrCreateContainer({
+    tagName: containerTagName,
+    locale,
+    writer: streamHandler.stream,
+    streamHandler,
+    timing,
+    buildBase,
+    resolvedManifest,
+    renderOptions: opts
+  });
+  await setServerPlatform(opts, resolvedManifest);
+  await ssrContainer.render(jsx);
+  await ssrContainer.$renderPromise$;
+  await streamHandler.flush();
+  const result = {
+    flushes: streamHandler.networkFlushes,
+    manifest: resolvedManifest?.manifest,
+    size: ssrContainer.size,
+    isStatic: false,
+    timing
+  };
+  return result;
+};
+function resolveManifest(manifest) {
+  const builtManifest = getClientManifest();
+  const mergedManifest = manifest ? { ...builtManifest, ...manifest } : builtManifest;
+  if (!mergedManifest || "mapper" in mergedManifest) {
+    return mergedManifest;
+  }
+  if (mergedManifest.mapping) {
+    const mapper = {};
+    for (const symbol in mergedManifest.mapping) {
+      const bundleFilename = mergedManifest.mapping[symbol];
+      mapper[getSymbolHash(symbol)] = [symbol, bundleFilename];
+    }
+    return {
+      mapper,
+      manifest: mergedManifest,
+      injections: mergedManifest.injections || []
+    };
+  }
+  return void 0;
+}
+var Q_FUNCS_PREFIX = 'document["qFuncs_HASH"]=';
+
+// packages/qwik/src/server/index.ts
+async function setServerPlatform2(manifest) {
+  const platform = createPlatform({ manifest }, resolveManifest(manifest));
+  setPlatform2(platform);
+}
+export {
+  getQwikBackpatchExecutorScript,
+  getQwikLoaderScript,
+  getQwikPrefetchWorkerScript,
+  renderToStream,
+  renderToString,
+  resolveManifest,
+  setServerPlatform2 as setServerPlatform,
+  versions
+};

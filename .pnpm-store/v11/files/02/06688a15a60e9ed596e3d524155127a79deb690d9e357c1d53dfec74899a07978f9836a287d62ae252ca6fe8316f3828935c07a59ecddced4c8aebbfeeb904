@@ -1,0 +1,17 @@
+import { viteAdapter } from '../../shared/vite/index.mjs';
+
+function ssgAdapter(opts) {
+  return viteAdapter({
+    name: "static-site-generation",
+    origin: opts.origin,
+    ssg: {
+      include: [
+        "/*"
+      ],
+      ...opts
+    }
+  });
+}
+const staticAdapter = ssgAdapter;
+
+export { ssgAdapter, staticAdapter };

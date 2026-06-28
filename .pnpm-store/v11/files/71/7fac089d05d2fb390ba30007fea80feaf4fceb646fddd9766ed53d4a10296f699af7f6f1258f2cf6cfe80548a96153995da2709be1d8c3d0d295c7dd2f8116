@@ -1,0 +1,35 @@
+import { componentQrl, inlinedQrl, _jsxSorted, _fnSignal } from '@qwik.dev/core';
+import { f as useHttpStatus } from './use-functions.qwik.mjs';
+
+const _hf0 = (p0) => p0.status || 500;
+const _hf0_str = "p0.status||500";
+const _hf1 = (p0) => p0.message || "";
+const _hf1_str = 'p0.message||""';
+const cacheKey = (ev) => String(ev.status);
+const COLOR_400 = "#006ce9";
+const COLOR_500 = "#713fc2";
+const DisplayHttpStatus = /* @__PURE__ */ componentQrl(/* @__PURE__ */ inlinedQrl(() => {
+  const httpstatus = useHttpStatus();
+  const width = httpstatus.message ? "600px" : "300px";
+  const color = httpstatus.status < 500 ? COLOR_400 : COLOR_500;
+  const style = `
+			body { color: ${color}; background-color: #fafafa; padding: 30px; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif; }
+			p { max-width: ${width}; margin: 60px auto 30px auto; background: white; border-radius: 4px; box-shadow: 0px 0px 50px -20px ${color}; overflow: hidden; }
+			strong { display: inline-block; padding: 15px; background: ${color}; color: white; }
+			span { display: inline-block; padding: 15px; }
+	`;
+  return /* @__PURE__ */ _jsxSorted("p", null, null, [
+    /* @__PURE__ */ _jsxSorted("style", {
+      dangerouslySetInnerHTML: style
+    }, null, null, 3, null),
+    /* @__PURE__ */ _jsxSorted("strong", null, null, _fnSignal(_hf0, [
+      httpstatus
+    ], _hf0_str), 3, null),
+    " ",
+    /* @__PURE__ */ _jsxSorted("span", null, null, _fnSignal(_hf1, [
+      httpstatus
+    ], _hf1_str), 3, null)
+  ], 1, "vY_0");
+}, "DisplayHttpStatus_component_PJf4K4PL7Oc"));
+
+export { cacheKey, DisplayHttpStatus as default };

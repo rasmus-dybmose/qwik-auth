@@ -1,0 +1,23 @@
+import { useContext, implicit$FirstArg, useVisibleTaskQrl, inlinedQrl, _captures, noSerialize, useServerData } from '@qwik.dev/core';
+import { C as ContentContext, D as DocumentHeadContext, H as HttpStatusContext, h as RouteLocationContext, j as RouteNavigateContext, o as RoutePreventNavigateContext, n as RouteActionContext } from './head.qwik.mjs';
+
+const useHttpStatus = () => useContext(HttpStatusContext).value;
+const useContent = () => useContext(ContentContext);
+const useDocumentHead = () => useContext(DocumentHeadContext);
+const useLocation = () => useContext(RouteLocationContext);
+const useNavigate = () => useContext(RouteNavigateContext);
+const usePreventNavigateQrl = (fn) => {
+  const registerPreventNav = useContext(RoutePreventNavigateContext);
+  useVisibleTaskQrl(/* @__PURE__ */ inlinedQrl(() => {
+    const fn2 = _captures[0], registerPreventNav2 = _captures[1];
+    return registerPreventNav2(fn2);
+  }, "usePreventNavigateQrl_useVisibleTask_BsYUaz9XhUs", [
+    fn,
+    registerPreventNav
+  ]));
+};
+const usePreventNavigate$ = implicit$FirstArg(usePreventNavigateQrl);
+const useAction = () => useContext(RouteActionContext);
+const useQwikRouterEnv = () => noSerialize(useServerData("qwikrouter"));
+
+export { useLocation as a, useDocumentHead as b, useQwikRouterEnv as c, useAction as d, useContent as e, useHttpStatus as f, usePreventNavigate$ as g, usePreventNavigateQrl as h, useNavigate as u };

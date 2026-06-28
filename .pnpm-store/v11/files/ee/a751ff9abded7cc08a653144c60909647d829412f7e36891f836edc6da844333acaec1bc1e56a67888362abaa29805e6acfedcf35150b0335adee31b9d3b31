@@ -1,0 +1,333 @@
+import fs from 'node:fs';
+import { isAbsolute, resolve, join, dirname } from 'node:path';
+import { cpus } from 'node:os';
+import { Worker } from 'node:worker_threads';
+import { k as normalizePath } from './fs.mjs';
+import { g as getLoaderName } from './request-path.mjs';
+import { e as ensureSlash } from './pathname.mjs';
+
+function ssgWorkerCompare(a, b) {
+  if (a.activeTasks < b.activeTasks) {
+    return -1;
+  }
+  if (a.activeTasks > b.activeTasks) {
+    return 1;
+  }
+  return a.totalTasks < b.totalTasks ? -1 : 1;
+}
+async function createWorkerPool(sys, opts) {
+  const log = await sys.createLogger();
+  const ssgWorkers = [];
+  const sitemapBuffer = [];
+  let sitemapStream = null;
+  opts = {
+    ...opts
+  };
+  let outDir = opts.outDir;
+  if (typeof outDir !== "string") {
+    throw new Error(`Missing "outDir" option`);
+  }
+  if (!isAbsolute(outDir)) {
+    throw new Error(`"outDir" must be an absolute file path, received: ${outDir}`);
+  }
+  outDir = normalizePath(outDir);
+  let maxWorkers = cpus().length;
+  if (typeof opts.maxWorkers === "number") {
+    maxWorkers = Math.max(1, Math.min(opts.maxWorkers, maxWorkers));
+  }
+  let maxTasksPerWorker = 20;
+  if (typeof opts.maxTasksPerWorker === "number") {
+    maxTasksPerWorker = Math.max(1, Math.min(opts.maxTasksPerWorker, 50));
+  }
+  let sitemapOutFile = opts.sitemapOutFile;
+  if (sitemapOutFile !== null) {
+    if (typeof sitemapOutFile !== "string") {
+      sitemapOutFile = "sitemap.xml";
+    }
+    if (!isAbsolute(sitemapOutFile)) {
+      sitemapOutFile = resolve(outDir, sitemapOutFile);
+    }
+  }
+  if (!opts.workerFilePath) {
+    throw new Error('Missing "workerFilePath" option for SSG worker creation');
+  }
+  const workerFilePath = typeof opts.workerFilePath === "string" && opts.workerFilePath.startsWith("file://") ? new URL(opts.workerFilePath) : opts.workerFilePath;
+  const { render: _r, qwikRouterConfig: _c, workerFilePath: _w, ...workerData } = opts;
+  const createWorker = () => {
+    let terminateResolve = null;
+    const mainTasks = /* @__PURE__ */ new Map();
+    let terminateTimeout = null;
+    const nodeWorker = new Worker(workerFilePath, {
+      workerData
+    });
+    nodeWorker.unref();
+    const ssgWorker = {
+      activeTasks: 0,
+      totalTasks: 0,
+      render: (staticRoute) => {
+        return new Promise((resolve2, reject) => {
+          try {
+            ssgWorker.activeTasks++;
+            ssgWorker.totalTasks++;
+            mainTasks.set(staticRoute.pathname, resolve2);
+            nodeWorker.postMessage(staticRoute);
+          } catch (e) {
+            ssgWorker.activeTasks--;
+            mainTasks.delete(staticRoute.pathname);
+            reject(e);
+          }
+        });
+      },
+      terminate: async () => {
+        mainTasks.clear();
+        const msg = {
+          type: "close"
+        };
+        await new Promise((resolve2) => {
+          terminateResolve = () => {
+            resolve2();
+          };
+          terminateTimeout = setTimeout(async () => {
+            terminateTimeout = null;
+            terminateResolve = null;
+            await nodeWorker.terminate();
+            resolve2();
+          }, 1e3);
+          nodeWorker.postMessage(msg);
+        });
+        if (terminateTimeout) {
+          clearTimeout(terminateTimeout);
+          terminateTimeout = null;
+        }
+      }
+    };
+    nodeWorker.on("message", (msg) => {
+      switch (msg.type) {
+        case "render": {
+          const mainTask = mainTasks.get(msg.pathname);
+          if (mainTask) {
+            mainTasks.delete(msg.pathname);
+            ssgWorker.activeTasks--;
+            mainTask(msg);
+          }
+          break;
+        }
+        case "close": {
+          if (terminateResolve) {
+            terminateResolve();
+            terminateResolve = null;
+          }
+          break;
+        }
+      }
+    });
+    nodeWorker.on("error", (e) => {
+      log.error(`worker error`, e);
+    });
+    nodeWorker.on("exit", (code) => {
+      log.debug(`worker exit code=${code}`);
+      if (terminateTimeout) {
+        clearTimeout(terminateTimeout);
+        terminateTimeout = null;
+      }
+      if (mainTasks.size > 0) {
+        for (const [pathname, resolve2] of mainTasks) {
+          ssgWorker.activeTasks--;
+          resolve2({
+            type: "render",
+            pathname,
+            url: "",
+            ok: false,
+            error: {
+              message: `Worker exited with code ${code}`,
+              stack: void 0
+            },
+            filePath: null,
+            contentType: null,
+            resourceType: null
+          });
+        }
+        mainTasks.clear();
+      }
+      if (terminateResolve) {
+        terminateResolve();
+        terminateResolve = null;
+      }
+      if (code !== 0) {
+        console.error(`worker exit ${code}`);
+      }
+    });
+    return ssgWorker;
+  };
+  const getNextWorker = () => ssgWorkers.sort(ssgWorkerCompare)[0];
+  const hasAvailableWorker = () => {
+    const ssgWorker = getNextWorker();
+    return ssgWorker.activeTasks < maxTasksPerWorker;
+  };
+  const render = async (ssgRoute) => {
+    const ssgWorker = getNextWorker();
+    const result = await ssgWorker.render(ssgRoute);
+    const isNotFoundPage = result.pathname.endsWith("/404.html");
+    if (sitemapOutFile && result.ok && result.resourceType === "page" && !isNotFoundPage) {
+      sitemapBuffer.push(`<url><loc>${result.url}</loc></url>`);
+      if (sitemapBuffer.length > 50) {
+        const siteMapUrls = sitemapBuffer.join("\n") + "\n";
+        sitemapBuffer.length = 0;
+        if (sitemapStream) {
+          sitemapStream.write(siteMapUrls);
+        }
+      }
+    }
+    return result;
+  };
+  const close = async () => {
+    const promises = [];
+    if (sitemapStream) {
+      sitemapBuffer.push(`</urlset>`);
+      sitemapStream.write(sitemapBuffer.join("\n"));
+      sitemapBuffer.length = 0;
+      await new Promise((resolve2, reject) => {
+        if (sitemapStream) {
+          sitemapStream.end((err) => {
+            if (err) {
+              reject(err);
+            } else {
+              resolve2();
+            }
+          });
+        } else {
+          resolve2();
+        }
+      });
+      sitemapStream = null;
+    }
+    for (const ssgWorker of ssgWorkers) {
+      try {
+        promises.push(ssgWorker.terminate());
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    await Promise.all(promises);
+    ssgWorkers.length = 0;
+    if (process.platform === "win32") {
+      await new Promise((resolve2) => setTimeout(resolve2, 300));
+    }
+  };
+  if (sitemapOutFile) {
+    await sys.ensureDir(sitemapOutFile);
+    sitemapStream = fs.createWriteStream(sitemapOutFile, {
+      flags: "w"
+    });
+    sitemapStream.write(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+`);
+  }
+  log.debug(`creating ${maxWorkers} workers, ${maxTasksPerWorker} tasks each`);
+  for (let i = 0; i < maxWorkers; i++) {
+    ssgWorkers.push(createWorker());
+    if (process.platform === "win32" && i < maxWorkers - 1) {
+      await new Promise((resolve2) => setTimeout(resolve2, 100));
+    }
+  }
+  const mainCtx = {
+    hasAvailableWorker,
+    render,
+    close
+  };
+  return mainCtx;
+}
+
+const ensureDir = async (filePath) => {
+  await fs.promises.mkdir(dirname(filePath), {
+    recursive: true
+  });
+};
+const access = async (path) => {
+  try {
+    await fs.promises.access(path);
+    return true;
+  } catch {
+    return false;
+  }
+};
+async function createSystem(opts, threadId) {
+  const createWriteStream = (filePath) => {
+    return fs.createWriteStream(filePath, {
+      flags: "w"
+    });
+  };
+  const NS_PER_SEC = 1e9;
+  const MS_PER_NS = 1e-6;
+  const createTimer = () => {
+    const start = process.hrtime();
+    return () => {
+      const diff = process.hrtime(start);
+      return (diff[0] * NS_PER_SEC + diff[1]) * MS_PER_NS;
+    };
+  };
+  const noop = () => {
+  };
+  const createLogger = async () => {
+    const isQuiet = opts.log === "quiet";
+    const isDebug = opts.log === "debug";
+    if (threadId !== void 0) {
+      return {
+        debug: isDebug ? console.debug.bind(console, `[${threadId}]`) : noop,
+        error: console.error.bind(console, `[${threadId}]`),
+        info: isQuiet ? noop : console.info.bind(console, `[${threadId}]`)
+      };
+    }
+    return {
+      debug: isDebug ? console.debug.bind(console) : noop,
+      error: console.error.bind(console),
+      info: isQuiet ? noop : console.info.bind(console)
+    };
+  };
+  const outDir = normalizePath(opts.outDir);
+  const basePathname = opts.basePathname || "/";
+  const basenameLen = basePathname.length;
+  const getRouteFilePath = (pathname, isHtml) => {
+    pathname = decodeURIComponent(pathname.slice(basenameLen));
+    if (isHtml) {
+      if (!pathname.endsWith(".html")) {
+        if (pathname.endsWith("/")) {
+          pathname += "index.html";
+        } else {
+          pathname += "/index.html";
+        }
+      }
+    } else {
+      if (pathname.endsWith("/")) {
+        pathname = pathname.slice(0, -1);
+      }
+    }
+    return join(outDir, pathname);
+  };
+  const getLoaderFilePath = (pathname, loaderId, manifestHash) => {
+    pathname = decodeURIComponent(pathname.slice(basenameLen));
+    const suffix = getLoaderName(loaderId, manifestHash);
+    pathname = ensureSlash(pathname) + suffix;
+    return join(outDir, pathname);
+  };
+  const sys = {
+    createMainProcess: null,
+    createLogger,
+    getOptions: () => opts,
+    ensureDir,
+    createWriteStream,
+    createTimer,
+    access,
+    getRouteFilePath,
+    getLoaderFilePath,
+    getEnv: (key) => process.env[key],
+    platform: {
+      static: true,
+      node: process.versions.node
+    }
+  };
+  sys.createMainProcess = () => createWorkerPool(sys, opts);
+  return sys;
+}
+
+export { access, createSystem, ensureDir };

@@ -1,0 +1,454 @@
+const doc = document;
+const win = window;
+const windowPrefix = "w";
+const passiveWindowPrefix = "wp";
+const documentPrefix = "d";
+const passiveDocumentPrefix = "dp";
+const elementPrefix = "e";
+const passiveElementPrefix = "ep";
+const capturePrefix = "capture:";
+const readyStateChange = "readystatechange";
+const QwikEvContainerReady = 0;
+const events = /* @__PURE__ */ new Set();
+const roots = /* @__PURE__ */ new Set([doc]);
+const symbols = /* @__PURE__ */ new Map();
+const readyContainers = {};
+let observer;
+let hasInitialized;
+let queuedTasks;
+const nativeQuerySelectorAll = (root, selector) => Array.from(root.querySelectorAll(selector));
+const querySelectorAll = (query) => {
+  const elements = [];
+  roots.forEach((root) => elements.push(...nativeQuerySelectorAll(root, query)));
+  return elements;
+};
+const addEventListener = (el, eventName, handler, capture = false, passive = false) => el.addEventListener(eventName, handler, { capture, passive });
+const findShadowRoots = (fragment) => {
+  addEventOrRoot(fragment);
+  const shadowRoots = nativeQuerySelectorAll(fragment, "[q\\:shadowroot]");
+  for (let i = 0; i < shadowRoots.length; i++) {
+    const parent = shadowRoots[i];
+    const shadowRoot = parent.shadowRoot;
+    shadowRoot && findShadowRoots(shadowRoot);
+  }
+};
+const isPromise = (promise) => promise && typeof promise.then === "function";
+const runTasks = async (tasks) => {
+  for (let i = 0; i < tasks.length; i++) {
+    await tasks[i]();
+  }
+};
+const queueTasks = (tasks) => {
+  if (tasks.length) {
+    const run = () => runTasks(tasks);
+    queuedTasks = queuedTasks ? queuedTasks.then(run, run) : run();
+  }
+};
+const resolveContainer = (containerEl) => {
+  if (containerEl._qwikjson_ === void 0) {
+    const parentJSON = containerEl === doc.documentElement ? doc.body : containerEl;
+    let script = parentJSON.lastElementChild;
+    while (script) {
+      if (script.tagName === "SCRIPT" && script.getAttribute("type") === "qwik/json") {
+        containerEl._qwikjson_ = JSON.parse(
+          script.textContent.replace(/\\x3C(\/?script)/gi, "<$1")
+        );
+        break;
+      }
+      script = script.previousElementSibling;
+    }
+  }
+};
+const markContainerReady = (hash) => {
+  readyContainers[hash] = 1;
+  emitEvent(readyStateChange);
+};
+const waitForContainerReady = (container) => {
+  const hash = container.getAttribute("q:instance");
+  return container.getAttribute("q:container") === "paused" && doc.readyState === "loading" && !readyContainers[hash] && new Promise((resolve) => {
+    const ready = () => {
+      if (doc.readyState !== "loading" || readyContainers[hash]) {
+        resolve();
+      }
+    };
+    addEventListener(doc, readyStateChange, ready);
+  });
+};
+const createEvent = (eventName, detail) => new CustomEvent(eventName, { detail });
+const emitEvent = (eventName, detail) => {
+  doc.dispatchEvent(createEvent(eventName, detail));
+};
+const camelToKebab = (str) => str.replace(/([A-Z-])/g, (a) => "-" + a.toLowerCase());
+const kebabToCamel = (eventName) => eventName.replace(/-./g, (a) => a[1].toUpperCase());
+const parseKebabEvent = (event) => {
+  const separatorIndex = event.indexOf(":");
+  const scope = event.slice(0, separatorIndex);
+  return {
+    scope,
+    eventName: kebabToCamel(event.slice(separatorIndex + 1))
+  };
+};
+const isPassiveScope = (scope) => scope.length === 2;
+const getRootScope = (scope) => scope.charAt(0);
+const isElementNode = (node) => !!node && node.nodeType === 1;
+const isCaptureHandlerElement = (element, scopedKebabName, captureAttribute) => element.hasAttribute(captureAttribute) && (!!element._qDispatch?.[scopedKebabName] || element.hasAttribute("q-" + scopedKebabName));
+const resolveHandler = (container, element, qBase, base, chunk, symbol, reqTime, reportSyncError = true) => {
+  const eventData = {
+    qBase,
+    symbol,
+    element,
+    reqTime
+  };
+  if (!chunk) {
+    const handler2 = (doc["qFuncs_" + container.getAttribute("q:instance")] || [])[+symbol];
+    if (!handler2 && reportSyncError) {
+      const error = new Error("sym:" + symbol);
+      emitEvent("qerror", {
+        importError: "sync",
+        error,
+        ...eventData
+      });
+      console.error(error);
+    }
+    return handler2;
+  }
+  const key = `${symbol}|${qBase}|${chunk}`;
+  const handler = symbols.get(key);
+  if (handler) {
+    return handler;
+  }
+  const href = new URL(chunk, base).href;
+  const module = import(
+    /* @vite-ignore */
+    href
+  );
+  resolveContainer(container);
+  return module.then(
+    (module2) => {
+      const handler2 = module2[symbol];
+      if (!handler2) {
+        const error = new Error(`${symbol} not in ${href}`);
+        emitEvent("qerror", {
+          importError: "no-symbol",
+          error,
+          ...eventData
+        });
+        console.error(error);
+      } else {
+        symbols.set(key, handler2);
+        emitEvent("qsymbol", eventData);
+      }
+      return handler2;
+    },
+    (error) => {
+      emitEvent("qerror", {
+        importError: "async",
+        error,
+        ...eventData
+      });
+      console.error(error);
+      return void 0;
+    }
+  );
+};
+const dispatch = (element, ev, scopedKebabName, tasks, kebabName, allowPreventDefault = true) => {
+  let defer = false;
+  if (kebabName) {
+    if (allowPreventDefault && element.hasAttribute("preventdefault:" + kebabName)) {
+      ev.preventDefault();
+    }
+    if (element.hasAttribute("stoppropagation:" + kebabName)) {
+      ev.stopPropagation();
+    }
+  }
+  const handlers = element._qDispatch?.[scopedKebabName];
+  if (handlers) {
+    if (typeof handlers === "function") {
+      const run = () => handlers(ev, element);
+      if (defer) {
+        tasks.push(async () => {
+          const result = run();
+          if (isPromise(result)) {
+            await result;
+          }
+        });
+      } else {
+        const result = run();
+        if (isPromise(result)) {
+          defer = true;
+          tasks.push(() => result);
+        }
+      }
+    } else if (handlers.length) {
+      for (let i = 0; i < handlers.length; i++) {
+        const handler = handlers[i];
+        if (handler) {
+          const run = () => handler(ev, element);
+          if (defer) {
+            tasks.push(async () => {
+              const result = run();
+              if (isPromise(result)) {
+                await result;
+              }
+            });
+          } else {
+            const result = run();
+            if (isPromise(result)) {
+              defer = true;
+              tasks.push(() => result);
+            }
+          }
+        }
+      }
+    }
+    return;
+  }
+  const attrValue = element.getAttribute("q-" + scopedKebabName);
+  if (attrValue) {
+    const container = element.closest(
+      "[q\\:container]:not([q\\:container=html]):not([q\\:container=text])"
+    );
+    const qBase = container.getAttribute("q:base");
+    const base = new URL(qBase, doc.baseURI);
+    const qrls = attrValue.split("|");
+    const waitForReady = waitForContainerReady(container);
+    for (let i = 0; i < qrls.length; i++) {
+      const qrl = qrls[i];
+      const reqTime = performance.now();
+      const [chunk, symbol, capturedIds] = qrl.split("#");
+      const run = (handler2) => {
+        if (handler2 && element.isConnected) {
+          const onError = (error) => {
+            emitEvent("qerror", {
+              error,
+              qBase,
+              symbol,
+              element,
+              reqTime
+            });
+          };
+          try {
+            const result = handler2.call(capturedIds, ev, element);
+            if (isPromise(result)) {
+              return result.catch(onError);
+            }
+          } catch (error) {
+            return onError(error);
+          }
+        }
+      };
+      const resolve = (reportSyncError = true) => resolveHandler(container, element, qBase, base, chunk, symbol, reqTime, reportSyncError);
+      const handler = waitForReady ? void 0 : resolve();
+      if (waitForReady) {
+        defer = true;
+        tasks.push(async () => {
+          await waitForReady;
+          await run(await resolve(false) || await resolve());
+        });
+      } else if (isPromise(handler)) {
+        defer = true;
+        tasks.push(() => handler.then(run));
+      } else if (defer) {
+        defer = true;
+        tasks.push(async () => {
+          await run(handler || await resolve());
+        });
+      } else {
+        const result = run(handler);
+        if (isPromise(result)) {
+          defer = true;
+          tasks.push(() => result);
+        }
+      }
+    }
+  }
+};
+const processElementEvent = (ev, scope = elementPrefix, allowPreventDefault = true) => {
+  const kebabName = camelToKebab(ev.type);
+  const scopedKebabName = scope + ":" + kebabName;
+  const captureAttribute = capturePrefix + kebabName;
+  const elements = [];
+  const captureHandlers = [];
+  const tasks = [];
+  let current = ev.target;
+  while (current) {
+    if (isElementNode(current)) {
+      elements.push(current);
+      captureHandlers.push(isCaptureHandlerElement(current, scopedKebabName, captureAttribute));
+      current = current.parentElement;
+    } else {
+      current = current.parentElement;
+    }
+  }
+  for (let i = elements.length - 1; i >= 0; i--) {
+    if (captureHandlers[i]) {
+      dispatch(elements[i], ev, scopedKebabName, tasks, kebabName, allowPreventDefault);
+      if (ev.cancelBubble) {
+        queueTasks(tasks);
+        return;
+      }
+    }
+  }
+  for (let i = 0; i < elements.length; i++) {
+    if (!captureHandlers[i]) {
+      dispatch(elements[i], ev, scopedKebabName, tasks, kebabName, allowPreventDefault);
+      if (!ev.bubbles || ev.cancelBubble) {
+        queueTasks(tasks);
+        return;
+      }
+    }
+  }
+  queueTasks(tasks);
+};
+const processPassiveElementEvent = (ev) => processElementEvent(ev, passiveElementPrefix, false);
+const broadcast = (scope, ev, allowPreventDefault = true) => {
+  const kebabName = camelToKebab(ev.type);
+  const scopedKebabName = scope + ":" + kebabName;
+  const elements = querySelectorAll("[q-" + scope + "\\:" + kebabName + "]");
+  const tasks = [];
+  for (let i = 0; i < elements.length; i++) {
+    const el = elements[i];
+    dispatch(el, ev, scopedKebabName, tasks, kebabName, allowPreventDefault);
+  }
+  queueTasks(tasks);
+};
+const processDocumentEvent = (ev) => {
+  broadcast(documentPrefix, ev);
+};
+const processPassiveDocumentEvent = (ev) => {
+  broadcast(passiveDocumentPrefix, ev, false);
+};
+const processWindowEvent = (ev) => {
+  broadcast(windowPrefix, ev);
+};
+const processPassiveWindowEvent = (ev) => {
+  broadcast(passiveWindowPrefix, ev, false);
+};
+const processReadyStateChange = () => {
+  const readyState = doc.readyState;
+  if (readyState == "interactive" || readyState == "complete") {
+    hasInitialized = 1;
+    roots.forEach(findShadowRoots);
+    if (events.has("d:qinit")) {
+      events.delete("d:qinit");
+      const ev = createEvent("qinit");
+      const elements = querySelectorAll("[q-d\\:qinit]");
+      const tasks = [];
+      for (let i = 0; i < elements.length; i++) {
+        const el = elements[i];
+        dispatch(el, ev, "d:qinit", tasks);
+        el.removeAttribute("q-d:qinit");
+      }
+      queueTasks(tasks);
+    }
+    if (events.has("d:qidle")) {
+      events.delete("d:qidle");
+      const riC = win.requestIdleCallback ?? win.setTimeout;
+      riC.bind(win)(() => {
+        const ev = createEvent("qidle");
+        const elements = querySelectorAll("[q-d\\:qidle]");
+        const tasks = [];
+        for (let i = 0; i < elements.length; i++) {
+          const el = elements[i];
+          dispatch(el, ev, "d:qidle", tasks);
+          el.removeAttribute("q-d:qidle");
+        }
+        queueTasks(tasks);
+      });
+    }
+    if (events.has("e:qvisible")) {
+      observer || (observer = new IntersectionObserver((entries) => {
+        const tasks = [];
+        for (let i = 0; i < entries.length; i++) {
+          const entry = entries[i];
+          if (entry.isIntersecting) {
+            observer.unobserve(entry.target);
+            dispatch(
+              entry.target,
+              createEvent("qvisible", entry),
+              "e:qvisible",
+              tasks
+            );
+          }
+        }
+        queueTasks(tasks);
+      }));
+      const elements = querySelectorAll("[q-e\\:qvisible]:not([q\\:observed])");
+      for (let i = 0; i < elements.length; i++) {
+        const el = elements[i];
+        observer.observe(el);
+        el.setAttribute("q:observed", "true");
+      }
+    }
+  }
+};
+const addEventOrRoot = (...eventNames) => {
+  for (let i = 0; i < eventNames.length; i++) {
+    const eventNameOrRoot = eventNames[i];
+    if (eventNameOrRoot === QwikEvContainerReady) {
+      markContainerReady(eventNames[++i]);
+    } else if (typeof eventNameOrRoot === "string") {
+      if (!events.has(eventNameOrRoot)) {
+        events.add(eventNameOrRoot);
+        const { scope, eventName } = parseKebabEvent(eventNameOrRoot);
+        const passive = isPassiveScope(scope);
+        const rootScope = getRootScope(scope);
+        if (rootScope === windowPrefix) {
+          addEventListener(
+            win,
+            eventName,
+            passive ? processPassiveWindowEvent : processWindowEvent,
+            true,
+            passive
+          );
+        } else {
+          roots.forEach(
+            (root) => addEventListener(
+              root,
+              eventName,
+              rootScope === documentPrefix ? passive ? processPassiveDocumentEvent : processDocumentEvent : passive ? processPassiveElementEvent : processElementEvent,
+              true,
+              passive
+            )
+          );
+        }
+        if (hasInitialized === 1 && (eventNameOrRoot === "e:qvisible" || eventNameOrRoot === "d:qinit" || eventNameOrRoot === "d:qidle")) {
+          processReadyStateChange();
+        }
+      }
+    } else {
+      if (!roots.has(eventNameOrRoot)) {
+        events.forEach((kebabEventName) => {
+          const { scope, eventName } = parseKebabEvent(kebabEventName);
+          const passive = isPassiveScope(scope);
+          const rootScope = getRootScope(scope);
+          if (rootScope !== windowPrefix) {
+            addEventListener(
+              eventNameOrRoot,
+              eventName,
+              rootScope === documentPrefix ? passive ? processPassiveDocumentEvent : processDocumentEvent : passive ? processPassiveElementEvent : processElementEvent,
+              true,
+              passive
+            );
+          }
+        });
+        roots.add(eventNameOrRoot);
+      }
+    }
+  }
+};
+const _qwikEv = win._qwikEv;
+if (!_qwikEv?.roots) {
+  if (Array.isArray(_qwikEv)) {
+    addEventOrRoot(..._qwikEv);
+  } else {
+    addEventOrRoot("e:click", "e:input");
+  }
+  win._qwikEv = {
+    events,
+    roots,
+    push: addEventOrRoot
+  };
+  addEventListener(doc, readyStateChange, processReadyStateChange);
+  processReadyStateChange();
+}

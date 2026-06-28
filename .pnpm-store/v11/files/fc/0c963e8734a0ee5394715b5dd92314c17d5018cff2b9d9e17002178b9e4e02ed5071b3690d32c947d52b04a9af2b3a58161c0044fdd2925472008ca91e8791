@@ -1,0 +1,3704 @@
+const En = (t, e = 0) => {
+  for (let n = 0; n < t.length; n++) {
+    const r = t.charCodeAt(n);
+    e = (e << 5) - e + r, e |= 0;
+  }
+  return Number(Math.abs(e)).toString(36);
+}, kn = /* @__PURE__ */ new Set([
+  "_chk",
+  "_rsc",
+  "_res",
+  "_run",
+  "_task",
+  "_val",
+  // Each
+  "_eaC",
+  "_eaT",
+  // Show
+  "_shC",
+  "_shT",
+  // Suspense
+  "_suC",
+  "_suT",
+  // Reveal
+  "_reR",
+  "_reC",
+  "_reT"
+]);
+function In(t) {
+  const e = t.symbols;
+  return Object.keys(e).sort((n, r) => {
+    const i = e[n], s = e[r];
+    if (i.ctxKind === "eventHandler" && s.ctxKind !== "eventHandler")
+      return -1;
+    if (i.ctxKind !== "eventHandler" && s.ctxKind === "eventHandler")
+      return 1;
+    if (i.ctxKind === "eventHandler" && s.ctxKind === "eventHandler") {
+      const l = yt.indexOf(i.ctxName.toLowerCase()), a = yt.indexOf(s.ctxName.toLowerCase());
+      if (l > -1 && a > -1) {
+        if (l < a)
+          return -1;
+        if (l > a)
+          return 1;
+      } else {
+        if (l > -1)
+          return -1;
+        if (a > -1)
+          return 1;
+      }
+    } else if (i.ctxKind === "function" && s.ctxKind === "function") {
+      const l = bt.indexOf(i.ctxName.toLowerCase()), a = bt.indexOf(s.ctxName.toLowerCase());
+      if (l > -1 && a > -1) {
+        if (l < a)
+          return -1;
+        if (l > a)
+          return 1;
+      } else {
+        if (l > -1)
+          return -1;
+        if (a > -1)
+          return 1;
+      }
+    }
+    return !i.parent && s.parent ? -1 : i.parent && !s.parent ? 1 : i.hash < s.hash ? -1 : i.hash > s.hash ? 1 : 0;
+  });
+}
+const yt = [
+  // Click Events
+  "click",
+  "dblclick",
+  "contextmenu",
+  "auxclick",
+  // Pointer Events
+  "pointerdown",
+  "pointerup",
+  "pointermove",
+  "pointerover",
+  "pointerenter",
+  "pointerleave",
+  "pointerout",
+  "pointercancel",
+  "gotpointercapture",
+  "lostpointercapture",
+  // Touch Events
+  "touchstart",
+  "touchend",
+  "touchmove",
+  "touchcancel",
+  // Mouse Events
+  "mousedown",
+  "mouseup",
+  "mousemove",
+  "mouseenter",
+  "mouseleave",
+  "mouseover",
+  "mouseout",
+  "wheel",
+  // Gesture Events
+  "gesturestart",
+  "gesturechange",
+  "gestureend",
+  // Keyboard Events
+  "keydown",
+  "keyup",
+  "keypress",
+  // Input/Change Events
+  "input",
+  "change",
+  "search",
+  "invalid",
+  "beforeinput",
+  "select",
+  // Focus/Blur Events
+  "focusin",
+  "focusout",
+  "focus",
+  "blur",
+  // Form Events
+  "submit",
+  "reset",
+  // Scroll Events
+  "scroll"
+].map((t) => `on${t.toLowerCase()}$`), bt = ["useTask$", "useVisibleTask$", "component$", "useStyles$", "useStylesScoped$"].map(
+  (t) => t.toLowerCase()
+);
+function _n(t) {
+  return Object.keys(t.bundles).sort(Xe);
+}
+function Cn(t) {
+  const e = In(t), n = {}, r = {};
+  for (const l of e)
+    n[l] = t.symbols[l], r[l] = t.mapping[l];
+  const i = _n(t), s = {};
+  for (const l of i) {
+    s[l] = t.bundles[l];
+    const a = t.bundles[l];
+    Array.isArray(a.imports) && a.imports.sort(Xe), Array.isArray(a.dynamicImports) && a.dynamicImports.sort(Xe);
+    const c = [];
+    for (const h of e)
+      l === r[h] && c.push(h);
+    c.length > 0 && (c.sort(Xe), a.symbols = c);
+  }
+  return t.symbols = n, t.mapping = r, t.bundles = s, t;
+}
+function Xe(t, e) {
+  return t = t.toLocaleLowerCase(), e = e.toLocaleLowerCase(), t < e ? -1 : t > e ? 1 : 0;
+}
+function xt(t) {
+  if (t != null && t.mapping != null && typeof t.mapping == "object" && t.symbols != null && typeof t.symbols == "object" && t.bundles != null && typeof t.bundles == "object")
+    return t;
+}
+const Tn = (t, e) => {
+  let n = 0;
+  if (t.symbols)
+    for (const r of t.symbols) {
+      let i = 1;
+      const s = e.symbols[r];
+      s && (s.ctxKind === "function" ? /(component|useStyles|useStylesScoped)/i.test(s.ctxName) ? i += 1 : /(useComputed|useTask|useVisibleTask|useOn)/i.test(s.ctxName) && (i += 2) : (i += 1, /(click|mouse|pointer|touch|key|scroll|gesture|wheel)/i.test(s.ctxName) && (i += 3))), n = Math.max(n, i);
+    }
+  return n;
+};
+function Pn(t) {
+  let e = 0;
+  const n = [], r = [], i = /* @__PURE__ */ new Map(), s = /* @__PURE__ */ new Map(), l = /* @__PURE__ */ new Set();
+  function a(u) {
+    i.set(u, e), s.set(u, e), e++, n.push(u), l.add(u);
+    const p = t[u].imports || [];
+    for (const d of p)
+      i.has(d) ? l.has(d) && s.set(u, Math.min(s.get(u), i.get(d))) : (a(d), s.set(u, Math.min(s.get(u), s.get(d))));
+    if (s.get(u) === i.get(u)) {
+      const d = [];
+      let b;
+      do
+        b = n.pop(), l.delete(b), d.push(b);
+      while (b !== u);
+      r.push(d);
+    }
+  }
+  for (const u of Object.keys(t))
+    i.has(u) || a(u);
+  const c = /* @__PURE__ */ new Map();
+  r.forEach((u, p) => {
+    for (const d of u)
+      c.set(d, p);
+  });
+  const h = Array.from({ length: r.length }, () => /* @__PURE__ */ new Set());
+  for (const u of Object.keys(t)) {
+    const p = c.get(u);
+    for (const d of t[u].imports || []) {
+      const b = c.get(d);
+      p !== b && h[p].add(b);
+    }
+  }
+  const o = /* @__PURE__ */ new Set(), w = [];
+  function v(u) {
+    o.add(u);
+    for (const p of h[u])
+      o.has(p) || v(p);
+    w.push(u);
+  }
+  for (let u = 0; u < r.length; u++)
+    o.has(u) || v(u);
+  w.reverse();
+  const g = new Array(r.length).fill(0);
+  for (let u = 0; u < r.length; u++) {
+    let p = 0;
+    for (const d of r[u])
+      p += t[d].size;
+    g[u] = p;
+  }
+  for (let u = w.length - 1; u >= 0; u--) {
+    const p = w[u];
+    let d = g[p];
+    for (const b of h[p])
+      d += g[b];
+    g[p] = d;
+  }
+  for (let u = 0; u < r.length; u++) {
+    const p = g[u];
+    for (const d of r[u])
+      t[d].total = p;
+  }
+}
+const St = /[/\\](core|qwik)[/\\]dist[/\\]preloader\.(|c|m)js$/, Et = /[/\\](core|qwik)[/\\]dist[/\\]core(\.min|\.prod)?\.(|c|m)js$/, kt = /[/\\](core|qwik)[/\\](dist[/\\])?qwikloader(\.debug)?\.[^/]*js$/;
+function Dn(t, e, n, r, i, s, l) {
+  const a = {
+    version: "1",
+    manifestHash: "",
+    options: {
+      target: i.target,
+      buildMode: i.buildMode,
+      // don't copy the insights stuff
+      entryStrategy: i.entryStrategy && { type: i.entryStrategy.type }
+    },
+    core: void 0,
+    preloader: void 0,
+    qwikLoader: void 0,
+    bundleGraphAsset: void 0,
+    injections: n,
+    mapping: {},
+    bundles: {},
+    assets: {},
+    symbols: {},
+    bundleGraph: void 0
+  }, c = (g) => {
+    const u = r[g];
+    if (!u) {
+      console.warn(`Client manifest generation: skipping external import "${g}"`);
+      return;
+    }
+    return l(u.fileName);
+  };
+  let h, o, w;
+  for (const g of Object.values(r)) {
+    const u = c(g.fileName);
+    g.name === "core" && (h = u), g.name === "preloader" && (o = u), g.name === "handlers" && (w = u);
+  }
+  const v = new Set(e.map((g) => g.name));
+  for (const g of Object.values(r)) {
+    if (g.type === "asset") {
+      g.fileName.endsWith("js.map") || (a.assets[g.fileName] = {
+        name: g.names[0],
+        size: g.source.length
+      });
+      continue;
+    }
+    const u = l(g.fileName), d = {
+      size: g.code.length,
+      total: -1
+    };
+    for (const m of g.exports)
+      v.has(m) && (!a.mapping[m] || g.exports.length !== 1) && (a.mapping[m] = u);
+    const b = g.imports.filter((m) => g.code.includes(t.basename(m))).map((m) => c(m)).filter((m) => m !== o && m !== h && m !== w).filter(Boolean);
+    b.length > 0 && (d.imports = b);
+    const O = g.dynamicImports.filter((m) => g.code.includes(t.basename(m))).map((m) => c(m)).filter(Boolean);
+    O.length > 0 && (d.dynamicImports = O), g.facadeModuleId && (St.test(g.facadeModuleId) ? a.preloader = u : Et.test(g.facadeModuleId) ? a.core = u : kt.test(g.facadeModuleId) && (a.qwikLoader = u));
+    const L = (g.moduleIds || Object.keys(g.modules)).filter((m) => !m.startsWith("\0")).map((m) => t.relative(i.rootDir, m));
+    L.length > 0 && (d.origins = L, !a.preloader && L.some((m) => St.test(m)) && (a.preloader = u), !a.core && L.some((m) => Et.test(m)) && (a.core = u), !a.qwikLoader && L.some((m) => kt.test(m)) && (a.qwikLoader = u)), a.bundles[u] = d;
+  }
+  for (const g of e) {
+    const u = g.name, p = a.mapping[u];
+    if (!p) {
+      s(`Note: qrl ${g.name} is not in the bundle, likely tree shaken`, a);
+      continue;
+    }
+    (a.bundles[p].symbols ||= []).push(u), a.symbols[u] = {
+      displayName: g.displayName,
+      hash: g.hash,
+      ctxKind: g.ctxKind,
+      ctxName: g.ctxName,
+      captures: g.captures,
+      canonicalFilename: g.canonicalFilename,
+      parent: g.parent,
+      origin: g.origin,
+      loc: g.loc,
+      paramNames: g.paramNames,
+      captureNames: g.captureNames
+    };
+  }
+  if (w)
+    for (const g of kn)
+      a.symbols[g] = {
+        origin: "Qwik core",
+        displayName: g,
+        canonicalFilename: "",
+        hash: g,
+        ctxKind: "function",
+        ctxName: g,
+        captures: !1,
+        parent: null,
+        loc: [0, 0]
+      }, a.mapping[g] = w;
+  else
+    console.error("Qwik core bundle not found, is Qwik actually used in this project?");
+  for (const g of Object.values(a.bundles)) {
+    const u = Tn(g, a);
+    g.interactivity = u;
+  }
+  return Pn(a.bundles), Cn(a);
+}
+const Nn = 300, On = 0.5 / (Nn * 1024 / 8), Rn = (t) => {
+  const e = t.lastIndexOf("_");
+  return e > -1 ? t.slice(e + 1) : t;
+};
+function Ln(t, e) {
+  const n = [];
+  if (!t.bundles)
+    return [];
+  const r = { ...t.bundles };
+  for (const [c, h] of Object.entries(t.mapping)) {
+    if (c.startsWith("_") && c.length < 10)
+      continue;
+    const o = Rn(c);
+    o && (r[o] = { dynamicImports: [h] });
+  }
+  if (e) {
+    const c = { ...t, bundles: r };
+    for (const h of e) {
+      const o = h(c);
+      o && Object.assign(r, o);
+    }
+  }
+  for (const c of Object.keys(r)) {
+    const h = r[c], o = h.imports?.filter((v) => r[v]) || [], w = h.dynamicImports?.filter(
+      // we only want to include dynamic imports that belong to the app
+      // e.g. not all languages supported by shiki
+      (v) => r[v] && // either there are qrls
+      (r[v].symbols || // or it's a dynamic import from the app source
+      r[v].origins?.some((g) => !g.includes("node_modules")))
+    ) || [];
+    r[c] = {
+      ...h,
+      imports: o,
+      dynamicImports: w
+    };
+  }
+  const i = new Set(Object.keys(r));
+  for (const c of Object.keys(r)) {
+    for (const h of r[c].imports)
+      i.delete(h);
+    for (const h of r[c].dynamicImports)
+      i.delete(h);
+  }
+  for (const c of i) {
+    const h = r[c];
+    !h.imports?.length && !h.dynamicImports?.length && delete r[c];
+  }
+  const s = Object.keys(r), l = /* @__PURE__ */ new Map(), a = (c, h, o = /* @__PURE__ */ new Set()) => {
+    const w = r[h];
+    for (const v of w.imports)
+      c.has(v) && c.delete(v), o.has(v) || (o.add(v), a(c, v, o));
+  };
+  for (const c of s) {
+    const h = r[c], o = new Set(h.imports);
+    for (const u of o)
+      a(o, u);
+    const w = new Set(h.dynamicImports), v = /* @__PURE__ */ new Map();
+    for (const u of w) {
+      a(w, u);
+      const p = r[u];
+      let d = 0.5;
+      if (d += (p.interactivity || 0) * 0.08, h.origins && p.origins) {
+        for (const b of h.origins)
+          if (p.origins.some((O) => O.startsWith(b))) {
+            d += 0.25;
+            break;
+          }
+      }
+      p.total > On && (d += d > 0.5 ? 0.02 : -0.02), p.total < 1e3 && (d += 0.15), v.set(u, Math.min(d, 0.99));
+    }
+    if (w.size > 0) {
+      const u = Array.from(w).sort(
+        (d, b) => v.get(b) - v.get(d)
+      );
+      let p = -1;
+      for (const d of u)
+        v.get(d) !== p && (p = v.get(d), o.add(-Math.round(p * 10))), o.add(d);
+    }
+    const g = n.length;
+    n.push(c);
+    for (let u = 0; u < o.size; u++)
+      n.push(null);
+    l.set(c, { index: g, deps: o });
+  }
+  for (const c of s) {
+    const h = l.get(c);
+    let { index: o, deps: w } = h;
+    o++;
+    for (const v of w) {
+      if (typeof v == "number") {
+        n[o++] = v;
+        continue;
+      }
+      const u = l.get(v).index;
+      n[o++] = u;
+    }
+  }
+  return n;
+}
+async function $n(t, e, n) {
+  const r = await t.dynamicImport("eslint");
+  let i = new r.ESLint({ cache: !0 });
+  if ((await i.calculateConfigForFile("no-real-file.tsx")).parser === null) {
+    const a = {
+      cache: !0,
+      overrideConfig: {
+        languageOptions: {
+          parserOptions: {
+            tsconfigRootDir: e,
+            project: n,
+            ecmaVersion: 2021,
+            sourceType: "module",
+            ecmaFeatures: {
+              jsx: !0
+            }
+          }
+        }
+      }
+    };
+    i = new r.ESLint(a);
+  }
+  return {
+    async lint(a, c, h) {
+      try {
+        const o = Mn(h);
+        if (await i.isPathIgnored(o))
+          return null;
+        (await i.lintText(c, {
+          filePath: o
+        })).forEach((v) => {
+          for (const g of v.messages) {
+            if (g.ruleId != null && !g.ruleId.startsWith("qwik/"))
+              continue;
+            const u = jn(v.filePath, g);
+            a.warn(u);
+          }
+        });
+      } catch (o) {
+        console.warn(o);
+      }
+    }
+  };
+}
+function Mn(t) {
+  return t.split("?", 2)[0];
+}
+function jn(t, e) {
+  return Object.assign(new Error(e.message), {
+    id: t,
+    plugin: "vite-plugin-eslint",
+    loc: {
+      file: t,
+      column: e.column,
+      line: e.line
+    },
+    stack: ""
+  });
+}
+const Un = /\.server\.[cm]?[jt]sx?$/, qn = /\.server\.[cm]?[jt]sx?_/, Bn = /(^|\/)server(\/|$)/, It = (t) => t.includes(".server") || t.includes("/server") || t.includes("\\server") || t.includes("server/") || t.includes("server\\"), Ze = (t) => t.replace(/\\/g, "/").replace(/^\/@fs\//, ""), Fn = (t, e) => {
+  const n = Ze(t), r = e.rootDir ? Ze(e.rootDir).replace(/\/+$/, "") : "";
+  return r && (n === r || n.startsWith(r + "/")) ? n : r && n.startsWith("/") && !n.startsWith("//") && !/^[a-zA-Z]:\//.test(n) ? `${r}${n}` : n;
+}, An = (t) => {
+  const e = Ze(t);
+  return Un.test(e) || qn.test(e);
+}, zn = (t, e) => {
+  const n = typeof e == "string" || e == null ? { srcDir: e } : e;
+  if (!n.srcDir)
+    return !1;
+  const r = Fn(t, n), i = Ze(n.srcDir).replace(/\/+$/, "");
+  return r.startsWith(i + "/") ? Bn.test(r.slice(i.length + 1)) : !1;
+}, Wn = (t, e) => An(t) || zn(t, e), Hn = (t, e) => {
+  const n = e ? `
+Importer: ${e}` : "";
+  return `Server-only module cannot be imported by client code.
+
+Server-only module: ${t}${n}
+
+Files named \`.server.*\` or placed under \`src/**/server/**\` are excluded from client bundles. Move this import behind SSR-only route loaders, actions, endpoint handlers, or expose the operation through an intentional \`server$\` API.`;
+};
+async function Gn(t, e) {
+  const n = e;
+  let r = n.loc;
+  if (!n.frame && !n.plugin && (r || (r = Qn(n)), r && (n.loc = r, r.file))) {
+    const i = await t.dynamicImport("node:fs"), { normalizePath: s } = await t.dynamicImport("vite");
+    n.id = s(n.loc.file);
+    try {
+      const l = i.readFileSync(n.loc.file, "utf-8");
+      n.frame = Jn(l, n.loc);
+    } catch {
+    }
+  }
+  return e;
+}
+const Qn = (t) => {
+  const e = t.stack;
+  if (typeof e == "string") {
+    const n = e.split(`
+`).filter((r) => !r.includes("/node_modules/") && !r.includes("(node:"));
+    for (let r = 1; r < n.length; r++) {
+      const i = n[r].replace("file:///", "/");
+      if (/^\s+at/.test(i)) {
+        const s = i.indexOf("/"), l = i.lastIndexOf(")", s);
+        if (s > 0) {
+          const c = i.slice(s, l).split(":"), h = _t(c[c.length - 1]), o = _t(c[c.length - 2]);
+          return typeof h == "number" && typeof o == "number" ? (c.length -= 2, {
+            file: c.join(":"),
+            line: o,
+            column: h
+          }) : typeof h == "number" ? (c.length -= 1, {
+            file: c.join(":"),
+            line: h,
+            column: void 0
+          }) : {
+            file: c.join(":"),
+            line: void 0,
+            column: void 0
+          };
+        }
+      }
+    }
+  }
+}, le = (t) => t.startsWith("\0"), _t = (t) => {
+  try {
+    return parseInt(t, 10);
+  } catch {
+    return;
+  }
+}, nn = /\r?\n/, Ct = 2;
+function Kn(t, e) {
+  if (typeof e == "number")
+    return e;
+  if (e.lo != null)
+    return e.lo;
+  const n = t.split(nn), { line: r, column: i } = e;
+  let s = 0;
+  for (let l = 0; l < r - 1 && l < n.length; l++)
+    s += n[l].length + 1;
+  return s + i;
+}
+function Jn(t, e = 0, n) {
+  e = Kn(t, e), n = n || e;
+  const r = t.split(nn);
+  let i = 0;
+  const s = [];
+  for (let l = 0; l < r.length; l++)
+    if (i += r[l].length + 1, i >= e) {
+      for (let a = l - Ct; a <= l + Ct || n > i; a++) {
+        if (a < 0 || a >= r.length)
+          continue;
+        const c = a + 1;
+        s.push(`${c}${" ".repeat(Math.max(3 - String(c).length, 0))}|  ${r[a]}`);
+        const h = r[a].length;
+        if (a === l) {
+          const o = Math.max(e - (i - h) + 1, 0), w = Math.max(1, n > i ? h - o : n - e);
+          s.push("   |  " + " ".repeat(o) + "^".repeat(w));
+        } else if (a > l) {
+          if (n > i) {
+            const o = Math.max(Math.min(n - i, h), 1);
+            s.push("   |  " + "^".repeat(o));
+          }
+          i += h + 1;
+        }
+      }
+      break;
+    }
+  return s.join(`
+`);
+}
+function Yn(t) {
+  return t === "win32";
+}
+function Se(t) {
+  const [e, n] = t.split("?"), r = n || "";
+  return {
+    originalId: t,
+    pathId: e,
+    query: r ? `?${n}` : "",
+    params: new URLSearchParams(r)
+  };
+}
+var Xn = 44, Zn = 59, Tt = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/", rn = new Uint8Array(64), Vn = new Uint8Array(128);
+for (let t = 0; t < Tt.length; t++) {
+  const e = Tt.charCodeAt(t);
+  rn[t] = e, Vn[e] = t;
+}
+function Ee(t, e, n) {
+  let r = e - n;
+  r = r < 0 ? -r << 1 | 1 : r << 1;
+  do {
+    let i = r & 31;
+    r >>>= 5, r > 0 && (i |= 32), t.write(rn[i]);
+  } while (r > 0);
+  return e;
+}
+var Pt = 1024 * 16, Dt = typeof TextDecoder < "u" ? /* @__PURE__ */ new TextDecoder() : typeof Buffer < "u" ? {
+  decode(t) {
+    return Buffer.from(t.buffer, t.byteOffset, t.byteLength).toString();
+  }
+} : {
+  decode(t) {
+    let e = "";
+    for (let n = 0; n < t.length; n++)
+      e += String.fromCharCode(t[n]);
+    return e;
+  }
+}, er = class {
+  constructor() {
+    this.pos = 0, this.out = "", this.buffer = new Uint8Array(Pt);
+  }
+  write(t) {
+    const { buffer: e } = this;
+    e[this.pos++] = t, this.pos === Pt && (this.out += Dt.decode(e), this.pos = 0);
+  }
+  flush() {
+    const { buffer: t, out: e, pos: n } = this;
+    return n > 0 ? e + Dt.decode(t.subarray(0, n)) : e;
+  }
+};
+function tr(t) {
+  const e = new er();
+  let n = 0, r = 0, i = 0, s = 0;
+  for (let l = 0; l < t.length; l++) {
+    const a = t[l];
+    if (l > 0 && e.write(Zn), a.length === 0) continue;
+    let c = 0;
+    for (let h = 0; h < a.length; h++) {
+      const o = a[h];
+      h > 0 && e.write(Xn), c = Ee(e, o[0], c), o.length !== 1 && (n = Ee(e, o[1], n), r = Ee(e, o[2], r), i = Ee(e, o[3], i), o.length !== 4 && (s = Ee(e, o[4], s)));
+    }
+  }
+  return e.flush();
+}
+class Ve {
+  constructor(e) {
+    this.bits = e instanceof Ve ? e.bits.slice() : [];
+  }
+  add(e) {
+    this.bits[e >> 5] |= 1 << (e & 31);
+  }
+  has(e) {
+    return !!(this.bits[e >> 5] & 1 << (e & 31));
+  }
+}
+class ze {
+  constructor(e, n, r) {
+    this.start = e, this.end = n, this.original = r, this.intro = "", this.outro = "", this.content = r, this.storeName = !1, this.edited = !1, this.previous = null, this.next = null;
+  }
+  appendLeft(e) {
+    this.outro += e;
+  }
+  appendRight(e) {
+    this.intro = this.intro + e;
+  }
+  clone() {
+    const e = new ze(this.start, this.end, this.original);
+    return e.intro = this.intro, e.outro = this.outro, e.content = this.content, e.storeName = this.storeName, e.edited = this.edited, e;
+  }
+  contains(e) {
+    return this.start < e && e < this.end;
+  }
+  eachNext(e) {
+    let n = this;
+    for (; n; )
+      e(n), n = n.next;
+  }
+  eachPrevious(e) {
+    let n = this;
+    for (; n; )
+      e(n), n = n.previous;
+  }
+  edit(e, n, r) {
+    return this.content = e, r || (this.intro = "", this.outro = ""), this.storeName = n, this.edited = !0, this;
+  }
+  prependLeft(e) {
+    this.outro = e + this.outro;
+  }
+  prependRight(e) {
+    this.intro = e + this.intro;
+  }
+  reset() {
+    this.intro = "", this.outro = "", this.edited && (this.content = this.original, this.storeName = !1, this.edited = !1);
+  }
+  split(e) {
+    const n = e - this.start, r = this.original.slice(0, n), i = this.original.slice(n);
+    this.original = r;
+    const s = new ze(e, this.end, i);
+    return s.outro = this.outro, this.outro = "", this.end = e, this.edited ? (s.edit("", !1), this.content = "") : this.content = r, s.next = this.next, s.next && (s.next.previous = s), s.previous = this, this.next = s, s;
+  }
+  toString() {
+    return this.intro + this.content + this.outro;
+  }
+  trimEnd(e) {
+    if (this.outro = this.outro.replace(e, ""), this.outro.length) return !0;
+    const n = this.content.replace(e, "");
+    if (n.length)
+      return n !== this.content && (this.split(this.start + n.length).edit("", void 0, !0), this.edited && this.edit(n, this.storeName, !0)), !0;
+    if (this.edit("", void 0, !0), this.intro = this.intro.replace(e, ""), this.intro.length) return !0;
+  }
+  trimStart(e) {
+    if (this.intro = this.intro.replace(e, ""), this.intro.length) return !0;
+    const n = this.content.replace(e, "");
+    if (n.length) {
+      if (n !== this.content) {
+        const r = this.split(this.end - n.length);
+        this.edited && r.edit(n, this.storeName, !0), this.edit("", void 0, !0);
+      }
+      return !0;
+    } else if (this.edit("", void 0, !0), this.outro = this.outro.replace(e, ""), this.outro.length) return !0;
+  }
+}
+function nr() {
+  return typeof globalThis < "u" && typeof globalThis.btoa == "function" ? (t) => globalThis.btoa(unescape(encodeURIComponent(t))) : typeof Buffer == "function" ? (t) => Buffer.from(t, "utf-8").toString("base64") : () => {
+    throw new Error("Unsupported environment: `window.btoa` or `Buffer` should be supported.");
+  };
+}
+const rr = /* @__PURE__ */ nr();
+class ir {
+  constructor(e) {
+    this.version = 3, this.file = e.file, this.sources = e.sources, this.sourcesContent = e.sourcesContent, this.names = e.names, this.mappings = tr(e.mappings), typeof e.x_google_ignoreList < "u" && (this.x_google_ignoreList = e.x_google_ignoreList), typeof e.debugId < "u" && (this.debugId = e.debugId);
+  }
+  toString() {
+    return JSON.stringify(this);
+  }
+  toUrl() {
+    return "data:application/json;charset=utf-8;base64," + rr(this.toString());
+  }
+}
+function or(t) {
+  const e = t.split(`
+`), n = e.filter((s) => /^\t+/.test(s)), r = e.filter((s) => /^ {2,}/.test(s));
+  if (n.length === 0 && r.length === 0)
+    return null;
+  if (n.length >= r.length)
+    return "	";
+  const i = r.reduce((s, l) => {
+    const a = /^ +/.exec(l)[0].length;
+    return Math.min(a, s);
+  }, 1 / 0);
+  return new Array(i + 1).join(" ");
+}
+function sr(t, e) {
+  const n = t.split(/[/\\]/), r = e.split(/[/\\]/);
+  for (n.pop(); n[0] === r[0]; )
+    n.shift(), r.shift();
+  if (n.length) {
+    let i = n.length;
+    for (; i--; ) n[i] = "..";
+  }
+  return n.concat(r).join("/");
+}
+const ar = Object.prototype.toString;
+function lr(t) {
+  return ar.call(t) === "[object Object]";
+}
+function Nt(t) {
+  const e = t.split(`
+`), n = [];
+  for (let r = 0, i = 0; r < e.length; r++)
+    n.push(i), i += e[r].length + 1;
+  return function(i) {
+    let s = 0, l = n.length;
+    for (; s < l; ) {
+      const h = s + l >> 1;
+      i < n[h] ? l = h : s = h + 1;
+    }
+    const a = s - 1, c = i - n[a];
+    return { line: a, column: c };
+  };
+}
+const cr = /\w/;
+class dr {
+  constructor(e) {
+    this.hires = e, this.generatedCodeLine = 0, this.generatedCodeColumn = 0, this.raw = [], this.rawSegments = this.raw[this.generatedCodeLine] = [], this.pending = null;
+  }
+  addEdit(e, n, r, i) {
+    if (n.length) {
+      const s = n.length - 1;
+      let l = n.indexOf(`
+`, 0), a = -1;
+      for (; l >= 0 && s > l; ) {
+        const h = [this.generatedCodeColumn, e, r.line, r.column];
+        i >= 0 && h.push(i), this.rawSegments.push(h), this.generatedCodeLine += 1, this.raw[this.generatedCodeLine] = this.rawSegments = [], this.generatedCodeColumn = 0, a = l, l = n.indexOf(`
+`, l + 1);
+      }
+      const c = [this.generatedCodeColumn, e, r.line, r.column];
+      i >= 0 && c.push(i), this.rawSegments.push(c), this.advance(n.slice(a + 1));
+    } else this.pending && (this.rawSegments.push(this.pending), this.advance(n));
+    this.pending = null;
+  }
+  addUneditedChunk(e, n, r, i, s) {
+    let l = n.start, a = !0, c = !1;
+    for (; l < n.end; ) {
+      if (r[l] === `
+`)
+        i.line += 1, i.column = 0, this.generatedCodeLine += 1, this.raw[this.generatedCodeLine] = this.rawSegments = [], this.generatedCodeColumn = 0, a = !0, c = !1;
+      else {
+        if (this.hires || a || s.has(l)) {
+          const h = [this.generatedCodeColumn, e, i.line, i.column];
+          this.hires === "boundary" ? cr.test(r[l]) ? c || (this.rawSegments.push(h), c = !0) : (this.rawSegments.push(h), c = !1) : this.rawSegments.push(h);
+        }
+        i.column += 1, this.generatedCodeColumn += 1, a = !1;
+      }
+      l += 1;
+    }
+    this.pending = null;
+  }
+  advance(e) {
+    if (!e) return;
+    const n = e.split(`
+`);
+    if (n.length > 1) {
+      for (let r = 0; r < n.length - 1; r++)
+        this.generatedCodeLine++, this.raw[this.generatedCodeLine] = this.rawSegments = [];
+      this.generatedCodeColumn = 0;
+    }
+    this.generatedCodeColumn += n[n.length - 1].length;
+  }
+}
+const ke = `
+`, me = {
+  insertLeft: !1,
+  insertRight: !1,
+  storeName: !1
+};
+class ht {
+  constructor(e, n = {}) {
+    const r = new ze(0, e.length, e);
+    Object.defineProperties(this, {
+      original: { writable: !0, value: e },
+      outro: { writable: !0, value: "" },
+      intro: { writable: !0, value: "" },
+      firstChunk: { writable: !0, value: r },
+      lastChunk: { writable: !0, value: r },
+      lastSearchedChunk: { writable: !0, value: r },
+      byStart: { writable: !0, value: {} },
+      byEnd: { writable: !0, value: {} },
+      filename: { writable: !0, value: n.filename },
+      indentExclusionRanges: { writable: !0, value: n.indentExclusionRanges },
+      sourcemapLocations: { writable: !0, value: new Ve() },
+      storedNames: { writable: !0, value: {} },
+      indentStr: { writable: !0, value: void 0 },
+      ignoreList: { writable: !0, value: n.ignoreList },
+      offset: { writable: !0, value: n.offset || 0 }
+    }), this.byStart[0] = r, this.byEnd[e.length] = r;
+  }
+  addSourcemapLocation(e) {
+    this.sourcemapLocations.add(e);
+  }
+  append(e) {
+    if (typeof e != "string") throw new TypeError("outro content must be a string");
+    return this.outro += e, this;
+  }
+  appendLeft(e, n) {
+    if (e = e + this.offset, typeof n != "string") throw new TypeError("inserted content must be a string");
+    this._split(e);
+    const r = this.byEnd[e];
+    return r ? r.appendLeft(n) : this.intro += n, this;
+  }
+  appendRight(e, n) {
+    if (e = e + this.offset, typeof n != "string") throw new TypeError("inserted content must be a string");
+    this._split(e);
+    const r = this.byStart[e];
+    return r ? r.appendRight(n) : this.outro += n, this;
+  }
+  clone() {
+    const e = new ht(this.original, { filename: this.filename, offset: this.offset });
+    let n = this.firstChunk, r = e.firstChunk = e.lastSearchedChunk = n.clone();
+    for (; n; ) {
+      e.byStart[r.start] = r, e.byEnd[r.end] = r;
+      const i = n.next, s = i && i.clone();
+      s && (r.next = s, s.previous = r, r = s), n = i;
+    }
+    return e.lastChunk = r, this.indentExclusionRanges && (e.indentExclusionRanges = this.indentExclusionRanges.slice()), e.sourcemapLocations = new Ve(this.sourcemapLocations), e.intro = this.intro, e.outro = this.outro, e;
+  }
+  generateDecodedMap(e) {
+    e = e || {};
+    const n = 0, r = Object.keys(this.storedNames), i = new dr(e.hires), s = Nt(this.original);
+    return this.intro && i.advance(this.intro), this.firstChunk.eachNext((l) => {
+      const a = s(l.start);
+      l.intro.length && i.advance(l.intro), l.edited ? i.addEdit(
+        n,
+        l.content,
+        a,
+        l.storeName ? r.indexOf(l.original) : -1
+      ) : i.addUneditedChunk(n, l, this.original, a, this.sourcemapLocations), l.outro.length && i.advance(l.outro);
+    }), this.outro && i.advance(this.outro), {
+      file: e.file ? e.file.split(/[/\\]/).pop() : void 0,
+      sources: [
+        e.source ? sr(e.file || "", e.source) : e.file || ""
+      ],
+      sourcesContent: e.includeContent ? [this.original] : void 0,
+      names: r,
+      mappings: i.raw,
+      x_google_ignoreList: this.ignoreList ? [n] : void 0
+    };
+  }
+  generateMap(e) {
+    return new ir(this.generateDecodedMap(e));
+  }
+  _ensureindentStr() {
+    this.indentStr === void 0 && (this.indentStr = or(this.original));
+  }
+  _getRawIndentString() {
+    return this._ensureindentStr(), this.indentStr;
+  }
+  getIndentString() {
+    return this._ensureindentStr(), this.indentStr === null ? "	" : this.indentStr;
+  }
+  indent(e, n) {
+    const r = /^[^\r\n]/gm;
+    if (lr(e) && (n = e, e = void 0), e === void 0 && (this._ensureindentStr(), e = this.indentStr || "	"), e === "") return this;
+    n = n || {};
+    const i = {};
+    n.exclude && (typeof n.exclude[0] == "number" ? [n.exclude] : n.exclude).forEach((o) => {
+      for (let w = o[0]; w < o[1]; w += 1)
+        i[w] = !0;
+    });
+    let s = n.indentStart !== !1;
+    const l = (h) => s ? `${e}${h}` : (s = !0, h);
+    this.intro = this.intro.replace(r, l);
+    let a = 0, c = this.firstChunk;
+    for (; c; ) {
+      const h = c.end;
+      if (c.edited)
+        i[a] || (c.content = c.content.replace(r, l), c.content.length && (s = c.content[c.content.length - 1] === `
+`));
+      else
+        for (a = c.start; a < h; ) {
+          if (!i[a]) {
+            const o = this.original[a];
+            o === `
+` ? s = !0 : o !== "\r" && s && (s = !1, a === c.start || (this._splitChunk(c, a), c = c.next), c.prependRight(e));
+          }
+          a += 1;
+        }
+      a = c.end, c = c.next;
+    }
+    return this.outro = this.outro.replace(r, l), this;
+  }
+  insert() {
+    throw new Error(
+      "magicString.insert(...) is deprecated. Use prependRight(...) or appendLeft(...)"
+    );
+  }
+  insertLeft(e, n) {
+    return me.insertLeft || (console.warn(
+      "magicString.insertLeft(...) is deprecated. Use magicString.appendLeft(...) instead"
+    ), me.insertLeft = !0), this.appendLeft(e, n);
+  }
+  insertRight(e, n) {
+    return me.insertRight || (console.warn(
+      "magicString.insertRight(...) is deprecated. Use magicString.prependRight(...) instead"
+    ), me.insertRight = !0), this.prependRight(e, n);
+  }
+  move(e, n, r) {
+    if (e = e + this.offset, n = n + this.offset, r = r + this.offset, r >= e && r <= n) throw new Error("Cannot move a selection inside itself");
+    this._split(e), this._split(n), this._split(r);
+    const i = this.byStart[e], s = this.byEnd[n], l = i.previous, a = s.next, c = this.byStart[r];
+    if (!c && s === this.lastChunk) return this;
+    const h = c ? c.previous : this.lastChunk;
+    return l && (l.next = a), a && (a.previous = l), h && (h.next = i), c && (c.previous = s), i.previous || (this.firstChunk = s.next), s.next || (this.lastChunk = i.previous, this.lastChunk.next = null), i.previous = h, s.next = c || null, h || (this.firstChunk = i), c || (this.lastChunk = s), this;
+  }
+  overwrite(e, n, r, i) {
+    return i = i || {}, this.update(e, n, r, { ...i, overwrite: !i.contentOnly });
+  }
+  update(e, n, r, i) {
+    if (e = e + this.offset, n = n + this.offset, typeof r != "string") throw new TypeError("replacement content must be a string");
+    if (this.original.length !== 0) {
+      for (; e < 0; ) e += this.original.length;
+      for (; n < 0; ) n += this.original.length;
+    }
+    if (n > this.original.length) throw new Error("end is out of bounds");
+    if (e === n)
+      throw new Error(
+        "Cannot overwrite a zero-length range – use appendLeft or prependRight instead"
+      );
+    this._split(e), this._split(n), i === !0 && (me.storeName || (console.warn(
+      "The final argument to magicString.overwrite(...) should be an options object. See https://github.com/rich-harris/magic-string"
+    ), me.storeName = !0), i = { storeName: !0 });
+    const s = i !== void 0 ? i.storeName : !1, l = i !== void 0 ? i.overwrite : !1;
+    if (s) {
+      const h = this.original.slice(e, n);
+      Object.defineProperty(this.storedNames, h, {
+        writable: !0,
+        value: !0,
+        enumerable: !0
+      });
+    }
+    const a = this.byStart[e], c = this.byEnd[n];
+    if (a) {
+      let h = a;
+      for (; h !== c; ) {
+        if (h.next !== this.byStart[h.end])
+          throw new Error("Cannot overwrite across a split point");
+        h = h.next, h.edit("", !1);
+      }
+      a.edit(r, s, !l);
+    } else {
+      const h = new ze(e, n, "").edit(r, s);
+      c.next = h, h.previous = c;
+    }
+    return this;
+  }
+  prepend(e) {
+    if (typeof e != "string") throw new TypeError("outro content must be a string");
+    return this.intro = e + this.intro, this;
+  }
+  prependLeft(e, n) {
+    if (e = e + this.offset, typeof n != "string") throw new TypeError("inserted content must be a string");
+    this._split(e);
+    const r = this.byEnd[e];
+    return r ? r.prependLeft(n) : this.intro = n + this.intro, this;
+  }
+  prependRight(e, n) {
+    if (e = e + this.offset, typeof n != "string") throw new TypeError("inserted content must be a string");
+    this._split(e);
+    const r = this.byStart[e];
+    return r ? r.prependRight(n) : this.outro = n + this.outro, this;
+  }
+  remove(e, n) {
+    if (e = e + this.offset, n = n + this.offset, this.original.length !== 0) {
+      for (; e < 0; ) e += this.original.length;
+      for (; n < 0; ) n += this.original.length;
+    }
+    if (e === n) return this;
+    if (e < 0 || n > this.original.length) throw new Error("Character is out of bounds");
+    if (e > n) throw new Error("end must be greater than start");
+    this._split(e), this._split(n);
+    let r = this.byStart[e];
+    for (; r; )
+      r.intro = "", r.outro = "", r.edit(""), r = n > r.end ? this.byStart[r.end] : null;
+    return this;
+  }
+  reset(e, n) {
+    if (e = e + this.offset, n = n + this.offset, this.original.length !== 0) {
+      for (; e < 0; ) e += this.original.length;
+      for (; n < 0; ) n += this.original.length;
+    }
+    if (e === n) return this;
+    if (e < 0 || n > this.original.length) throw new Error("Character is out of bounds");
+    if (e > n) throw new Error("end must be greater than start");
+    this._split(e), this._split(n);
+    let r = this.byStart[e];
+    for (; r; )
+      r.reset(), r = n > r.end ? this.byStart[r.end] : null;
+    return this;
+  }
+  lastChar() {
+    if (this.outro.length) return this.outro[this.outro.length - 1];
+    let e = this.lastChunk;
+    do {
+      if (e.outro.length) return e.outro[e.outro.length - 1];
+      if (e.content.length) return e.content[e.content.length - 1];
+      if (e.intro.length) return e.intro[e.intro.length - 1];
+    } while (e = e.previous);
+    return this.intro.length ? this.intro[this.intro.length - 1] : "";
+  }
+  lastLine() {
+    let e = this.outro.lastIndexOf(ke);
+    if (e !== -1) return this.outro.substr(e + 1);
+    let n = this.outro, r = this.lastChunk;
+    do {
+      if (r.outro.length > 0) {
+        if (e = r.outro.lastIndexOf(ke), e !== -1) return r.outro.substr(e + 1) + n;
+        n = r.outro + n;
+      }
+      if (r.content.length > 0) {
+        if (e = r.content.lastIndexOf(ke), e !== -1) return r.content.substr(e + 1) + n;
+        n = r.content + n;
+      }
+      if (r.intro.length > 0) {
+        if (e = r.intro.lastIndexOf(ke), e !== -1) return r.intro.substr(e + 1) + n;
+        n = r.intro + n;
+      }
+    } while (r = r.previous);
+    return e = this.intro.lastIndexOf(ke), e !== -1 ? this.intro.substr(e + 1) + n : this.intro + n;
+  }
+  slice(e = 0, n = this.original.length - this.offset) {
+    if (e = e + this.offset, n = n + this.offset, this.original.length !== 0) {
+      for (; e < 0; ) e += this.original.length;
+      for (; n < 0; ) n += this.original.length;
+    }
+    let r = "", i = this.firstChunk;
+    for (; i && (i.start > e || i.end <= e); ) {
+      if (i.start < n && i.end >= n)
+        return r;
+      i = i.next;
+    }
+    if (i && i.edited && i.start !== e)
+      throw new Error(`Cannot use replaced character ${e} as slice start anchor.`);
+    const s = i;
+    for (; i; ) {
+      i.intro && (s !== i || i.start === e) && (r += i.intro);
+      const l = i.start < n && i.end >= n;
+      if (l && i.edited && i.end !== n)
+        throw new Error(`Cannot use replaced character ${n} as slice end anchor.`);
+      const a = s === i ? e - i.start : 0, c = l ? i.content.length + n - i.end : i.content.length;
+      if (r += i.content.slice(a, c), i.outro && (!l || i.end === n) && (r += i.outro), l)
+        break;
+      i = i.next;
+    }
+    return r;
+  }
+  // TODO deprecate this? not really very useful
+  snip(e, n) {
+    const r = this.clone();
+    return r.remove(0, e), r.remove(n, r.original.length), r;
+  }
+  _split(e) {
+    if (this.byStart[e] || this.byEnd[e]) return;
+    let n = this.lastSearchedChunk, r = n;
+    const i = e > n.end;
+    for (; n; ) {
+      if (n.contains(e)) return this._splitChunk(n, e);
+      if (n = i ? this.byStart[n.end] : this.byEnd[n.start], n === r) return;
+      r = n;
+    }
+  }
+  _splitChunk(e, n) {
+    if (e.edited && e.content.length) {
+      const i = Nt(this.original)(n);
+      throw new Error(
+        `Cannot split a chunk that has already been edited (${i.line}:${i.column} – "${e.original}")`
+      );
+    }
+    const r = e.split(n);
+    return this.byEnd[n] = e, this.byStart[n] = r, this.byEnd[r.end] = r, e === this.lastChunk && (this.lastChunk = r), this.lastSearchedChunk = e, !0;
+  }
+  toString() {
+    let e = this.intro, n = this.firstChunk;
+    for (; n; )
+      e += n.toString(), n = n.next;
+    return e + this.outro;
+  }
+  isEmpty() {
+    let e = this.firstChunk;
+    do
+      if (e.intro.length && e.intro.trim() || e.content.length && e.content.trim() || e.outro.length && e.outro.trim())
+        return !1;
+    while (e = e.next);
+    return !0;
+  }
+  length() {
+    let e = this.firstChunk, n = 0;
+    do
+      n += e.intro.length + e.content.length + e.outro.length;
+    while (e = e.next);
+    return n;
+  }
+  trimLines() {
+    return this.trim("[\\r\\n]");
+  }
+  trim(e) {
+    return this.trimStart(e).trimEnd(e);
+  }
+  trimEndAborted(e) {
+    const n = new RegExp((e || "\\s") + "+$");
+    if (this.outro = this.outro.replace(n, ""), this.outro.length) return !0;
+    let r = this.lastChunk;
+    do {
+      const i = r.end, s = r.trimEnd(n);
+      if (r.end !== i && (this.lastChunk === r && (this.lastChunk = r.next), this.byEnd[r.end] = r, this.byStart[r.next.start] = r.next, this.byEnd[r.next.end] = r.next), s) return !0;
+      r = r.previous;
+    } while (r);
+    return !1;
+  }
+  trimEnd(e) {
+    return this.trimEndAborted(e), this;
+  }
+  trimStartAborted(e) {
+    const n = new RegExp("^" + (e || "\\s") + "+");
+    if (this.intro = this.intro.replace(n, ""), this.intro.length) return !0;
+    let r = this.firstChunk;
+    do {
+      const i = r.end, s = r.trimStart(n);
+      if (r.end !== i && (r === this.lastChunk && (this.lastChunk = r.next), this.byEnd[r.end] = r, this.byStart[r.next.start] = r.next, this.byEnd[r.next.end] = r.next), s) return !0;
+      r = r.next;
+    } while (r);
+    return !1;
+  }
+  trimStart(e) {
+    return this.trimStartAborted(e), this;
+  }
+  hasChanged() {
+    return this.original !== this.toString();
+  }
+  _replaceRegexp(e, n) {
+    function r(s, l) {
+      return typeof n == "string" ? n.replace(/\$(\$|&|\d+)/g, (a, c) => c === "$" ? "$" : c === "&" ? s[0] : +c < s.length ? s[+c] : `$${c}`) : n(...s, s.index, l, s.groups);
+    }
+    function i(s, l) {
+      let a;
+      const c = [];
+      for (; a = s.exec(l); )
+        c.push(a);
+      return c;
+    }
+    if (e.global)
+      i(e, this.original).forEach((l) => {
+        if (l.index != null) {
+          const a = r(l, this.original);
+          a !== l[0] && this.overwrite(l.index, l.index + l[0].length, a);
+        }
+      });
+    else {
+      const s = this.original.match(e);
+      if (s && s.index != null) {
+        const l = r(s, this.original);
+        l !== s[0] && this.overwrite(s.index, s.index + s[0].length, l);
+      }
+    }
+    return this;
+  }
+  _replaceString(e, n) {
+    const { original: r } = this, i = r.indexOf(e);
+    return i !== -1 && (typeof n == "function" && (n = n(e, i, r)), e !== n && this.overwrite(i, i + e.length, n)), this;
+  }
+  replace(e, n) {
+    return typeof e == "string" ? this._replaceString(e, n) : this._replaceRegexp(e, n);
+  }
+  _replaceAllString(e, n) {
+    const { original: r } = this, i = e.length;
+    for (let s = r.indexOf(e); s !== -1; s = r.indexOf(e, s + i)) {
+      const l = r.slice(s, s + i);
+      let a = n;
+      typeof n == "function" && (a = n(l, s, r)), l !== a && this.overwrite(s, s + i, a);
+    }
+    return this;
+  }
+  replaceAll(e, n) {
+    if (typeof e == "string")
+      return this._replaceAllString(e, n);
+    if (!e.global)
+      throw new TypeError(
+        "MagicString.prototype.replaceAll called with a non-global RegExp argument"
+      );
+    return this._replaceRegexp(e, n);
+  }
+}
+const ur = "__QWIK_WORKER_QRL__", hr = `${ur}:`, at = "__QWIK_WORKER_CORE__", fr = new RegExp(`${hr}([^"'\\\`\\s]+)`, "g"), lt = (t, e) => `${t.endsWith("/") ? t : `${t}/`}${e}`.replace(/\/{2,}/g, "/"), on = (t) => {
+  const e = t.replace(/\/+$/, ""), n = e.lastIndexOf("/");
+  return n === -1 ? "." : n === 0 ? "/" : e.slice(0, n);
+}, pr = (t, e) => {
+  const n = e.replace(/^\.\//, "");
+  return n === "build" || n.startsWith("build/") || !n.startsWith("../") && /^[^./][^?]*\/build\//.test(n) ? lt(t, n) : new URL(n, `https://qwik.dev${lt(t, "build/")}`).pathname;
+}, gr = (t, e) => {
+  const n = /* @__PURE__ */ new Map();
+  for (const [r, i] of Object.entries(t.symbols)) {
+    const s = t.mapping[r];
+    s && n.set(
+      i.canonicalFilename,
+      e(s)
+    );
+  }
+  return (r) => n.get(
+    r.replace(/^\.\//, "").replace(/\.[^./?]+(?:\?.*)?$/, "")
+  );
+}, sn = (t, e) => t.replace(fr, (n, r) => e(r) ?? n), mr = (t, e) => gr(
+  t,
+  (n) => pr(e, n)
+), vr = (t) => {
+  const e = t.replace(/\\/g, "/"), n = on(e);
+  return (r) => {
+    const [, i = "", s = ""] = /^([^?#]*)(.*)$/.exec(r) ?? [], l = i.replace(/^\.\//, "").replace(/\.[^./?]+(?:\?.*)?$/, ""), a = lt(n, `${l}.js`);
+    return s.startsWith("?") ? `${a}?worker_file&type=module&${s.slice(1)}` : s.startsWith("#") ? `${a}?worker_file&type=module${s}` : `${a}?worker_file&type=module`;
+  };
+}, wr = (t) => t.startsWith(".") ? t : `./${t}`, Ot = (t) => {
+  const e = [];
+  for (const n of t.replace(/\\/g, "/").split("/"))
+    !n || n === "." || (n === ".." && e.length > 0 && e[e.length - 1] !== ".." ? e.pop() : e.push(n));
+  return e;
+}, yr = (t, e) => {
+  const n = t === "." ? [] : Ot(t), r = Ot(e);
+  let i = 0;
+  for (; i < n.length && i < r.length && n[i] === r[i]; )
+    i++;
+  return [...n.slice(i).map(() => ".."), ...r.slice(i)].join("/");
+}, an = (t) => (e) => {
+  const n = yr(on(e), t);
+  return wr(n);
+}, Rt = (t, e) => {
+  if (!t.includes(at))
+    return t;
+  const n = e();
+  return n ? t.replaceAll(at, n) : t;
+}, br = ["server"], Lt = [
+  "onGet",
+  "onPost",
+  "onPut",
+  "onRequest",
+  "onDelete",
+  "onHead",
+  "onOptions",
+  "onPatch",
+  "onStaticGenerate"
+], $t = [
+  "useServer",
+  "route",
+  "server",
+  "action$",
+  "loader$",
+  "zod$",
+  "validator$",
+  "globalAction$"
+], xr = [
+  "useClient",
+  "useBrowser",
+  "useVisibleTask",
+  "client",
+  "browser",
+  "event$"
+];
+var ln = /* @__PURE__ */ ((t) => (t.each = "each", t.show = "show", t.suspense = "suspense", t.valibot = "valibot", t.noSPA = "noSPA", t.insights = "insights", t))(ln || {});
+function cn(t = {}) {
+  const e = `${Math.round(Math.random() * 899) + 100}`, n = /* @__PURE__ */ new Map(), r = /* @__PURE__ */ new Map(), i = /* @__PURE__ */ new Map(), s = /* @__PURE__ */ new Map(), l = /* @__PURE__ */ new Set();
+  let a = null, c, h = () => {
+  };
+  const o = {
+    csr: !1,
+    target: "client",
+    buildMode: "development",
+    debug: !1,
+    rootDir: void 0,
+    tsconfigFileNames: ["./tsconfig.json"],
+    input: void 0,
+    outDir: void 0,
+    assetsDir: void 0,
+    resolveQwikBuild: !0,
+    entryStrategy: void 0,
+    srcDir: void 0,
+    ssrOutDir: void 0,
+    clientOutDir: void 0,
+    sourcemap: !!t.sourcemap,
+    manifestInput: null,
+    manifestInputPath: null,
+    manifestOutput: null,
+    transformedModuleOutput: null,
+    scope: null,
+    devTools: {
+      imageDevTools: !0,
+      clickToSource: ["Alt"],
+      hmr: !0
+    },
+    inlineStylesUpToBytes: 2e4,
+    lint: !1,
+    experimental: void 0
+  };
+  let w, v;
+  const g = async () => {
+    if (!a) {
+      const y = (t._optimizer || await import("@qwik.dev/optimizer")).createOptimizer;
+      if (a = await y(t), w = Sr(a.sys), a.sys.env !== "browsermain" && a.sys.env !== "webworker")
+        try {
+          v === void 0 && (v = await a.sys.dynamicImport("node:fs"));
+        } catch {
+          console.log("node:fs not available, disabling automatic manifest reading"), v = null;
+        }
+    }
+  }, u = () => {
+    if (!a)
+      throw new Error("Qwik plugin has not been initialized");
+    return a;
+  }, p = () => u().sys, d = () => u().sys.path;
+  let b;
+  const O = (y) => {
+    b = y;
+  }, Y = async (y) => {
+    const f = Object.assign({}, y), E = u(), _ = E.sys.path, k = (...P) => J(_.resolve(...P));
+    o.debug = !!f.debug, f.devTools && (o.devTools = {
+      ...o.devTools,
+      ...f.devTools
+    }), f.assetsDir && (o.assetsDir = f.assetsDir), f.target === "ssr" || f.target === "client" || f.target === "lib" || f.target === "test" ? o.target = f.target : o.target ||= "client", o.target === "lib" ? o.buildMode = "development" : f.buildMode === "production" || f.buildMode === "development" ? o.buildMode = f.buildMode : o.buildMode ||= "development", o.csr = !!f.csr, f.entryStrategy && typeof f.entryStrategy == "object" && (o.entryStrategy = { ...f.entryStrategy }), o.entryStrategy || (o.target === "ssr" || o.target === "test" ? o.entryStrategy = { type: "hoist" } : o.target === "lib" ? o.entryStrategy = { type: "inline" } : o.buildMode === "production" ? o.entryStrategy = { type: "smart" } : o.entryStrategy = { type: "segment" }), typeof f.rootDir == "string" && (o.rootDir = f.rootDir), typeof o.rootDir != "string" && (o.rootDir ||= E.sys.cwd()), o.rootDir = k(E.sys.cwd(), o.rootDir);
+    let x = k(o.rootDir, Ir);
+    if (typeof f.srcDir == "string" ? (o.srcDir = k(o.rootDir, f.srcDir), x = o.srcDir) : o.srcDir ||= x, o.srcDir = k(o.rootDir, o.srcDir), Array.isArray(f.tsconfigFileNames) && f.tsconfigFileNames.length > 0 && (o.tsconfigFileNames = f.tsconfigFileNames), !o.csr && !f.input && !o.input && (o.target === "ssr" ? o.input = [k(x, "entry.ssr")] : o.target === "client" ? o.input = [k(x, "root")] : o.input = void 0), f.outDir && (o.outDir = k(o.rootDir, f.outDir)), o.clientOutDir = k(o.rootDir, f.clientOutDir || jt), o.ssrOutDir = k(o.rootDir, f.ssrOutDir || _r), o.target === "ssr" ? o.outDir ||= o.ssrOutDir : o.target === "lib" ? o.outDir ||= k(o.rootDir, Cr) : o.outDir ||= o.clientOutDir, typeof f.manifestOutput == "function" && (o.manifestOutput = f.manifestOutput), f.manifestInput && (o.manifestInput = xt(f.manifestInput) || null), typeof f.transformedModuleOutput == "function" && (o.transformedModuleOutput = f.transformedModuleOutput), f.scope !== void 0)
+      o.scope = f.scope;
+    else if (!o.scope && v) {
+      let P = "";
+      try {
+        let U = o.rootDir;
+        for (; P = _.resolve(U, "package.json"), !await v.promises.stat(P).catch(() => !1); ) {
+          const D = _.resolve(U, "..");
+          if (D === U)
+            break;
+          U = D, P = "";
+        }
+        if (P) {
+          const D = await v.promises.readFile(P, "utf-8"), N = JSON.parse(D);
+          typeof N.name == "string" && (o.scope = N.name);
+        }
+      } catch (U) {
+        console.warn(
+          `could not read ${P || "package.json"} to determine package name, ignoring. (${U})`
+        );
+      }
+    }
+    if (typeof f.resolveQwikBuild == "boolean" && (o.resolveQwikBuild = f.resolveQwikBuild), typeof f.devTools == "object" && ("imageDevTools" in f.devTools && (o.devTools.imageDevTools = f.devTools.imageDevTools), "clickToSource" in f.devTools && (o.devTools.clickToSource = f.devTools.clickToSource)), "inlineStylesUpToBytes" in t && (typeof t.inlineStylesUpToBytes == "number" ? o.inlineStylesUpToBytes = t.inlineStylesUpToBytes : (typeof o.inlineStylesUpToBytes != "number" || o.inlineStylesUpToBytes < 0) && (o.inlineStylesUpToBytes = 0)), typeof f.lint == "boolean" && (o.lint = f.lint), "experimental" in f) {
+      o.experimental = void 0;
+      for (const P of f.experimental ?? [])
+        ln[P] ? (o.experimental ||= {})[P] = !0 : console.error(`Qwik plugin: Unknown experimental feature: ${P}`);
+    }
+    const $ = { ...o };
+    return o.input ||= f.input, o.input && typeof o.input == "string" && (o.input = [o.input]), $;
+  };
+  let L = !1;
+  const m = async (y) => {
+    if (!L) {
+      L = !0;
+      const f = p();
+      if (f.env === "node") {
+        const E = await f.dynamicImport("node:fs");
+        if (!E.existsSync(o.rootDir))
+          throw new Error(`Qwik rootDir "${o.rootDir}" not found.`);
+        if (typeof o.srcDir == "string" && !E.existsSync(o.srcDir))
+          throw new Error(`Qwik srcDir "${o.srcDir}" not found.`);
+        for (const [_, k] of Object.entries(o.input || {}))
+          if (!await y(k))
+            throw new Error(`Qwik input "${k}" not found.`);
+      }
+    }
+  };
+  let S, C = !1;
+  const T = async (y) => {
+    if (j("buildStart()", o.buildMode, o.scope, o.target, o.rootDir, o.srcDir), S = u(), C = !b, S.sys.env === "node" && o.target === "ssr" && o.lint)
+      try {
+        c = await $n(S.sys, o.rootDir, o.tsconfigFileNames);
+      } catch {
+      }
+    if (j("transformedOutputs.clear()"), r.clear(), i.clear(), o.target === "client" && !b) {
+      const f = await y.resolve("@qwik.dev/core/qwikloader.js", void 0, {
+        skipSelf: !0
+      });
+      f && y.emitFile({
+        id: f.id,
+        type: "chunk",
+        preserveSignature: "allow-extension"
+      });
+    }
+  }, I = (y, f) => y.environment ? y.environment.config.consumer === "server" : b ? !!f?.ssr : o.target === "ssr" || o.target === "test", R = (y) => !y && (o.target === "client" || !!b && o.target === "ssr"), W = (y) => !!b && y && (o.target === "client" || o.target === "ssr"), B = (y, f, E = !1) => {
+    if (R(E) && Wn(y, o))
+      throw new Error(Hn(y, f));
+  }, M = (y) => {
+    const f = y.replace(/\\/g, "/");
+    return f.includes(".server") || /(^|\/)server(\/|$)/.test(f);
+  }, Q = (y, f) => {
+    const E = /* @__PURE__ */ new Set(), _ = (x) => {
+      typeof x?.value == "string" && E.add(x.value);
+    }, k = [y.parse(f)];
+    for (; k.length > 0; ) {
+      const x = k.pop();
+      if (!(!x || typeof x != "object" || typeof x.type != "string")) {
+        x.type === "ImportDeclaration" && x.importKind !== "type" || (x.type === "ExportNamedDeclaration" || x.type === "ExportAllDeclaration") && x.exportKind !== "type" || x.type === "ImportExpression" ? _(x.source) : x.type === "CallExpression" && x.callee?.type === "Import" && _(x.arguments?.[0]);
+        for (const $ of Object.keys(x)) {
+          if ($ === "parent")
+            continue;
+          const P = x[$];
+          if (Array.isArray(P))
+            for (const U of P)
+              k.push(U);
+          else
+            k.push(P);
+        }
+      }
+    }
+    return Array.from(E);
+  }, X = async (y, f, E, _ = E) => {
+    if (It(f))
+      for (const k of Q(y, f)) {
+        if (!M(k))
+          continue;
+        B(k, _);
+        const x = await y.resolve(k, E, { skipSelf: !0 });
+        x && B(J(Se(x.id).pathId), _);
+      }
+  }, K = async (y, f, E, _, k = !1) => {
+    const x = d();
+    for (const $ of f.modules) {
+      if (k && !Mt($))
+        continue;
+      const P = J(x.join(E, $.path));
+      await X(y, $.code, P, _ ?? P);
+    }
+  };
+  let te = 0, ne = !1;
+  const ye = async (y, f, E, _) => {
+    if (le(f))
+      return;
+    const k = b && /^(.*)\?editor(:(\d+)(:\d+)?)?$/.exec(f);
+    if (k) {
+      if (!ne) {
+        ne = !0, setTimeout(() => ne = !1, 500);
+        const [, z, q] = k, re = await y.resolve(z, E);
+        if (re) {
+          const ue = y.environment.moduleGraph.getModuleById(re.id)?.file;
+          if (ue) {
+            const ee = `${ue}${q}`;
+            try {
+              console.warn(`Opening in editor: ${ee}`);
+              const he = (await import("launch-editor")).default;
+              he(ee);
+            } catch (he) {
+              console.error(`Failed to open editor: ${he.message}`);
+            }
+          }
+        }
+      }
+      return { id: "\0editor" };
+    }
+    const x = te++, $ = I(y, _);
+    j(`resolveId(${x})`, `begin ${f} | ${$ ? "server" : "client"} | ${E}`);
+    const P = E && Se(E);
+    if (E = P && J(P.pathId), f.startsWith(".") && P) {
+      const z = d(), q = z.dirname(P.pathId);
+      q && (f = z.resolve(q, f));
+    }
+    const U = Se(f), D = J(U.pathId);
+    let N;
+    if (b && _?.scan || B(D, E, $), /**
+     * Check if we know the QRL. During regular builds, we'll encounter and build parents before
+     * their QRLs, so this will always match.
+     */
+    s.get(D))
+      j(`resolveId(${x}) Resolved already known ${D}`), N = {
+        id: D + U.query,
+        moduleSideEffects: !1
+      };
+    else if (
+      /**
+       * Now the requests we handle are for one of the virtual modules, or a QRL segment that hasn't
+       * been transformed yet.
+       */
+      // We test with endsWith because the dev server adds the base pathname
+      D.endsWith(ae)
+    )
+      o.resolveQwikBuild && (j(`resolveId(${x})`, "Resolved", ae), N = {
+        id: ae,
+        moduleSideEffects: !1
+      });
+    else if (D.endsWith(se))
+      console.error(
+        `${E ? `${E}: ` : ""}importing ${se} is deprecated. Use \`getClientManifest()\` instead.`
+      ), j(`resolveId(${x})`, "Resolved", se), N = {
+        id: se,
+        moduleSideEffects: !1
+      };
+    else if (!b && !$ && D.endsWith(nt)) {
+      j(`resolveId(${x})`, "Resolved", nt);
+      const z = await y.resolve(nt, E, {
+        skipSelf: !0
+      });
+      if (z)
+        return y.emitFile({
+          id: z.id,
+          type: "chunk",
+          preserveSignature: "allow-extension"
+        }), z;
+    } else if (D.endsWith(Ie))
+      j(`resolveId(${x})`, "Resolved", Ie), N = {
+        id: Ie,
+        moduleSideEffects: !1
+      };
+    else {
+      if (!$ && C && f.endsWith("@qwik.dev/core")) {
+        C = !1;
+        const q = await y.resolve("@qwik.dev/core/handlers.mjs", E, {
+          skipSelf: !0
+        });
+        if (!q)
+          throw new Error("Failed to resolve @qwik.dev/core/handlers.mjs");
+        y.emitFile({
+          id: q.id,
+          type: "chunk",
+          preserveSignature: "allow-extension"
+        });
+      }
+      const z = /^(?<parent>.*\.[mc]?[jt]sx?)_(?<name>[^/]+)\.js(?<query>$|\?.*$)/.exec(f)?.groups;
+      if (z) {
+        const { parent: q, name: re, query: Ge } = z, ue = await y.resolve(q, E, { skipSelf: !0 });
+        if (ue) {
+          const ee = ue.id.split("?")[0], be = b && E?.endsWith(".html") ? `${ee}_${re}.js` : D;
+          j(`resolveId(${x})`, `resolved to QRL ${re} of ${ee}`), s.set(be, ee), N = {
+            id: be + Ge,
+            // QRL segments can't have side effects. Probably never useful, but it's here for consistency
+            moduleSideEffects: !1
+          };
+        } else
+          console.error(`resolveId(${x})`, `QRL parent ${q} does not exist!`);
+      } else if (E) {
+        const q = s.get(E);
+        if (q)
+          return j(`resolveId(${x}) end`, `resolving via ${q}`), y.resolve(f, q, { skipSelf: !0 });
+      }
+    }
+    return j(`resolveId(${x}) end`, N?.id || N), N;
+  };
+  let A = 0;
+  const de = async (y, f, E) => {
+    if (f === "\0editor")
+      return '"opening in editor"';
+    if (le(f))
+      return;
+    const _ = A++, k = I(y, E), x = Se(f), $ = J(x.pathId);
+    if (B($, void 0, k), f.startsWith("/@fs/"))
+      return;
+    if (o.resolveQwikBuild && f === ae)
+      return j(`load(${_})`, ae, o.buildMode), {
+        moduleSideEffects: !1,
+        code: gt(k, o.target)
+      };
+    if (f === se)
+      return j(`load(${_})`, se, o.buildMode), {
+        moduleSideEffects: !1,
+        code: `import { getClientManifest } from '@qwik.dev/core'; export const manifest = getClientManifest();
+`
+      };
+    if (f === Ie)
+      return j(`load(${_})`, Ie, o.buildMode), {
+        moduleSideEffects: !1,
+        code: "export * from '@qwik.dev/core';"
+      };
+    f = $;
+    const P = k ? i : r;
+    if (b && !P.has(f)) {
+      const D = s.get(f);
+      if (D) {
+        const N = b.moduleGraph.getModuleById(D);
+        if (N) {
+          if (j(`load(${_})`, "transforming QRL parent", D), await b.transformRequest(N.url), !P.has(f))
+            return j(`load(${_})`, `QRL segment ${f} not found in ${D}`), null;
+        } else
+          console.error(`load(${_})`, `module ${D} does not exist in the build graph!`);
+      }
+    }
+    const U = P.get(f);
+    if (U) {
+      j(`load(${_})`, "Found", f);
+      let { code: D } = U[0];
+      const { map: N, segment: z } = U[0], q = U[1];
+      if (b?.hot && q && o.devTools.hmr && z?.ctxName !== "worker$") {
+        const re = q.startsWith(o.rootDir) ? q.slice(o.rootDir.length) : q;
+        D += `
+if (import.meta.hot && typeof document !== 'undefined') {import.meta.hot.accept(()=>{document.dispatchEvent(new CustomEvent('qHmr', {detail: {files:[${JSON.stringify(re)}], t: document.__hmrT}}));});}`;
+      }
+      return { code: D, map: N, meta: { segment: z } };
+    }
+    return j(`load(${_})`, "Not a QRL or virtual module", f), null;
+  };
+  let Z, He = 0;
+  const fn = async function(y, f, E, _ = {}) {
+    if (le(E))
+      return;
+    const k = I(y, _), x = k ? i : r;
+    if (x.has(E))
+      return;
+    let $ = !1;
+    const P = He++, U = u(), D = d(), { pathId: N } = Se(E), z = J(N);
+    B(z, void 0, k);
+    const q = D.parse(N), re = q.dir, Ge = q.base, ue = q.ext.toLowerCase();
+    let ee, he;
+    const be = o.target === "lib" ? "lib" : o.buildMode === "development" ? b?.hot && o.devTools.hmr ? "hmr" : "dev" : "prod";
+    if (be !== "lib" && (f = f.replaceAll(/__EXPERIMENTAL__\.(\w+)/g, (ie, ge) => ($ = !0, o.experimental?.[ge] ? "true" : "false"))), ue in kr || dn.test(N)) {
+      const ie = o.target === "client" || o.target === "ssr";
+      j(
+        `transform(${P})`,
+        `Transforming ${E} (for: ${k ? "server" : "client"}${ie ? ", strip" : ""})`
+      );
+      let ge = Ge;
+      o.srcDir && (ge = D.relative(o.srcDir, N)), ge = J(ge);
+      const xe = o.srcDir ? o.srcDir : J(re), mt = o.entryStrategy;
+      let oe;
+      const vt = y.environment?.moduleGraph ?? b?.moduleGraph;
+      if (vt && (oe = vt.getModuleById(N)?.url, !oe && o.rootDir)) {
+        const F = J(o.rootDir), V = J(N);
+        V.startsWith(F) && (oe = V.slice(F.length), oe.startsWith("/") || (oe = "/" + oe));
+      }
+      const fe = {
+        input: [{ code: f, path: ge, devPath: oe }],
+        entryStrategy: k ? { type: "hoist" } : mt,
+        minify: "simplify",
+        // Always enable sourcemaps in dev for click-to-source
+        sourceMaps: o.sourcemap || o.buildMode === "development",
+        transpileTs: !0,
+        transpileJsx: !0,
+        explicitExtensions: !0,
+        preserveFilenames: !0,
+        srcDir: xe,
+        rootDir: o.rootDir,
+        mode: be,
+        scope: o.scope || void 0,
+        isServer: k
+      };
+      ie && (k ? (fe.stripCtxName = xr, fe.stripEventHandlers = !0, fe.regCtxName = br) : (fe.stripCtxName = $t, fe.stripExports = Lt));
+      const Sn = Date.now(), pe = await U.transformModules(fe);
+      if (j(`transform(${P})`, `done in ${Date.now() - Sn}ms`), oe) {
+        const F = vr(oe);
+        for (const V of pe.modules)
+          V.code = sn(
+            V.code,
+            F
+          );
+      }
+      const Qe = pe.modules.find((F) => !Mt(F));
+      if (R(k))
+        await K(y, pe, xe, z);
+      else if (W(k) && It(f)) {
+        const F = {
+          ...fe,
+          entryStrategy: mt,
+          isServer: !1
+        };
+        ie && (F.stripCtxName = $t, F.stripExports = Lt, F.stripEventHandlers = void 0, F.regCtxName = void 0), await K(
+          y,
+          await U.transformModules(F),
+          xe,
+          z,
+          !0
+        );
+      }
+      h(pe.diagnostics, U, xe), k ? pe.diagnostics.length === 0 && c && c.lint(y, f, E) : n.set(E, pe);
+      const wt = /* @__PURE__ */ new Set();
+      for (const F of pe.modules)
+        if (F !== Qe) {
+          const V = J(D.join(xe, F.path));
+          if (j(`transform(${P})`, `segment ${V}`, F.segment.displayName), s.set(V, E), x.set(V, [F, E]), wt.add(V), b) {
+            const Ke = b.moduleGraph.getModuleById(V);
+            Ke && b.moduleGraph.invalidateModule(Ke);
+          }
+          if (o.target === "client" && !b && y.emitFile({
+            id: V,
+            type: "chunk",
+            preserveSignature: "allow-extension"
+          }), F.segment && l.size > 0)
+            for (const Ke of l)
+              Ke(E, F.segment);
+        }
+      y.addWatchFile(E), f = Qe.code, ee = Qe.map, he = {
+        segment: Qe.segment,
+        qwikdeps: Array.from(wt)
+      }, $ = !0;
+    }
+    if (f.includes(`globalThis.${Ye}`)) {
+      Z === void 0 && (Z = await vn(k));
+      const ie = new ht(f);
+      ie.replace(`!globalThis.${Ye}`, "false"), Z && ie.replace(`globalThis.${Ye}`, Z), f = ie.toString(), ee ||= ie.generateMap({ source: E, includeContent: !1 }), $ = !0, j(`transform(${P})`, `Replaced globalThis.${Ye} with manifest input`);
+    }
+    if ($)
+      return Er(E) && (ee = null), { code: f, map: ee, meta: he };
+    j(`transform(${P})`, "Not transforming", E);
+  }, ft = (y) => {
+    const f = [], E = {
+      addInjection: (_) => f.push(_)
+    };
+    return E.generateManifest = async (_) => {
+      const x = u().sys.path, $ = x.resolve(o.rootDir, o.outDir, "build"), P = (N) => x.relative($, x.resolve(o.rootDir, o.outDir, N));
+      E.canonPath = P;
+      const U = Array.from(n.values()).flatMap((N) => N.modules).map((N) => N.segment).filter((N) => !!N), D = Dn(
+        x,
+        U,
+        f,
+        y,
+        o,
+        j,
+        P
+      );
+      _ && Object.assign(D, _);
+      for (const N of Object.values(D.symbols))
+        N.origin && (N.origin = J(N.origin));
+      for (const N of Object.values(D.bundles))
+        N.origins && (N.origins = N.origins.sort());
+      return D.manifestHash = En(JSON.stringify(D)), D;
+    }, E;
+  }, pn = () => o, pt = () => Array.from(r.values()).map((y) => y[0]), j = (...y) => {
+    o.debug && console.debug(`[QWIK PLUGIN: ${e}]`, ...y);
+  }, gn = (...y) => {
+    console.log(`[QWIK PLUGIN: ${e}]`, ...y);
+  }, mn = (y) => {
+    h = y;
+  }, J = (y) => w(y);
+  function gt(y, f) {
+    const E = o.buildMode === "development";
+    return E ? `// @qwik.dev/core/build
+export const isBrowser = /*#__PURE__*/ (() =>
+  typeof window !== 'undefined' &&
+  typeof HTMLElement !== 'undefined' &&
+  !!window.document &&
+  String(HTMLElement).includes('[native code]'))();
+export const isServer = !isBrowser;
+export const isDev = true;
+` : `// @qwik.dev/core/build
+export const isServer = ${JSON.stringify(y)};
+export const isBrowser = ${JSON.stringify(!y)};
+export const isDev = ${JSON.stringify(E)};
+`;
+  }
+  async function vn(y) {
+    if (!o.manifestInput && o.target === "ssr" && o.buildMode === "production" && v) {
+      const _ = d();
+      let k = o.manifestInputPath || _.resolve(o.clientOutDir, rt);
+      await v.promises.stat(k).catch(() => !1) || (k = _.resolve(o.rootDir, jt, rt));
+      try {
+        const x = await v.promises.readFile(k, "utf-8");
+        o.manifestInput = xt(JSON.parse(x)) || null, console.info("Read client manifest from", k);
+      } catch (x) {
+        console.warn(
+          `
+==========
+Could not read Qwik client manifest ${k}.
+Make sure you provide it to the qwikVite plugin via the \`manifestInput\` \`manifestInputPath\`  arguments, or to the SSR renderer via the \`manifest\` argument, or define it in \`globalThis.__QWIK_MANIFEST__\` before the server bundle is loaded, or embed it in the server bundle by replacing \`globalThis.__QWIK_MANIFEST__\`.
+Without the manifest, the SSR renderer will not be able to generate event handlers.
+(${x})
+==========
+`
+        );
+      }
+    }
+    const f = y ? o.manifestInput : null;
+    let E = null;
+    return f?.manifestHash && (E = {
+      manifestHash: f.manifestHash,
+      core: f.core,
+      preloader: f.preloader,
+      qwikLoader: f.qwikLoader,
+      bundleGraphAsset: f.bundleGraphAsset,
+      injections: f.injections,
+      mapping: f.mapping,
+      bundleGraph: f.bundleGraph
+    }), E && JSON.stringify(E);
+  }
+  function wn(y) {
+    o.sourcemap = y;
+  }
+  function yn(y, f) {
+    const E = y.name === "ssr";
+    j("hotUpdate()", f.file, y.name);
+    const _ = E ? i : r;
+    for (const k of f.modules) {
+      const { id: x } = k;
+      if (x) {
+        j("hotUpdate()", `invalidate ${x}`), n.delete(x);
+        for (const [$, [P, U]] of _)
+          if (U === x) {
+            j("hotUpdate()", `invalidate ${x} segment ${$}`), _.delete($);
+            const D = y.moduleGraph.getModuleById($);
+            D && y.moduleGraph.invalidateModule(D);
+          }
+      }
+    }
+  }
+  const bn = (y, { getModuleInfo: f }) => {
+    if (o.target === "client") {
+      if (
+        // The preloader has to stay in a separate chunk if it's a client build
+        y.endsWith("@qwik.dev/core/build") || /[/\\](core|qwik)[/\\]dist[/\\]preloader\.[cm]js$/.test(y)
+      )
+        return "qwik-preloader";
+      if (
+        // likewise, core and handlers have to be in the same chunk so there's no import waterfall
+        /[/\\](core|qwik)[/\\](handlers|dist[/\\]core(\.prod|\.min)?)\.[cm]js$/.test(y)
+      )
+        return "qwik-core";
+      if (/[/\\](core|qwik)[/\\]dist[/\\]qwikloader\.js$/.test(y))
+        return "qwik-loader";
+    }
+    const E = f(y);
+    if (E) {
+      const _ = E.meta.segment;
+      if (_) {
+        if (["qwikify$", "useVisibleTask$", "useComputed$"].includes(_.ctxName))
+          return null;
+        const { hash: k } = _, x = o.entryStrategy.manual?.[k] || _.entry;
+        if (x)
+          return x;
+      }
+    }
+    return null;
+  };
+  async function xn(y, f, E, _) {
+    const x = await ft(f).generateManifest(_);
+    x.platform = {
+      ..._?.platform,
+      rollup: y.meta?.rollupVersion || "",
+      env: S.sys.env,
+      os: S.sys.os
+    }, S.sys.env === "node" && (x.platform.node = process.versions.node);
+    const $ = Ln(x, E), P = y.emitFile({
+      type: "asset",
+      name: "bundle-graph.json",
+      source: JSON.stringify($)
+    }), U = y.getFileName(P);
+    x.bundleGraphAsset = U, x.assets[U] = {
+      name: "bundle-graph.json",
+      size: $.length
+    };
+    const D = JSON.stringify(x, null, "	");
+    return y.emitFile({
+      fileName: rt,
+      type: "asset",
+      source: D
+    }), typeof o.manifestOutput == "function" && await o.manifestOutput(x), typeof o.transformedModuleOutput == "function" && await o.transformedModuleOutput(pt()), x;
+  }
+  return {
+    buildStart: T,
+    createOutputAnalyzer: ft,
+    getQwikBuildModule: gt,
+    getOptimizer: u,
+    getOptions: pn,
+    getPath: d,
+    getSys: p,
+    getTransformedOutputs: pt,
+    init: g,
+    load: de,
+    debug: j,
+    log: gn,
+    normalizeOptions: Y,
+    normalizePath: J,
+    onDiagnostics: mn,
+    resolveId: ye,
+    segmentCallbacks: l,
+    transform: fn,
+    validateSource: m,
+    setSourceMapSupport: wn,
+    configureServer: O,
+    hotUpdate: yn,
+    manualChunks: bn,
+    generateManifest: xn
+  };
+}
+const Sr = (t) => (e) => typeof e == "string" ? Yn(t.os) ? (e.startsWith("\\\\?\\") || /[^\u0000-\u0080]+/.test(e) || (e = e.replace(/\\/g, "/")), t.path.posix.normalize(e)) : t.path.normalize(e) : e;
+function Mt(t) {
+  return t.isEntry || t.segment;
+}
+const Er = (t) => t.startsWith("virtual:"), kr = {
+  ".jsx": !0,
+  ".ts": !0,
+  ".tsx": !0
+}, dn = /\.qwik\.[mc]?js$/, ve = "@qwik.dev/core", we = "@qwik.dev/core/internal", ae = "@qwik.dev/core/build", ct = "@qwik.dev/core/jsx-runtime", dt = "@qwik.dev/core/jsx-dev-runtime", Je = "@qwik.dev/core/server", se = "@qwik-client-manifest", nt = "@qwik.dev/core/preloader", Ie = "@qwik-handlers", Ir = "src", jt = "dist", _r = "server", Cr = "lib", rt = "q-manifest.json", Ye = "__QWIK_MANIFEST__";
+async function Tr(t, e, n) {
+  if (t.env === "browsermain" || t.env === "webworker")
+    return;
+  const r = await t.dynamicImport("node:fs");
+  let i = n;
+  for (; i; ) {
+    const s = t.path.join(i, "node_modules", e, "package.json");
+    try {
+      return await r.promises.access(s), r.promises.realpath(s);
+    } catch {
+    }
+    const l = t.path.dirname(i);
+    if (l === i)
+      break;
+    i = l;
+  }
+}
+function co(t = {}) {
+  const e = cn(t.optimizerOptions);
+  return {
+    name: "rollup-plugin-qwik",
+    api: {
+      getOptimizer: () => e.getOptimizer(),
+      getOptions: () => e.getOptions()
+    },
+    async options(r) {
+      await e.init();
+      const i = r.onwarn;
+      r.onwarn = (a, c) => {
+        a.plugin === "typescript" && a.message.includes("outputToFilesystem") || (i ? i(a, c) : c(a));
+      };
+      const s = {
+        csr: t.csr,
+        target: t.target,
+        buildMode: t.buildMode,
+        debug: t.debug,
+        entryStrategy: t.entryStrategy,
+        rootDir: t.rootDir,
+        srcDir: t.srcDir,
+        srcInputs: t.srcInputs,
+        input: r.input,
+        resolveQwikBuild: !0,
+        manifestOutput: t.manifestOutput,
+        manifestInput: t.manifestInput,
+        transformedModuleOutput: t.transformedModuleOutput,
+        inlineStylesUpToBytes: t.optimizerOptions?.inlineStylesUpToBytes,
+        lint: t.lint,
+        experimental: t.experimental
+      };
+      await e.normalizeOptions(s);
+      const { input: l } = e.getOptions();
+      return r.input = l, r;
+    },
+    outputOptions(r) {
+      return ut(
+        e,
+        r,
+        !1,
+        e.getOptions().outDir
+      );
+    },
+    async buildStart() {
+      e.onDiagnostics((r, i, s) => {
+        r.forEach((l) => {
+          const a = e.normalizePath(i.sys.path.join(s, l.file));
+          l.category === "error" ? this.error(et(a, l)) : this.warn(et(a, l));
+        });
+      }), await e.buildStart(this);
+    },
+    resolveId(r, i) {
+      return le(r) ? null : e.resolveId(this, r, i);
+    },
+    load(r) {
+      return le(r) ? null : e.load(this, r);
+    },
+    transform(r, i) {
+      return le(i) ? null : e.transform(this, r, i);
+    },
+    async generateBundle(r, i) {
+      e.getOptions().target === "client" && await e.generateManifest(this, i);
+    }
+  };
+}
+async function Pr(t, e, n) {
+  return Array.isArray(e) ? (e.length || e.push({}), await Promise.all(
+    e.map(
+      (r) => ut(t, r, n)
+    )
+  )) : ut(t, e, n);
+}
+const Dr = (t) => t ? `${t.replace(/\/+$/, "")}/` : "", Nr = (t) => `${Dr(t)}build/`, Or = (t, e, n) => {
+  const r = Nr(t);
+  return e.buildMode === "production" && !e.debug ? `${r}q-[hash].js` : (i) => {
+    if (i.moduleIds?.some((a) => /core\.(prod|min)\.mjs$/.test(a)))
+      return `${r}core.js`;
+    if (i.moduleIds?.some((a) => /qwik-router\/lib\/index\.qwik\.mjs$/.test(a)))
+      return `${r}qwik-router.js`;
+    const l = n.sys.path.relative(n.sys.cwd(), i.name).replace(/^(\.\.\/)+/, "").replace(/^\/+/, "").replace(/\//g, "-");
+    return `${r}${l}.js`;
+  };
+};
+async function ut(t, e, n, r) {
+  const i = { ...e }, s = t.getOptions(), l = t.getOptimizer(), a = t.manualChunks;
+  i.assetFileNames || (i.assetFileNames = `${n ? `${s.assetsDir}/` : ""}assets/[hash]-[name].[ext]`);
+  const c = Or(n ? `${s.assetsDir}` : "", s, l);
+  if (s.target === "client") {
+    i.entryFileNames || (i.entryFileNames = c), i.chunkFileNames || (i.chunkFileNames = c), i.format = "es";
+    const o = i.manualChunks;
+    if (o && typeof o != "function")
+      throw new Error("manualChunks must be a function");
+    i.manualChunks = o ? (w, v) => o(w, v) || a(w, v) : a;
+  } else
+    i.chunkFileNames || (i.chunkFileNames = c);
+  !i.dir && r && (i.dir = r), i.format === "cjs" && typeof i.exports != "string" && (i.exports = "auto"), i.hoistTransitiveImports = !1;
+  const h = await Tr(l.sys, "rollup", l.sys.cwd());
+  if (h)
+    try {
+      const w = await (await l.sys.dynamicImport("node:fs")).promises.readFile(h, "utf-8"), v = JSON.parse(w), g = String(v?.version || ""), [u, p, d] = g.split(".").map((O) => parseInt(O, 10));
+      Number.isFinite(u) && (u > 4 || u === 4 && (p > 52 || p === 52 && (d || 0) >= 0)) ? i.onlyExplicitManualChunks = !0 : console.warn(
+        `⚠️ We detected that you're using a Rollup version prior to 4.52.0 (${g}). For the latest and greatest, we recommend to let Vite install the latest version for you, or manually install the latest version of Rollup in your project if that doesn't work. It will enable the new Rollup \`outputOpts.onlyExplicitManualChunks\` feature flag, which improves preloading performance and reduces cache invalidation for a snappier user experience.`
+      );
+    } catch {
+    }
+  return i;
+}
+function et(t, e) {
+  const n = e.highlights?.[0];
+  return Object.assign(new Error(e.message), {
+    id: t,
+    plugin: "qwik",
+    loc: n && {
+      column: n.startCol,
+      line: n.startLine
+    },
+    stack: ""
+  });
+}
+const Rr = `"undefined"==typeof window||window.__qwikViteLog||(window.__qwikViteLog=!0,console.debug("%c⭐️ Qwik Dev SSR Mode","background: #0c75d2; color: white; padding: 2px 3px; border-radius: 2px; font-size: 0.8em;","App is running in SSR development mode!\\n - Additional JS is loaded by Vite for debugging and live reloading\\n - Rendering performance might not be optimal\\n - Delayed interactivity because prefetching is disabled\\n - Vite dev bundles do not represent production output\\n\\nProduction build can be tested running 'npm run preview'"))`, Lr = 'if("undefined"!=typeof document){const e=()=>{const e="data-qwik-inspector",t=globalThis.__HOTKEYS__,o=globalThis.__BASE__;let n=document.querySelector("#qwik-inspector-info-popup");n||(n=document.createElement("div"),n.id="qwik-inspector-info-popup",n["aria-hidden"]="true",document.body.appendChild(n)),n.textContent=`Click-to-Source: ${t.join(" + ")}`,console.debug("%c🔍 Qwik Click-To-Source","background: #564CE0; color: white; padding: 2px 3px; border-radius: 2px; font-size: 0.8em;",`Hold-press the \'${t.join(" + ")}\' key${t.length>1?"s":""} and click a component to jump directly to the source code in your IDE!`),window.__qwik_inspector_state={pressedKeys:new Set};const r=document.body,i=document.createElement("div");function s(t){return t&&t instanceof Element?t.closest(`[${e}]`):null}function d(){const e=window.__qwik_inspector_state.hoveredElement;if(e&&c()){const t=e.getBoundingClientRect();i.style.setProperty("height",t.height+"px"),i.style.setProperty("width",t.width+"px"),i.style.setProperty("top",t.top+"px"),i.style.setProperty("left",t.left+"px"),i.style.setProperty("visibility","visible"),r.style.setProperty("cursor","pointer")}else i.style.setProperty("height","0px"),i.style.setProperty("width","0px"),i.style.setProperty("visibility","hidden"),r.style.removeProperty("cursor")}function c(){return function(){const e=Array.from(window.__qwik_inspector_state.pressedKeys).map(e=>e?e.replace(/(Left|Right)$/g,""):void 0);return t.every(t=>e.includes(t))}()}i.id="qwik-inspector-overlay",i.setAttribute("aria-hidden","true"),r.appendChild(i),document.addEventListener("keydown",e=>{window.__qwik_inspector_state.pressedKeys.add(e.code),d()},{capture:!0}),document.addEventListener("keyup",e=>{window.__qwik_inspector_state.pressedKeys.delete(e.code),d()},{capture:!0}),window.addEventListener("blur",()=>{window.__qwik_inspector_state.pressedKeys.clear(),d()},{capture:!0}),document.addEventListener("mouseover",e=>{const t=s(e.target);window.__qwik_inspector_state.hoveredElement=t||void 0,d()},{capture:!0}),document.addEventListener("click",t=>{if(c()){window.__qwik_inspector_state.pressedKeys.clear();const n=s(t.target);if(n){t.preventDefault(),t.stopPropagation();const i=n.getAttribute(e);if("false"!==i){r.style.setProperty("cursor","progress");const e=i.match(/^(.*?)(:\\d+(:\\d+)?)?$/);if(e){const[,t,n]=e;fetch(`${o}${t}?editor${n}`,{cache:"no-cache"}).then(e=>{r.style.removeProperty("cursor"),e.blob()})}}}}},{capture:!0}),document.addEventListener("contextmenu",e=>{if(c()){window.__qwik_inspector_state.pressedKeys.clear();s(e.target)&&e.preventDefault()}},{capture:!0}),window.addEventListener("resize",d),document.addEventListener("scroll",d)};document.addEventListener("DOMContentLoaded",e)}', $r = `if("undefined"!=typeof HTMLElement){class e extends HTMLElement{get _root(){return this.shadowRoot||this}constructor(){super(),this.state={},this.props||(this.props={}),this.componentProps=["children","error"],this.nodesToDestroy=[],this.pendingUpdate=!1,this.attachShadow({mode:"open"})}destroyAnyNodes(){this.nodesToDestroy.forEach(e=>e.remove()),this.nodesToDestroy=[]}connectedCallback(){this.getAttributeNames().forEach(e=>{const t=e.replace(/-/g,""),o=new RegExp(t,"i");this.componentProps.forEach(t=>{if(o.test(t)){const o=this.getAttribute(e);this.props[t]!==o&&(this.props[t]=o)}})}),this._root.innerHTML='\\n\\n        <template data-el="show-errored-host">\\n        <div class="error">\\n          <template data-el="div-errored-host-2">\\n            \\x3c!-- String(props.error) --\\x3e\\n          </template>\\n        </div>\\n        </template>\\n\\n        <div class="arrow">👇 Uncaught error happened here 👇\\n          <span class="dev-tools">DevTools: Cmd+Alt+I</span>\\n        </div>\\n        <div class="div">\\n          <slot></slot>\\n        </div>\\n\\n        <style>\\n          .error {\\n            border-radius: 5px 5px 0px 0;\\n            background: black;\\n            color: white;\\n            font-family: monospace;\\n            font-size: 12px;\\n            margin: 0;\\n            padding: 10px;\\n          }\\n          .arrow {\\n            background: #f47e81;\\n            color: black;\\n            font-size: 14px;\\n            padding: 10px;\\n            text-align: center;\\n            font-family: sans-serif;\\n          }\\n          .dev-tools {\\n            background: red;\\n            padding: 2px 5px;\\n            border-radius: 3px;\\n            font-weight: 800;\\n          }\\n          .div {\\n            outline: 5px solid red;\\n            border-radius: 10px;\\n          }\\n        </style>',this.pendingUpdate=!0,this.render(),this.onMount(),this.pendingUpdate=!1,this.update()}showContent(e){const t=e.content.cloneNode(!0);Array.from(t.childNodes).forEach(t=>{e?.scope&&(t.scope=e.scope),e?.context&&(t.context=e.context),this.nodesToDestroy.push(t)}),e.after(t)}onMount(){}onUpdate(){}update(){!0!==this.pendingUpdate&&(this.pendingUpdate=!0,this.render(),this.onUpdate(),this.pendingUpdate=!1)}render(){this.destroyAnyNodes(),this.updateBindings()}updateBindings(){this._root.querySelectorAll("[data-el='show-errored-host']").forEach(e=>{this.props.error&&this.showContent(e)}),this._root.querySelectorAll("[data-el='div-errored-host-2']").forEach(e=>{this.renderTextNode(e,String(this.props.error))})}renderTextNode(e,t){const o=document.createTextNode(t);e?.scope&&(o.scope=e.scope),e?.context&&(o.context=e.context),e.after(o),this.nodesToDestroy.push(e.nextSibling)}}customElements.define("errored-host",e),document.addEventListener("qerror",e=>{const t=customElements.get("vite-error-overlay");if(!t)return;const o=new t(e.detail.error);document.body.appendChild(o)})}`, Mr = '[data-qwik-cls]{outline:2px solid red}[data-qwik-cls]:after{position:absolute;font-size:12px;content:"CLS " attr(data-qwik-cls);font-family:monospace;font-weight:700;background:red;color:#fff;margin:-2px;padding:1px;line-height:1;pointer-events:none}#qwik-image-warning-container{position:absolute!important;top:0!important;left:0!important;width:0!important;overflow:visible!important;height:0!important;pointer-events:none!important;contain:size layout style content;z-index:1}', jr = 'if("undefined"!=typeof document){const e=()=>{class e extends HTMLElement{#e=null;constructor(){super(),this.attachShadow({mode:"open"}),this.shadowRoot.appendChild(document.createElement("template").innerHTML=globalThis.__TEMPLATE__);const e=this.shadowRoot.querySelector("dialog");this.shadowRoot.addEventListener("click",async t=>{const o=t.target;"BUTTON"===o.nodeName&&("action-btn"===o.id?this.#e&&(this.#e(),e.close()):"icon"===o.id?e.open?e.close():(e.className=function(e){const{x:t}=e.getBoundingClientRect();let o="right";return t>window.innerWidth-260&&(o="left"),`bottom ${o}`}(o),e.show()):"loc"===o.id&&o.dataset.url&&globalThis.qwikOpenInEditor(o.dataset.url))})}set loc(e){const t=this.shadowRoot.querySelector("#loc");t.textContent=e,globalThis.qwikOpenInEditor&&(t.dataset.url=e)}set header(e){this.shadowRoot.querySelector("#title").textContent=e}set message(e){this.shadowRoot.querySelector("#message").innerHTML=e}set actionFn(e){this.#e=e}set actionName(e){e&&(this.shadowRoot.querySelector(".action-container").innerHTML=`<button id="action-btn" type="button">${e}</button>`)}}customElements.define("image-warning",e);const t=new Map;let o=document.querySelector("#qwik-image-warning-container");o||(o=document.createElement("div"),o.id="qwik-image-warning-container",document.body.appendChild(o));let n=!1;const i=new Map;function r(e){let t=i.get(e);return void 0===t&&(t=async function(e){if(!/^(https?|file|capacitor):/.test(e))return;const t=new URL("/__image_info",location.href);return t.searchParams.set("url",e),fetch(t).then(e=>e.json()).catch(()=>null)}(e),i.set(e,t)),t}function a(e){return e.endsWith("px")}async function s(e){const i=t.get(e);e.isConnected?e.complete&&async function(e){const i=window.scrollX,s=window.scrollY,c=e.getBoundingClientRect(),d=e.currentSrc,l=await r(d);let h=t.get(e);const u=window.innerWidth>500;if(l&&u){let r=!1;const d=e.getAttribute("data-qwik-inspector"),u=c.width*c.height;if(!e.hasAttribute("width")||!e.hasAttribute("height")){n=!0;const t=getComputedStyle(e),o="auto"!==t.getPropertyValue("aspect-ratio").toString(),i=a(t.getPropertyValue("width").toString()),s=a(t.getPropertyValue("height").toString()),c="absolute"===t.getPropertyValue("position").toString();r=u>1e3&&!c&&!o&&(!i||!s)}const g=u<.5*(l.width&&l.height)&&"svg"!==l.type;if(n=!1,r||g){if(h||(h=document.createElement("image-warning"),o.appendChild(h),t.set(e,h)),h.style.top=c.top+s+"px",h.style.left=c.left+i+"px",h.style.width=c.width+"px",h.style.height=c.height+"px",h.info=l,h.loc=d,r){const t=`width="${l.width}" height="${l.height}"`;h.header="Perf: layout shift",h.message=`Image\'s size is unknown until it\'s loaded, <a href="https://web.dev/cls/" target="_blank" rel="noopener noreferrer">causing layout shift</a>.</p><p>To solve this problem set the width/height in the img tag:</p><pre>&lt;img <span>${t}</span></pre>`;const o=1===document.querySelectorAll(\'[data-qwik-inspector="\'+d+\'"]\').length;d&&(o?(h.actionName="Auto fix",h.actionFn=async()=>{const t=new URL("/__image_fix",location.href);t.searchParams.set("loc",d),t.searchParams.set("width",l.width),t.searchParams.set("height",l.height),e.srcset||(t.searchParams.set("src",e.currentSrc),t.searchParams.set("currentHref",location.href)),await fetch(t,{method:"POST"})}):(h.actionName="Open in editor",h.actionFn=async()=>{await navigator.clipboard.writeText(t),globalThis.qwikOpenInEditor(d)}))}else g&&(h.header="Perf: properly size image",h.message=`The image is too big, <a href="https://developer.chrome.com/en/docs/lighthouse/performance/uses-responsive-images/" target="_blank" rel="noopener noreferrer">hurting performance</a>, it should be resized to the size it\'s displayed at. The image dimensions are ${l.width} x ${l.height} but it\'s displayed at ${c.width}x${c.height}.</p>`);return}}h&&(h.remove(),t.delete(e))}(e):i&&(i.remove(),t.delete(e))}const c=new ResizeObserver(e=>{if(!n)for(const t of e)s(t.target)}),d=new MutationObserver(e=>{for(const t of e){for(const e of t.addedNodes)"IMG"===e.nodeName?c.observe(e):1===e.nodeType&&e.querySelectorAll("img").forEach(e=>{c.observe(e)});for(const e of t.removedNodes)"IMG"===e.nodeName?(s(e),c.unobserve(e)):1===e.nodeType&&e.querySelectorAll("img").forEach(e=>{s(e),c.unobserve(e)})}});let l,h=0;const u=()=>{setTimeout(()=>{l&&(l.disconnect(),h>.005&&console.error("Detected Layout Shift during page load",h)),d.observe(document.body,{childList:!0,subtree:!0}),document.body.querySelectorAll("img").forEach(e=>{c.observe(e)})},100)};"complete"===document.readyState?u():window.addEventListener("load",u);const g=1===performance?.navigation.type||performance.getEntriesByType("navigation").map(e=>e.type).includes("reload");"undefined"==typeof PerformanceObserver||g||(l=new PerformanceObserver(e=>{e.getEntries().forEach(e=>{if(!e.hadRecentInput){if(e.value>.006)for(const t of e.sources)t.node&&1===t.node.nodeType&&"IMAGE-WARNING"!==t.node.nodeName&&t.node.setAttribute("data-qwik-cls",Number(e.value).toFixed(3));h+=e.value}})}),l.observe({type:"layout-shift",buffered:!0}))};document.addEventListener("load",e)}', Ur = `<style>
+  :host {
+    position: absolute;
+    border: 1px solid red;
+    pointer-events: none;
+    z-index: 1;
+    contain: layout size;
+  }
+
+  #icon {
+    border: 0;
+    margin: 5px;
+    color: black;
+    max-width: 100%;
+    width: 20px;
+    background: yellow;
+    border-radius: 100%;
+    height: 20px;
+    padding: 3px;
+    pointer-events: all;
+    cursor: pointer;
+  }
+
+  #icon svg {
+    width: 100%;
+    height: auto;
+    pointer-events: none;
+  }
+
+  dialog {
+    padding: 0;
+    border: 0;
+    margin: 0 5px;
+    background: #ffffe8;
+    color: black;
+    width: 250px;
+    font-size: 11px;
+    position: absolute;
+    inset-inline-start: unset;
+    inset-inline-end: unset;
+    border-radius: 5px;
+    pointer-events: all;
+    overflow: hidden;
+    box-shadow: 0px -2px 20px 0px #0000002e;
+    z-index: 10000;
+  }
+
+  .top {
+    bottom: calc(100% + 5px);
+  }
+  .bottom {
+    top: 40px;
+  }
+  .right {
+    inset-inline-start: 0;
+    inset-inline-end: unset;
+  }
+  .left {
+    inset-inline-start: unset;
+    inset-inline-end: calc(100% - 40px);
+  }
+
+  .content {
+    padding: 5px;
+  }
+
+  #loc {
+    background: #2e3801;
+    color: #d2d2d2;
+    font-family: monospace;
+    padding: 3px 5px;
+    pointer-events: all;
+    margin: 0;
+    border: 0;
+    cursor: pointer;
+    font-size: 11px;
+    width: calc(100% - 24px);
+    text-overflow: ellipsis;
+    overflow: hidden;
+    display: block;
+    direction: rtl;
+    text-align: right;
+  }
+  #loc:hover {
+    background: #3a4a01;
+  }
+
+  pre {
+    background: #f1fb8e;
+    padding: 5px;
+    margin: 5px 0;
+    border-radius: 3px;
+    user-select: none;
+  }
+
+  pre span {
+    user-select: all;
+  }
+
+  a {
+    text-decoration: underline;
+  }
+
+  #close {
+    border: 0;
+    width: 25px;
+    height: 25px;
+    position: absolute;
+    right: 0;
+    top: 0;
+    background: #ffe14f;
+    color: black;
+    font-weight: 900;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    cursor: pointer;
+  }
+  #close:hover {
+    background: #ffeb6f;
+  }
+
+  #action-btn {
+    border: 2px solid #18ae00;
+    padding: 2px 4px;
+    background: #50ff50;
+    border-radius: 5px;
+    color: #0c5500;
+    font-weight: 800;
+    font-size: 10px;
+    cursor: pointer;
+  }
+
+  p {
+    margin: 5px 0;
+  }
+
+  h2 {
+    font-weight: 900;
+    margin: 10px 0;
+  }
+</style>
+<button id="icon" type="button" aria-label="Open image dev dialog">
+  <svg width="32" height="32" viewBox="0 0 24 24">
+    <path
+      fill="currentColor"
+      d="M2.725 21q-.275 0-.5-.138t-.35-.362q-.125-.225-.138-.488t.138-.512l9.25-16q.15-.25.388-.375T12 3q.25 0 .488.125t.387.375l9.25 16q.15.25.138.513t-.138.487q-.125.225-.35.363t-.5.137H2.725ZM12 18q.425 0 .713-.288T13 17q0-.425-.288-.713T12 16q-.425 0-.713.288T11 17q0 .425.288.713T12 18Zm0-3q.425 0 .713-.288T13 14v-3q0-.425-.288-.713T12 10q-.425 0-.713.288T11 11v3q0 .425.288.713T12 15Z"
+    />
+  </svg>
+</button>
+<dialog>
+  <form method="dialog">
+    <button id="close" type="submit" aria-label="Close">X</button>
+  </form>
+  <button id="loc"></button>
+  <div class="content">
+    <h2 id="title"></h2>
+    <p id="message"></p>
+    <p class="action-container"></p>
+  </div>
+</dialog>
+`, qr = `vite-error-overlay{--color-bright: rgba(255, 255, 255, .8);--color-yellow: rgba(255, 246, 85, .8);--qwik-dark-blue: #006ce9;--qwik-light-blue: #3ec2f7;--qwik-light-purple: #ac7ff4;--qwik-dark-purple: #713fc2;--yellow: #fff;--purple: var(--color-bright);--red: var(--qwik-light-blue);--vertical-box-spacing: 15px;--box-padding: 20px;--box-margin: 0 0 var(--vertical-box-spacing) 0;--box-background: rgba(0, 0, 0, .5);--box-border-radius: 8px}vite-error-overlay::part(backdrop){background:#020b1199}vite-error-overlay::part(window){background:transparent;border:none;box-shadow:none;box-sizing:border-box;margin:50px auto;max-width:1200px;padding:var(--box-padding);width:90%}vite-error-overlay::part(message){display:flex;flex-direction:column;font-size:1.6rem;line-height:1.7;margin-bottom:30px}vite-error-overlay::part(plugin){font-size:.8rem;font-weight:100}vite-error-overlay::part(file),vite-error-overlay::part(frame),vite-error-overlay::part(stack),vite-error-overlay::part(tip){background:var(--box-background);border-left:5px solid transparent;border-radius:var(--box-border-radius);margin:var(--box-margin);min-height:50px;padding:var(--box-padding);position:relative}vite-error-overlay::part(file){border-left-color:#19b6f6;color:var(--color-bright)}vite-error-overlay::part(frame){border-left-color:var(--color-yellow);color:var(--color-yellow)}vite-error-overlay::part(stack){border-left-color:#ff5722}vite-error-overlay::part(tip){border-top:none;border-left-color:#ac7ff4}vite-error-overlay::part(file):before,vite-error-overlay::part(frame):before,vite-error-overlay::part(stack):before{border-bottom:1px solid #222;color:var(--color-bright);display:block;margin-bottom:15px;padding-bottom:5px;padding-left:30px;font-size:.8rem}vite-error-overlay::part(file):before{content:"File"}vite-error-overlay::part(frame):before{content:"Frame"}vite-error-overlay::part(stack):before{content:"Stack Trace"}vite-error-overlay::part(file):after,vite-error-overlay::part(frame):after,vite-error-overlay::part(stack):after{content:"";display:block;height:20px;position:absolute;left:var(--box-padding);top:var(--box-padding);width:20px}vite-error-overlay::part(file):after{background-image:url("data:image/svg+xml,%3Csvg width='20px' height='20px' viewBox='0 0 24 24' version='1.1' xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink'%3E%3Ctitle%3EFile-Generic%3C/title%3E%3Cg id='Page-1' stroke='none' stroke-width='1' fill='none' fill-rule='evenodd'%3E%3Cg id='File-Generic'%3E%3Crect id='Rectangle' fill-rule='nonzero' x='0' y='0' width='24' height='24'%3E%3C/rect%3E%3Cpath d='M4 5 C4 3.89543 4.89543 3 6 3 L15.1716 3 C15.702 3 16.2107 3.21071 16.5858 3.58579 L19.4142 6.41421 C19.7893 6.78929 20 7.29799 20 7.82843 L20 19 C20 20.1046 19.1046 21 18 21 L6 21 C4.89543 21 4 20.1046 4 19 L4 5 Z' id='Path' stroke='rgba(255,255,255,0.7)' stroke-width='1' stroke-linecap='round'%3E%3C/path%3E%3Cpath d='M15 4 L15 6 C15 7.10457 15.8954 8 17 8 L19 8' id='Path' stroke='rgba(255,255,255,0.7)' stroke-width='1' stroke-linecap='round'%3E%3C/path%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}vite-error-overlay::part(frame):after{background-image:url("data:image/svg+xml,%3Csvg width='20px' height='20px' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M15.6602 2.84952H19.1516C20.2555 2.84952 21.1504 3.74444 21.1504 4.84839V8.3398' stroke='rgba(255,255,255,0.7)' stroke-width='1.69904' stroke-linecap='round'/%3E%3Cpath d='M2.84949 8.33981L2.84949 4.8484C2.84949 3.74446 3.74441 2.84953 4.84836 2.84953L8.33977 2.84953' stroke='rgba(255,255,255,0.7)' stroke-width='1.69904' stroke-linecap='round'/%3E%3Cpath d='M21.1505 15.6602L21.1505 19.1516C21.1505 20.2555 20.2556 21.1505 19.1516 21.1505L15.6602 21.1505' stroke='rgba(255,255,255,0.7)' stroke-width='1.69904' stroke-linecap='round'/%3E%3Cpath d='M8.33984 21.1505L4.84843 21.1505C3.74449 21.1505 2.84956 20.2555 2.84956 19.1516L2.84956 15.6602' stroke='rgba(255,255,255,0.7)' stroke-width='1.69904' stroke-linecap='round'/%3E%3C/svg%3E")}vite-error-overlay::part(stack):after{background-image:url("data:image/svg+xml,%3Csvg width='20px' height='20px' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M14.78 20H9.78C7.98 20 4.58 19.09 4.58 15.64C4.58 12.19 7.98 11.28 9.78 11.28H14.22C14.37 11.28 17.92 11.23 17.92 8.42C17.92 5.61 14.37 5.56 14.22 5.56H9.22C9.02109 5.56 8.83032 5.48098 8.68967 5.34033C8.54902 5.19968 8.47 5.00891 8.47 4.81C8.47 4.61109 8.54902 4.42032 8.68967 4.27967C8.83032 4.13902 9.02109 4.06 9.22 4.06H14.22C16.02 4.06 19.42 4.97 19.42 8.42C19.42 11.87 16.02 12.78 14.22 12.78H9.78C9.63 12.78 6.08 12.83 6.08 15.64C6.08 18.45 9.63 18.5 9.78 18.5H14.78C14.9789 18.5 15.1697 18.579 15.3103 18.7197C15.451 18.8603 15.53 19.0511 15.53 19.25C15.53 19.4489 15.451 19.6397 15.3103 19.7803C15.1697 19.921 14.9789 20 14.78 20Z' fill='rgba(255,255,255,0.7)'/%3E%3Cpath d='M6.44 8.31C5.74314 8.30407 5.06363 8.09202 4.48708 7.70056C3.91054 7.30909 3.46276 6.75573 3.20018 6.11021C2.93759 5.46469 2.87195 4.75589 3.01153 4.07312C3.1511 3.39036 3.48965 2.76418 3.9845 2.2735C4.47935 1.78281 5.10837 1.44958 5.79229 1.31579C6.47622 1.182 7.18444 1.25363 7.82771 1.52167C8.47099 1.78971 9.02054 2.24215 9.40711 2.82199C9.79368 3.40182 9.99998 4.08311 10 4.78C10 5.2461 9.90773 5.70759 9.72846 6.13783C9.54919 6.56808 9.28648 6.95856 8.95551 7.28675C8.62453 7.61494 8.23184 7.87433 7.80009 8.04995C7.36834 8.22558 6.90609 8.31396 6.44 8.31ZM6.44 2.75C6.04444 2.75 5.65776 2.86729 5.32886 3.08706C4.99996 3.30682 4.74362 3.61918 4.59224 3.98463C4.44087 4.35008 4.40126 4.75221 4.47843 5.14018C4.5556 5.52814 4.74609 5.8845 5.02579 6.16421C5.3055 6.44391 5.66186 6.6344 6.04982 6.71157C6.43779 6.78874 6.83992 6.74913 7.20537 6.59776C7.57082 6.44638 7.88318 6.19003 8.10294 5.86114C8.32271 5.53224 8.44 5.14556 8.44 4.75C8.44 4.48735 8.38827 4.22728 8.28776 3.98463C8.18725 3.74198 8.03993 3.5215 7.85422 3.33578C7.6685 3.15007 7.44802 3.00275 7.20537 2.90224C6.96272 2.80173 6.70265 2.75 6.44 2.75Z' fill='rgba(255,255,255,0.7)'/%3E%3Cpath d='M17.56 22.75C16.8614 22.752 16.1779 22.5466 15.5961 22.1599C15.0143 21.7733 14.5603 21.2227 14.2916 20.5778C14.0229 19.933 13.9515 19.2229 14.0866 18.5375C14.2217 17.8521 14.5571 17.2221 15.0504 16.7275C15.5437 16.2328 16.1726 15.8956 16.8577 15.7586C17.5427 15.6215 18.253 15.6909 18.8986 15.9577C19.5442 16.2246 20.0961 16.6771 20.4844 17.2578C20.8727 17.8385 21.08 18.5214 21.08 19.22C21.08 20.1545 20.7095 21.0508 20.0496 21.7125C19.3898 22.3743 18.4945 22.7473 17.56 22.75ZM17.56 17.19C17.1644 17.19 16.7778 17.3073 16.4489 17.5271C16.12 17.7468 15.8636 18.0592 15.7122 18.4246C15.5609 18.7901 15.5213 19.1922 15.5984 19.5802C15.6756 19.9681 15.8661 20.3245 16.1458 20.6042C16.4255 20.8839 16.7819 21.0744 17.1698 21.1516C17.5578 21.2287 17.9599 21.1891 18.3254 21.0377C18.6908 20.8864 19.0032 20.63 19.2229 20.3011C19.4427 19.9722 19.56 19.5856 19.56 19.19C19.56 18.6596 19.3493 18.1508 18.9742 17.7758C18.5991 17.4007 18.0904 17.19 17.56 17.19Z' fill='rgba(255,255,255,0.7)'/%3E%3C/svg%3E")}vite-error-overlay::part(tip):before{content:"Not sure how to solve this? Visit https://qwik.dev or connect with the community on Discord.";display:block;margin-bottom:1em}`, Br = "#qwik-inspector-overlay{position:fixed;background:#18b6f645;pointer-events:none;box-sizing:border-box;border:2px solid rgba(172,126,244,.46);border-radius:4px;contain:strict;cursor:pointer;z-index:999999}#qwik-inspector-info-popup{position:fixed;bottom:10px;right:10px;font-family:monospace;background:#000000c2;color:#fff;padding:10px 20px;border-radius:8px;box-shadow:0 20px 25px -5px #00000057,0 8px 10px -6px #0000003d;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);-webkit-animation:fadeOut .3s 3s ease-in-out forwards;animation:fadeOut .3s 3s ease-in-out forwards;z-index:999999;contain:layout}#qwik-inspector-info-popup p{margin:0}@-webkit-keyframes fadeOut{0%{opacity:1}to{opacity:0}}@keyframes fadeOut{0%{opacity:1}to{opacity:0;visibility:hidden}}";
+async function Fr(t, e, n, r) {
+  const i = await n.dynamicImport("node:fs"), s = await n.dynamicImport("node:url"), a = ["mjs", "cjs", "js"].map(
+    (c) => r.join(e, `entry.preview.${c}`)
+  ).find((c) => i.existsSync(c));
+  if (!a)
+    return it(
+      t,
+      `Unable to find output "${e}/entry.preview" module.
+
+Please ensure "src/entry.preview.tsx" has been built before the "preview" command.`
+    );
+  try {
+    const c = s.pathToFileURL(a).href, h = await n.strictDynamicImport(c);
+    let o = null;
+    if (h.default && (typeof h.default == "function" ? o = h.default : typeof h.default == "object" && (o = h.default.router)), typeof o != "function")
+      return it(
+        t,
+        `Entry preview module "${a}" does not export a default middleware function`
+      );
+    t.use(o);
+  } catch (c) {
+    return it(t, String(c));
+  }
+}
+function it(t, e) {
+  console.log(`
+❌ ${e}
+`), t.use((n, r) => {
+    r.writeHead(400, {
+      "Content-Type": "text/plain"
+    }), r.end(e);
+  });
+}
+const Ar = (t, e) => {
+  const n = [
+    { tag: "style", children: qr, injectTo: "body" },
+    { tag: "style", children: Br, injectTo: "body" },
+    { tag: "script", attrs: { type: "module" }, children: $r, injectTo: "body" },
+    { tag: "script", attrs: { type: "module" }, children: Rr, injectTo: "body" }
+  ];
+  if ((t.devTools?.imageDevTools ?? !0) && n.push(
+    {
+      tag: "style",
+      children: Mr,
+      injectTo: "body"
+    },
+    {
+      tag: "script",
+      attrs: { type: "module" },
+      children: jr.replace(
+        "globalThis.__TEMPLATE__",
+        JSON.stringify(Ur)
+      ),
+      injectTo: "body"
+    }
+  ), t.devTools?.clickToSource ?? !0) {
+    const r = t.devTools.clickToSource ?? [];
+    e.endsWith("/") && (e = e.slice(0, -1)), n.push({
+      tag: "script",
+      attrs: { type: "module" },
+      children: Lr.replace("globalThis.__HOTKEYS__", JSON.stringify(r)).replace("globalThis.__BASE__", JSON.stringify(e)),
+      injectTo: "body"
+    });
+  }
+  return n;
+};
+function H(t) {
+  return t && t.__esModule && Object.prototype.hasOwnProperty.call(t, "default") ? t.default : t;
+}
+var _e = {}, ot = {}, Ut;
+function G() {
+  return Ut || (Ut = 1, (function(t) {
+    Object.defineProperty(t, "__esModule", { value: !0 }), t.findBox = t.readUInt = t.readUInt32LE = t.readUInt32BE = t.readInt32LE = t.readUInt24LE = t.readUInt16LE = t.readUInt16BE = t.readInt16LE = t.toHexString = t.toUTF8String = void 0;
+    const e = new TextDecoder(), n = (p, d = 0, b = p.length) => e.decode(p.slice(d, b));
+    t.toUTF8String = n;
+    const r = (p, d = 0, b = p.length) => p.slice(d, b).reduce((O, Y) => O + ("0" + Y.toString(16)).slice(-2), "");
+    t.toHexString = r;
+    const i = (p, d = 0) => {
+      const b = p[d] + p[d + 1] * 256;
+      return b | (b & 2 ** 15) * 131070;
+    };
+    t.readInt16LE = i;
+    const s = (p, d = 0) => p[d] * 2 ** 8 + p[d + 1];
+    t.readUInt16BE = s;
+    const l = (p, d = 0) => p[d] + p[d + 1] * 2 ** 8;
+    t.readUInt16LE = l;
+    const a = (p, d = 0) => p[d] + p[d + 1] * 2 ** 8 + p[d + 2] * 2 ** 16;
+    t.readUInt24LE = a;
+    const c = (p, d = 0) => p[d] + p[d + 1] * 2 ** 8 + p[d + 2] * 2 ** 16 + (p[d + 3] << 24);
+    t.readInt32LE = c;
+    const h = (p, d = 0) => p[d] * 2 ** 24 + p[d + 1] * 2 ** 16 + p[d + 2] * 2 ** 8 + p[d + 3];
+    t.readUInt32BE = h;
+    const o = (p, d = 0) => p[d] + p[d + 1] * 2 ** 8 + p[d + 2] * 2 ** 16 + p[d + 3] * 2 ** 24;
+    t.readUInt32LE = o;
+    const w = {
+      readUInt16BE: t.readUInt16BE,
+      readUInt16LE: t.readUInt16LE,
+      readUInt32BE: t.readUInt32BE,
+      readUInt32LE: t.readUInt32LE
+    };
+    function v(p, d, b, O) {
+      b = b || 0;
+      const Y = O ? "BE" : "LE", L = "readUInt" + d + Y;
+      return w[L](p, b);
+    }
+    t.readUInt = v;
+    function g(p, d) {
+      if (p.length - d < 4)
+        return;
+      const b = (0, t.readUInt32BE)(p, d);
+      if (!(p.length - d < b))
+        return {
+          name: (0, t.toUTF8String)(p, 4 + d, 8 + d),
+          offset: d,
+          size: b
+        };
+    }
+    function u(p, d, b) {
+      for (; b < p.length; ) {
+        const O = g(p, b);
+        if (!O)
+          break;
+        if (O.name === d)
+          return O;
+        b += O.size > 0 ? O.size : 8;
+      }
+    }
+    t.findBox = u;
+  })(ot)), ot;
+}
+var qt;
+function zr() {
+  if (qt) return _e;
+  qt = 1, Object.defineProperty(_e, "__esModule", { value: !0 }), _e.BMP = void 0;
+  const t = G();
+  return _e.BMP = {
+    validate: (e) => (0, t.toUTF8String)(e, 0, 2) === "BM",
+    calculate: (e) => ({
+      height: Math.abs((0, t.readInt32LE)(e, 22)),
+      width: (0, t.readUInt32LE)(e, 18)
+    })
+  }, _e;
+}
+var Wr = zr();
+const Hr = /* @__PURE__ */ H(Wr);
+var Ce = {}, Te = {}, Bt;
+function un() {
+  if (Bt) return Te;
+  Bt = 1, Object.defineProperty(Te, "__esModule", { value: !0 }), Te.ICO = void 0;
+  const t = G(), e = 1, n = 6, r = 16;
+  function i(l, a) {
+    const c = l[a];
+    return c === 0 ? 256 : c;
+  }
+  function s(l, a) {
+    const c = n + a * r;
+    return {
+      height: i(l, c + 1),
+      width: i(l, c)
+    };
+  }
+  return Te.ICO = {
+    validate(l) {
+      const a = (0, t.readUInt16LE)(l, 0), c = (0, t.readUInt16LE)(l, 4);
+      return a !== 0 || c === 0 ? !1 : (0, t.readUInt16LE)(l, 2) === e;
+    },
+    calculate(l) {
+      const a = (0, t.readUInt16LE)(l, 4), c = s(l, 0);
+      if (a === 1)
+        return c;
+      const h = [c];
+      for (let o = 1; o < a; o += 1)
+        h.push(s(l, o));
+      return {
+        height: c.height,
+        images: h,
+        width: c.width
+      };
+    }
+  }, Te;
+}
+var Ft;
+function Gr() {
+  if (Ft) return Ce;
+  Ft = 1, Object.defineProperty(Ce, "__esModule", { value: !0 }), Ce.CUR = void 0;
+  const t = un(), e = G(), n = 2;
+  return Ce.CUR = {
+    validate(r) {
+      const i = (0, e.readUInt16LE)(r, 0), s = (0, e.readUInt16LE)(r, 4);
+      return i !== 0 || s === 0 ? !1 : (0, e.readUInt16LE)(r, 2) === n;
+    },
+    calculate: (r) => t.ICO.calculate(r)
+  }, Ce;
+}
+var Qr = Gr();
+const Kr = /* @__PURE__ */ H(Qr);
+var Pe = {}, At;
+function Jr() {
+  if (At) return Pe;
+  At = 1, Object.defineProperty(Pe, "__esModule", { value: !0 }), Pe.DDS = void 0;
+  const t = G();
+  return Pe.DDS = {
+    validate: (e) => (0, t.readUInt32LE)(e, 0) === 542327876,
+    calculate: (e) => ({
+      height: (0, t.readUInt32LE)(e, 12),
+      width: (0, t.readUInt32LE)(e, 16)
+    })
+  }, Pe;
+}
+var Yr = Jr();
+const Xr = /* @__PURE__ */ H(Yr);
+var De = {}, zt;
+function Zr() {
+  if (zt) return De;
+  zt = 1, Object.defineProperty(De, "__esModule", { value: !0 }), De.GIF = void 0;
+  const t = G(), e = /^GIF8[79]a/;
+  return De.GIF = {
+    validate: (n) => e.test((0, t.toUTF8String)(n, 0, 6)),
+    calculate: (n) => ({
+      height: (0, t.readUInt16LE)(n, 8),
+      width: (0, t.readUInt16LE)(n, 6)
+    })
+  }, De;
+}
+var Vr = Zr();
+const ei = /* @__PURE__ */ H(Vr);
+var Ne = {}, Wt;
+function ti() {
+  if (Wt) return Ne;
+  Wt = 1, Object.defineProperty(Ne, "__esModule", { value: !0 }), Ne.ICNS = void 0;
+  const t = G(), e = 8, n = 4, r = 4, i = {
+    ICON: 32,
+    "ICN#": 32,
+    // m => 16 x 16
+    "icm#": 16,
+    icm4: 16,
+    icm8: 16,
+    // s => 16 x 16
+    "ics#": 16,
+    ics4: 16,
+    ics8: 16,
+    is32: 16,
+    s8mk: 16,
+    icp4: 16,
+    // l => 32 x 32
+    icl4: 32,
+    icl8: 32,
+    il32: 32,
+    l8mk: 32,
+    icp5: 32,
+    ic11: 32,
+    // h => 48 x 48
+    ich4: 48,
+    ich8: 48,
+    ih32: 48,
+    h8mk: 48,
+    // . => 64 x 64
+    icp6: 64,
+    ic12: 32,
+    // t => 128 x 128
+    it32: 128,
+    t8mk: 128,
+    ic07: 128,
+    // . => 256 x 256
+    ic08: 256,
+    ic13: 256,
+    // . => 512 x 512
+    ic09: 512,
+    ic14: 512,
+    // . => 1024 x 1024
+    ic10: 1024
+  };
+  function s(a, c) {
+    const h = c + r;
+    return [
+      (0, t.toUTF8String)(a, c, h),
+      (0, t.readUInt32BE)(a, h)
+    ];
+  }
+  function l(a) {
+    const c = i[a];
+    return { width: c, height: c, type: a };
+  }
+  return Ne.ICNS = {
+    validate: (a) => (0, t.toUTF8String)(a, 0, 4) === "icns",
+    calculate(a) {
+      const c = a.length, h = (0, t.readUInt32BE)(a, n);
+      let o = e, w = s(a, o), v = l(w[0]);
+      if (o += w[1], o === h)
+        return v;
+      const g = {
+        height: v.height,
+        images: [v],
+        width: v.width
+      };
+      for (; o < h && o < c; )
+        w = s(a, o), v = l(w[0]), o += w[1], g.images.push(v);
+      return g;
+    }
+  }, Ne;
+}
+var ni = ti();
+const ri = /* @__PURE__ */ H(ni);
+var ii = un();
+const oi = /* @__PURE__ */ H(ii);
+var Oe = {}, Ht;
+function si() {
+  if (Ht) return Oe;
+  Ht = 1, Object.defineProperty(Oe, "__esModule", { value: !0 }), Oe.J2C = void 0;
+  const t = G();
+  return Oe.J2C = {
+    // TODO: this doesn't seem right. SIZ marker doesn't have to be right after the SOC
+    validate: (e) => (0, t.readUInt32BE)(e, 0) === 4283432785,
+    calculate: (e) => ({
+      height: (0, t.readUInt32BE)(e, 12),
+      width: (0, t.readUInt32BE)(e, 8)
+    })
+  }, Oe;
+}
+var ai = si();
+const li = /* @__PURE__ */ H(ai);
+var Re = {}, Gt;
+function ci() {
+  if (Gt) return Re;
+  Gt = 1, Object.defineProperty(Re, "__esModule", { value: !0 }), Re.JP2 = void 0;
+  const t = G();
+  return Re.JP2 = {
+    validate(e) {
+      if ((0, t.toUTF8String)(e, 4, 8) !== "jP  ")
+        return !1;
+      const r = (0, t.findBox)(e, "ftyp", 0);
+      return r ? (0, t.toUTF8String)(e, r.offset + 8, r.offset + 12) === "jp2 " : !1;
+    },
+    calculate(e) {
+      const n = (0, t.findBox)(e, "jp2h", 0), r = n && (0, t.findBox)(e, "ihdr", n.offset + 8);
+      if (r)
+        return {
+          height: (0, t.readUInt32BE)(e, r.offset + 8),
+          width: (0, t.readUInt32BE)(e, r.offset + 12)
+        };
+      throw new TypeError("Unsupported JPEG 2000 format");
+    }
+  }, Re;
+}
+var di = ci();
+const ui = /* @__PURE__ */ H(di);
+var Le = {}, Qt;
+function hi() {
+  if (Qt) return Le;
+  Qt = 1, Object.defineProperty(Le, "__esModule", { value: !0 }), Le.JPG = void 0;
+  const t = G(), e = "45786966", n = 2, r = 6, i = 2, s = "4d4d", l = "4949", a = 12, c = 2;
+  function h(u) {
+    return (0, t.toHexString)(u, 2, 6) === e;
+  }
+  function o(u, p) {
+    return {
+      height: (0, t.readUInt16BE)(u, p),
+      width: (0, t.readUInt16BE)(u, p + 2)
+    };
+  }
+  function w(u, p) {
+    const b = r + 8, O = (0, t.readUInt)(u, 16, b, p);
+    for (let Y = 0; Y < O; Y++) {
+      const L = b + c + Y * a, m = L + a;
+      if (L > u.length)
+        return;
+      const S = u.slice(L, m);
+      if ((0, t.readUInt)(S, 16, 0, p) === 274)
+        return (0, t.readUInt)(S, 16, 2, p) !== 3 || (0, t.readUInt)(S, 32, 4, p) !== 1 ? void 0 : (0, t.readUInt)(S, 16, 8, p);
+    }
+  }
+  function v(u, p) {
+    const d = u.slice(n, p), b = (0, t.toHexString)(d, r, r + i), O = b === s;
+    if (O || b === l)
+      return w(d, O);
+  }
+  function g(u, p) {
+    if (p > u.length)
+      throw new TypeError("Corrupt JPG, exceeded buffer limits");
+  }
+  return Le.JPG = {
+    validate: (u) => (0, t.toHexString)(u, 0, 2) === "ffd8",
+    calculate(u) {
+      u = u.slice(4);
+      let p, d;
+      for (; u.length; ) {
+        const b = (0, t.readUInt16BE)(u, 0);
+        if (u[b] !== 255) {
+          u = u.slice(1);
+          continue;
+        }
+        if (h(u) && (p = v(u, b)), g(u, b), d = u[b + 1], d === 192 || d === 193 || d === 194) {
+          const O = o(u, b + 5);
+          return p ? {
+            height: O.height,
+            orientation: p,
+            width: O.width
+          } : O;
+        }
+        u = u.slice(b + 2);
+      }
+      throw new TypeError("Invalid JPG, no size found");
+    }
+  }, Le;
+}
+var fi = hi();
+const pi = /* @__PURE__ */ H(fi);
+var $e = {}, Kt;
+function gi() {
+  if (Kt) return $e;
+  Kt = 1, Object.defineProperty($e, "__esModule", { value: !0 }), $e.KTX = void 0;
+  const t = G();
+  return $e.KTX = {
+    validate: (e) => {
+      const n = (0, t.toUTF8String)(e, 1, 7);
+      return ["KTX 11", "KTX 20"].includes(n);
+    },
+    calculate: (e) => {
+      const n = e[5] === 49 ? "ktx" : "ktx2", r = n === "ktx" ? 36 : 20;
+      return {
+        height: (0, t.readUInt32LE)(e, r + 4),
+        width: (0, t.readUInt32LE)(e, r),
+        type: n
+      };
+    }
+  }, $e;
+}
+var mi = gi();
+const vi = /* @__PURE__ */ H(mi);
+var Me = {}, Jt;
+function wi() {
+  if (Jt) return Me;
+  Jt = 1, Object.defineProperty(Me, "__esModule", { value: !0 }), Me.PNG = void 0;
+  const t = G(), e = `PNG\r
+
+`, n = "IHDR", r = "CgBI";
+  return Me.PNG = {
+    validate(i) {
+      if (e === (0, t.toUTF8String)(i, 1, 8)) {
+        let s = (0, t.toUTF8String)(i, 12, 16);
+        if (s === r && (s = (0, t.toUTF8String)(i, 28, 32)), s !== n)
+          throw new TypeError("Invalid PNG");
+        return !0;
+      }
+      return !1;
+    },
+    calculate(i) {
+      return (0, t.toUTF8String)(i, 12, 16) === r ? {
+        height: (0, t.readUInt32BE)(i, 36),
+        width: (0, t.readUInt32BE)(i, 32)
+      } : {
+        height: (0, t.readUInt32BE)(i, 20),
+        width: (0, t.readUInt32BE)(i, 16)
+      };
+    }
+  }, Me;
+}
+var yi = wi();
+const bi = /* @__PURE__ */ H(yi);
+var je = {}, Yt;
+function xi() {
+  if (Yt) return je;
+  Yt = 1, Object.defineProperty(je, "__esModule", { value: !0 }), je.PNM = void 0;
+  const t = G(), e = {
+    P1: "pbm/ascii",
+    P2: "pgm/ascii",
+    P3: "ppm/ascii",
+    P4: "pbm",
+    P5: "pgm",
+    P6: "ppm",
+    P7: "pam",
+    PF: "pfm"
+  }, n = {
+    default: (r) => {
+      let i = [];
+      for (; r.length > 0; ) {
+        const s = r.shift();
+        if (s[0] !== "#") {
+          i = s.split(" ");
+          break;
+        }
+      }
+      if (i.length === 2)
+        return {
+          height: parseInt(i[1], 10),
+          width: parseInt(i[0], 10)
+        };
+      throw new TypeError("Invalid PNM");
+    },
+    pam: (r) => {
+      const i = {};
+      for (; r.length > 0; ) {
+        const s = r.shift();
+        if (s.length > 16 || s.charCodeAt(0) > 128)
+          continue;
+        const [l, a] = s.split(" ");
+        if (l && a && (i[l.toLowerCase()] = parseInt(a, 10)), i.height && i.width)
+          break;
+      }
+      if (i.height && i.width)
+        return {
+          height: i.height,
+          width: i.width
+        };
+      throw new TypeError("Invalid PAM");
+    }
+  };
+  return je.PNM = {
+    validate: (r) => (0, t.toUTF8String)(r, 0, 2) in e,
+    calculate(r) {
+      const i = (0, t.toUTF8String)(r, 0, 2), s = e[i], l = (0, t.toUTF8String)(r, 3).split(/[\r\n]+/);
+      return (n[s] || n.default)(l);
+    }
+  }, je;
+}
+var Si = xi();
+const Ei = /* @__PURE__ */ H(Si);
+var Ue = {}, Xt;
+function ki() {
+  if (Xt) return Ue;
+  Xt = 1, Object.defineProperty(Ue, "__esModule", { value: !0 }), Ue.PSD = void 0;
+  const t = G();
+  return Ue.PSD = {
+    validate: (e) => (0, t.toUTF8String)(e, 0, 4) === "8BPS",
+    calculate: (e) => ({
+      height: (0, t.readUInt32BE)(e, 14),
+      width: (0, t.readUInt32BE)(e, 18)
+    })
+  }, Ue;
+}
+var Ii = ki();
+const _i = /* @__PURE__ */ H(Ii);
+var qe = {}, Zt;
+function Ci() {
+  if (Zt) return qe;
+  Zt = 1, Object.defineProperty(qe, "__esModule", { value: !0 }), qe.SVG = void 0;
+  const t = G(), e = /<svg\s([^>"']|"[^"]*"|'[^']*')*>/, n = {
+    height: /\sheight=(['"])([^%]+?)\1/,
+    root: e,
+    viewbox: /\sviewBox=(['"])(.+?)\1/i,
+    width: /\swidth=(['"])([^%]+?)\1/
+  }, r = 2.54, i = {
+    in: 96,
+    cm: 96 / r,
+    em: 16,
+    ex: 8,
+    m: 96 / r * 100,
+    mm: 96 / r / 10,
+    pc: 96 / 72 / 12,
+    pt: 96 / 72,
+    px: 1
+  }, s = new RegExp(`^([0-9.]+(?:e\\d+)?)(${Object.keys(i).join("|")})?$`);
+  function l(w) {
+    const v = s.exec(w);
+    if (v)
+      return Math.round(Number(v[1]) * (i[v[2]] || 1));
+  }
+  function a(w) {
+    const v = w.split(" ");
+    return {
+      height: l(v[3]),
+      width: l(v[2])
+    };
+  }
+  function c(w) {
+    const v = w.match(n.width), g = w.match(n.height), u = w.match(n.viewbox);
+    return {
+      height: g && l(g[2]),
+      viewbox: u && a(u[2]),
+      width: v && l(v[2])
+    };
+  }
+  function h(w) {
+    return {
+      height: w.height,
+      width: w.width
+    };
+  }
+  function o(w, v) {
+    const g = v.width / v.height;
+    return w.width ? {
+      height: Math.floor(w.width / g),
+      width: w.width
+    } : w.height ? {
+      height: w.height,
+      width: Math.floor(w.height * g)
+    } : {
+      height: v.height,
+      width: v.width
+    };
+  }
+  return qe.SVG = {
+    // Scan only the first kilo-byte to speed up the check on larger files
+    validate: (w) => e.test((0, t.toUTF8String)(w, 0, 1e3)),
+    calculate(w) {
+      const v = (0, t.toUTF8String)(w).match(n.root);
+      if (v) {
+        const g = c(v[0]);
+        if (g.width && g.height)
+          return h(g);
+        if (g.viewbox)
+          return o(g, g.viewbox);
+      }
+      throw new TypeError("Invalid SVG");
+    }
+  }, qe;
+}
+var Ti = Ci();
+const Pi = /* @__PURE__ */ H(Ti);
+var Be = {}, Vt;
+function Di() {
+  if (Vt) return Be;
+  Vt = 1, Object.defineProperty(Be, "__esModule", { value: !0 }), Be.TGA = void 0;
+  const t = G();
+  return Be.TGA = {
+    validate(e) {
+      return (0, t.readUInt16LE)(e, 0) === 0 && (0, t.readUInt16LE)(e, 4) === 0;
+    },
+    calculate(e) {
+      return {
+        height: (0, t.readUInt16LE)(e, 14),
+        width: (0, t.readUInt16LE)(e, 12)
+      };
+    }
+  }, Be;
+}
+var Ni = Di();
+const Oi = /* @__PURE__ */ H(Ni);
+var Fe = {}, en;
+function Ri() {
+  if (en) return Fe;
+  en = 1, Object.defineProperty(Fe, "__esModule", { value: !0 }), Fe.WEBP = void 0;
+  const t = G();
+  function e(i) {
+    return {
+      height: 1 + (0, t.readUInt24LE)(i, 7),
+      width: 1 + (0, t.readUInt24LE)(i, 4)
+    };
+  }
+  function n(i) {
+    return {
+      height: 1 + ((i[4] & 15) << 10 | i[3] << 2 | (i[2] & 192) >> 6),
+      width: 1 + ((i[2] & 63) << 8 | i[1])
+    };
+  }
+  function r(i) {
+    return {
+      height: (0, t.readInt16LE)(i, 8) & 16383,
+      width: (0, t.readInt16LE)(i, 6) & 16383
+    };
+  }
+  return Fe.WEBP = {
+    validate(i) {
+      const s = (0, t.toUTF8String)(i, 0, 4) === "RIFF", l = (0, t.toUTF8String)(i, 8, 12) === "WEBP", a = (0, t.toUTF8String)(i, 12, 15) === "VP8";
+      return s && l && a;
+    },
+    calculate(i) {
+      const s = (0, t.toUTF8String)(i, 12, 16);
+      if (i = i.slice(20, 30), s === "VP8X") {
+        const a = i[0], c = (a & 192) === 0, h = (a & 1) === 0;
+        if (c && h)
+          return e(i);
+        throw new TypeError("Invalid WebP");
+      }
+      if (s === "VP8 " && i[0] !== 47)
+        return r(i);
+      const l = (0, t.toHexString)(i, 3, 6);
+      if (s === "VP8L" && l !== "9d012a")
+        return n(i);
+      throw new TypeError("Invalid WebP");
+    }
+  }, Fe;
+}
+var Li = Ri();
+const $i = /* @__PURE__ */ H(Li);
+var Ae = {}, tn;
+function Mi() {
+  if (tn) return Ae;
+  tn = 1, Object.defineProperty(Ae, "__esModule", { value: !0 }), Ae.HEIF = void 0;
+  const t = G(), e = {
+    avif: "avif",
+    mif1: "heif",
+    msf1: "heif",
+    // heif-sequence
+    heic: "heic",
+    heix: "heic",
+    hevc: "heic",
+    // heic-sequence
+    hevx: "heic"
+    // heic-sequence
+  };
+  return Ae.HEIF = {
+    validate(n) {
+      if ((0, t.toUTF8String)(n, 4, 8) !== "ftyp")
+        return !1;
+      const i = (0, t.findBox)(n, "ftyp", 0);
+      return i ? (0, t.toUTF8String)(n, i.offset + 8, i.offset + 12) in e : !1;
+    },
+    calculate(n) {
+      const r = (0, t.findBox)(n, "meta", 0), i = r && (0, t.findBox)(n, "iprp", r.offset + 12), s = i && (0, t.findBox)(n, "ipco", i.offset + 8), l = s && (0, t.findBox)(n, "ispe", s.offset + 8);
+      if (l)
+        return {
+          height: (0, t.readUInt32BE)(n, l.offset + 16),
+          width: (0, t.readUInt32BE)(n, l.offset + 12),
+          type: (0, t.toUTF8String)(n, 8, 12)
+        };
+      throw new TypeError("Invalid HEIF, no size found");
+    }
+  }, Ae;
+}
+var ji = Mi();
+const Ui = /* @__PURE__ */ H(ji), qi = {
+  56: "psd",
+  66: "bmp",
+  68: "dds",
+  71: "gif",
+  82: "webp",
+  105: "icns",
+  137: "png",
+  255: "jpg"
+}, tt = {
+  webp: $i.WEBP,
+  jpg: pi.JPG,
+  png: bi.PNG,
+  svg: Pi.SVG,
+  gif: ei.GIF,
+  avif: Ui.HEIF,
+  bmp: Hr.BMP,
+  cur: Kr.CUR,
+  dds: Xr.DDS,
+  icns: ri.ICNS,
+  ico: oi.ICO,
+  j2c: li.J2C,
+  jp2: ui.JP2,
+  ktx: vi.KTX,
+  pnm: Ei.PNM,
+  psd: _i.PSD,
+  tga: Oi.TGA
+}, Bi = Object.keys(tt);
+function Fi(t) {
+  const e = t[0], n = qi[e];
+  return n && tt[n].validate(t) ? n : Bi.find((r) => tt[r].validate(t));
+}
+function Ai(t) {
+  const e = Fi(t);
+  if (typeof e < "u") {
+    const n = tt[e].calculate(t);
+    if (n !== void 0)
+      return n.type = e, n;
+  }
+}
+async function zi(t) {
+  if (/^(https?|file|capacitor):/.test(t))
+    try {
+      const e = await fetch(t, {
+        headers: { Accept: "image/*,*/*" }
+      });
+      if (!e.ok) {
+        console.error("can not fetch", t);
+        return;
+      }
+      const n = await e.arrayBuffer(), r = Ai(Buffer.from(n));
+      if (r)
+        return {
+          width: r.width,
+          height: r.height,
+          type: r.type,
+          size: n.byteLength
+        };
+    } catch (e) {
+      console.error(e);
+      return;
+    }
+}
+const Wi = (t, e, n) => async (r, i, s) => {
+  try {
+    const l = await t.dynamicImport("node:fs"), a = await t.dynamicImport("node:path");
+    let c;
+    try {
+      c = new URL(r.url, "http://localhost:3000/");
+    } catch {
+      i.statusCode = 404, i.end();
+      return;
+    }
+    if (r.method === "GET" && c.pathname === "/__image_info") {
+      const h = c.searchParams.get("url");
+      if (i.setHeader("content-type", "application/json"), h) {
+        const o = await zi(h);
+        i.setHeader("cache-control", "public, max-age=31536000, immutable"), o ? i.write(JSON.stringify(o)) : i.statusCode = 404;
+      } else {
+        i.statusCode = 500;
+        const o = { message: "error" };
+        i.write(JSON.stringify(o));
+      }
+      i.end();
+      return;
+    } else if (r.method === "POST" && c.pathname === "/__image_fix") {
+      const h = c.searchParams.get("loc"), o = c.searchParams.get("width"), w = c.searchParams.get("height"), v = c.searchParams.get("src"), g = c.searchParams.get("currentHref"), u = h.split(":"), p = parseInt(u[u.length - 1], 10) - 1;
+      let d = parseInt(u[u.length - 2], 10) - 1;
+      const b = a.resolve(n, u.slice(0, u.length - 2).join(":")), O = a.extname(b).toLowerCase();
+      let L = l.readFileSync(b).toString("utf-8"), m = 0;
+      for (; m < L.length; m++)
+        if (d === 0) {
+          m += p;
+          break;
+        } else if (L[m] === `
+`) {
+          d--;
+          continue;
+        }
+      if (L.slice(m, m + 4) !== "<img") {
+        console.error(
+          "Could not apply auto fix, because it was not possible to find the original <img> tag"
+        ), i.statusCode = 500;
+        return;
+      }
+      const S = L.indexOf(">", m) + 1;
+      if (S < m) {
+        console.error(
+          "Could not apply auto fix, because it was not possible to find the original <img> tag"
+        ), i.statusCode = 500;
+        return;
+      }
+      const C = [".ts", ".tsx", ".js", ".jsx", ".mdx"].includes(O);
+      let T = L.slice(m, S);
+      if (v && g && C) {
+        const I = new URL(v), R = new URL(g);
+        if (I.origin === R.origin) {
+          const W = a.join(e, "public", I.pathname), B = a.join(e, I.pathname);
+          let M;
+          if (l.existsSync(W)) {
+            const ne = a.join(n, "media", a.dirname(I.pathname));
+            await l.promises.mkdir(ne, { recursive: !0 }), await l.promises.copyFile(
+              W,
+              a.join(n, "media", I.pathname)
+            ), M = "~/media" + I.pathname;
+          } else if (l.existsSync(B))
+            M = I.pathname.replace("/src/", "~/");
+          else
+            return;
+          const Q = Hi(I.pathname), X = `${M}?jsx`;
+          T = T.replace(/^<img/, `<${Q}`), T = T.replace(/\bwidth=(({[^}]*})|('[^']*')|("[^"]*"))\s*/, ""), T = T.replace(/\bheight=(({[^}]*})|('[^']*')|("[^"]*"))\s*/, ""), T = T.replace(/\bsrc=(({[^}]*})|('[^']*')|("[^"]*"))\s*/, "");
+          let K = 0;
+          if (O === ".mdx" && L.startsWith("---") && (K = L.indexOf("---", 4) + 3, K === -1))
+            return;
+          const te = `
+import ${Q} from '${X}';`;
+          L = `${L.slice(0, K)}${te}${L.slice(
+            K,
+            m
+          )}${T}${L.slice(S)}`, l.writeFileSync(b, L);
+          return;
+        }
+      }
+      T = T.replace(/\bwidth=(({[^}]*})|('[^']*')|("[^"]*"))/, `width="${o}"`), T = T.replace(/\bheight=(({[^}]*})|('[^']*')|("[^"]*"))/, `height="${w}"`), T.includes("height=") || (T = T.replace(/<img/, `<img height="${w}"`)), T.includes("width=") || (T = T.replace(/<img/, `<img width="${o}"`)), L = L.slice(0, m) + T + L.slice(S), l.writeFileSync(b, L);
+    } else
+      s();
+  } catch (l) {
+    l instanceof Error && await Gn(t, l), s(l);
+  }
+};
+function Hi(t) {
+  const e = t.lastIndexOf("."), n = t.lastIndexOf("/");
+  return t = t.substring(n + 1, e), `Img${Gi(t)}`;
+}
+function Gi(t) {
+  return `${t}`.toLowerCase().replace(new RegExp(/[-_]+/, "g"), " ").replace(new RegExp(/[^\w\s]/, "g"), "").replace(new RegExp(/\s+(.)(\w*)/, "g"), (e, n, r) => `${n.toUpperCase() + r}`).replace(new RegExp(/\w/), (e) => e.toUpperCase());
+}
+const We = "@qwik-worker-core", Qi = `
+export { setPlatform } from '@qwik.dev/core';
+export { _deserialize } from '@qwik.dev/core/internal';
+`, Ki = (t) => t.endsWith(We), Ji = () => ({
+  moduleSideEffects: !1,
+  code: Qi
+}), Yi = (t) => {
+  t.emitFile({
+    id: We,
+    name: "qwik-worker-core",
+    type: "chunk",
+    preserveSignature: "allow-extension"
+  });
+}, Xi = (t, e, n) => e !== "client" && e !== "ssr" || n !== "build" ? t : {
+  ...t,
+  format: "es",
+  plugins: to(t?.plugins)
+}, Zi = (t) => {
+  const e = Object.values(t).find(
+    (r) => r.type === "chunk" && r.facadeModuleId === We
+  ), n = e ? an(e.fileName) : void 0;
+  hn(
+    t,
+    (r) => n?.(r)
+  );
+}, Vi = (t, e) => {
+  const n = no(e), r = n ? an(n) : void 0;
+  hn(
+    t,
+    (i) => r?.(i)
+  );
+}, eo = () => ({
+  name: "vite-plugin-qwik-worker-core-external",
+  enforce: "pre",
+  resolveId(t) {
+    return t === ve || t === we ? {
+      id: at,
+      external: !0
+    } : null;
+  }
+}), to = (t) => () => [...typeof t == "function" ? t() : Array.isArray(t) ? t : [], eo()], hn = (t, e) => {
+  for (const n of Object.values(t))
+    n.type === "chunk" ? n.code = Rt(
+      n.code,
+      () => e(n.fileName)
+    ) : n.type === "asset" && typeof n.source == "string" && (n.source = Rt(
+      n.source,
+      () => e(n.fileName)
+    ));
+}, no = (t) => {
+  if (!t)
+    return;
+  const e = Object.keys(t.bundles).find(
+    (n) => /(?:^|[/\\])qwik-worker-core(?:[.-]|$)/.test(n)
+  );
+  if (e)
+    return e === "build" || e.startsWith("build/") || /[/\\]build[/\\]/.test(e) ? e : `build/${e}`;
+}, ro = [
+  ve,
+  ct,
+  dt,
+  we,
+  "@builder.io/qwik",
+  "@builder.io/qwik/jsx-runtime",
+  "@builder.io/qwik/jsx-dev-runtime"
+], io = [".css", ".scss", ".sass", ".less", ".styl", ".stylus"], oo = [".woff", ".woff2", ".ttf"], st = "@qwik-hmr-bridge", so = `
+  // HMR bridge: connects Vite HMR events to Qwik's component re-rendering.
+  if (import.meta.hot) {
+    let timeout;
+    import.meta.hot.on("qwik:hmr", (data) => {
+      if (data.t === document.__hmrT) {
+        console.log("Received duplicate HMR update, ignoring", data.files);
+        return;
+      }
+      clearTimeout(timeout);
+      document.__hmrT = data.t;
+      document.__hmrDone = 0;
+      document.dispatchEvent(
+        new CustomEvent("qHmr", { detail: data })
+      );
+      timeout = setTimeout(() => {
+      console.log(document.__hmrDone, document.__hmrT);
+        if (document.__hmrDone !== document.__hmrT) {
+          console.log("HMR update did not match active code, reloading the page", location.href);
+          location.reload();
+        }
+      }, 500);
+    });
+  }
+`;
+function uo(t = {}) {
+  let e = "serve", n = null, r = "/", i = null, s, l = null, a = null, c = null, h = "development", o;
+  const w = t.client?.outDir;
+  let v = null;
+  const g = t.fileFilter ? (m, S) => dn.test(m) || t.fileFilter(m, S) : () => !0, u = t.disableFontPreload ?? !1, p = [], d = cn(t.optimizerOptions), b = /* @__PURE__ */ new Set();
+  return [{
+    name: "vite-plugin-qwik",
+    enforce: "pre",
+    api: {
+      getOptimizer: () => d.getOptimizer(),
+      getOptions: () => d.getOptions(),
+      getManifest: () => d.getOptions().manifestInput,
+      getRootDir: () => d.getOptions().rootDir,
+      getClientOutDir: () => n,
+      getClientPublicOutDir: () => i,
+      getAssetsDir: () => s,
+      registerBundleGraphAdder: (m) => b.add(m),
+      onSegment: (m) => {
+        d.segmentCallbacks.add(m);
+      },
+      _oldDevSsrServer: () => t.devSsrServer
+    },
+    async config(m, S) {
+      await d.init();
+      let C;
+      S.mode === "lib" ? C = "lib" : m.build?.ssr || S.mode === "ssr" ? C = "ssr" : S.mode === "test" || S.mode === "benchmark" ? C = "test" : C = "client", e = S.command, S.mode === "production" ? h = "production" : S.mode === "development" ? h = "development" : e === "build" && C === "client" ? h = "production" : h = "development", d.debug(`vite config(), command: ${e}, env.mode: ${S.mode}`), e === "serve" ? t.entryStrategy = { type: "segment" } : C === "ssr" ? t.entryStrategy = { type: "hoist" } : C === "lib" && (t.entryStrategy = { type: "inline" });
+      const T = C === "ssr" ? typeof m.build?.ssr == "string" ? m.build.ssr : t.ssr?.input : void 0, I = C === "client" ? t.client?.input : void 0;
+      let R = m.build?.rollupOptions?.input || I || T;
+      R && typeof R == "string" && (R = [R]), s = m.build?.assetsDir;
+      const W = C === "client" && !!s && s !== "_astro", B = {
+        target: C,
+        buildMode: h,
+        csr: t.csr,
+        debug: t.debug,
+        entryStrategy: t.entryStrategy,
+        srcDir: t.srcDir,
+        rootDir: m.root,
+        tsconfigFileNames: t.tsconfigFileNames,
+        resolveQwikBuild: !0,
+        transformedModuleOutput: t.transformedModuleOutput,
+        outDir: m.build?.outDir,
+        ssrOutDir: t.ssr?.outDir || m.build?.outDir,
+        clientOutDir: w || // When ssr is true, this is probably an adapter build and not where the client build is
+        // However, if client.outDir was explicitly set, always use it
+        (m.build?.ssr && !w ? void 0 : m.build?.outDir),
+        assetsDir: W ? s : void 0,
+        devTools: t.devTools,
+        sourcemap: !!m.build?.sourcemap,
+        lint: t.lint,
+        experimental: t.experimental,
+        input: R,
+        manifestInput: t.ssr?.manifestInput,
+        manifestInputPath: t.ssr?.manifestInputPath,
+        manifestOutput: t.client?.manifestOutput
+      }, M = await d.normalizeOptions(B);
+      R ||= M.input, v = B, l = M.srcDir, a = M.rootDir, t.csr || (n = M.clientOutDir, i = n, c = M.ssrOutDir);
+      const Q = h === "development", X = "globalThis.qDev", K = "globalThis.qTest", te = "globalThis.qInspector", ne = m?.define?.[X] ?? Q, ye = m?.define?.[te] ?? Q, A = {
+        // Duplicated in configEnvironment to support legacy vite build --ssr compatibility
+        ssr: {
+          noExternal: [ve, we, Je, ae]
+        },
+        envPrefix: ["VITE_", "PUBLIC_"],
+        resolve: {
+          dedupe: [...ro],
+          alias: {
+            "@builder.io/qwik": "@qwik.dev/core",
+            "@builder.io/qwik/build": "@qwik.dev/core/build",
+            "@builder.io/qwik/server": "@qwik.dev/core/server",
+            "@builder.io/qwik/preloader": "@qwik.dev/core/preloader",
+            "@builder.io/qwik/jsx-runtime": "@qwik.dev/core/jsx-runtime",
+            "@builder.io/qwik/jsx-dev-runtime": "@qwik.dev/core/jsx-dev-runtime",
+            "@builder.io/qwik/optimizer": "@qwik.dev/core/optimizer",
+            "@builder.io/qwik/loader": "@qwik.dev/core/loader",
+            "@builder.io/qwik/backpatch": "@qwik.dev/core/backpatch",
+            "@builder.io/qwik/cli": "@qwik.dev/core/cli",
+            "@builder.io/qwik/testing": "@qwik.dev/core/testing"
+          }
+        },
+        optimizeDeps: {
+          exclude: [
+            // using optimized deps for qwik libraries will lead to duplicate imports
+            // this breaks Qwik because it relies a lot on module scoped symbols
+            ve,
+            we,
+            Je,
+            ct,
+            dt,
+            ae,
+            se,
+            "@builder.io/qwik"
+          ],
+          // Enforce scanning our input even when overridden later
+          entries: R && (typeof R == "string" ? [R] : typeof R == "object" ? Object.values(R) : R)
+        },
+        build: {
+          modulePreload: !1,
+          dynamicImportVarsOptions: {
+            exclude: [/./]
+          },
+          rollupOptions: {
+            external: ["node:async_hooks"],
+            // This will amend the existing input
+            input: R
+            // temporary fix for rolldown-vite types
+          }
+        },
+        worker: Xi(m.worker, C, e),
+        define: {
+          [X]: ne,
+          [te]: ye,
+          [K]: JSON.stringify(process.env.NODE_ENV === "test")
+        }
+      };
+      if (!t.csr) {
+        A.build.cssCodeSplit = !1, M.outDir && (A.build.outDir = M.outDir);
+        const de = A.build.rollupOptions?.onwarn;
+        A.build.rollupOptions = {
+          ...A.build.rollupOptions,
+          output: await Pr(
+            d,
+            m.build?.rollupOptions?.output,
+            W
+          ),
+          preserveEntrySignatures: "exports-only",
+          onwarn: (Z, He) => {
+            Z.plugin === "typescript" && Z.message.includes("outputToFilesystem") || (de ? de(Z, He) : He(Z));
+          }
+        }, M.target === "ssr" ? e === "build" && (A.publicDir = !1, A.build.ssr = !0, m.build?.minify == null && h === "production" && (A.build.minify = !0)) : M.target === "client" || (M.target === "lib" ? (A.build.minify = !1, A.build.rollupOptions.external = [
+          ve,
+          we,
+          Je,
+          ct,
+          dt,
+          ae,
+          se
+        ]) : A.define = {
+          [X]: !0,
+          [K]: !0,
+          [te]: !1
+        }), globalThis.qDev = ne, globalThis.qTest = !0, globalThis.qInspector = ye;
+      }
+      return A;
+    },
+    configEnvironment(m, S, C) {
+      return m === "ssr" || m === "ssg" ? {
+        resolve: {
+          noExternal: [ve, we, Je, ae]
+        }
+      } : h === "production" ? {
+        resolve: {
+          conditions: ["min"]
+        }
+      } : {};
+    },
+    async configResolved(m) {
+      if (r = m.base, !(r.startsWith("/") && r.endsWith("/")))
+        throw new Error("vite's config.base must begin and end with /");
+      if (m.build.sourcemap && t.optimizerOptions?.sourcemap === void 0 && d.setSourceMapSupport(!0), v ? d.normalizeOptions(v) : d.normalizeOptions(t), e === "build" && !t.csr && d.getOptions().target === "client") {
+        const C = ["vite:build-import-analysis"], T = m.plugins;
+        for (const I of C) {
+          const R = T.findIndex((W) => W?.name === I);
+          R >= 0 && T.splice(R, 1);
+        }
+      }
+    },
+    async buildStart() {
+      p.length = 0;
+      const m = this.resolve.bind(this);
+      await d.validateSource(m), d.onDiagnostics((S, C, T) => {
+        S.forEach((I) => {
+          const R = d.normalizePath(C.sys.path.join(T, I.file));
+          I.category === "error" ? this.error(et(R, I)) : this.warn(et(R, I));
+        });
+      }), await d.buildStart(this), e === "build" && d.getOptions().target === "client" && Yi(this);
+    },
+    resolveId(m, S, C) {
+      if (m.endsWith(st))
+        return st;
+      if (Ki(m))
+        return We;
+      const T = g(m, "resolveId");
+      return le(m) || !T ? null : d.resolveId(this, m, S, C);
+    },
+    load(m, S) {
+      if (m === st)
+        return { code: so };
+      if (m === We)
+        return Ji();
+      const C = g(m, "load");
+      return le(m) || !C ? null : (m = d.normalizePath(m), e === "serve" && m.endsWith(se) ? {
+        code: "export const manifest = undefined;"
+      } : d.load(this, m, S));
+    },
+    transform(m, S, C) {
+      if (S.includes(".vite/deps/") && m.slice(0, 5e3).includes("qwik") && /import[^\n]*qwik[^\n]*\n/.test(m)) {
+        const R = a && S.startsWith(a) ? S.slice(a.length) : S;
+        throw new Error(
+          `
+
+==============
+
+⚠️ IMPORTANT: This dependency was pre-bundled by Vite, but it seems to use Qwik, which needs processing by the optimizer.
+
+👉 Please add the original modulename to the "optimizeDeps.exclude" array in your Vite config
+👉   ${R}
+
+==============
+
+`
+        );
+      }
+      const T = g(S, "transform"), I = S.includes("?raw");
+      return le(S) || !T || I ? null : d.transform(this, m, S, C);
+    }
+  }, {
+    name: "vite-plugin-qwik-post",
+    enforce: "post",
+    generateBundle: {
+      order: "post",
+      async handler(m, S) {
+        const C = this.environment.config.consumer === "client", T = this.environment.config.consumer === "server";
+        if (C) {
+          const I = d.getOptions();
+          for (const [B, M] of Object.entries(S))
+            if (M.type === "asset") {
+              const Q = r + B;
+              if (io.some((X) => B.endsWith(X)))
+                typeof M.source == "string" && M.source.length < I.inlineStylesUpToBytes ? p.push({
+                  tag: "style",
+                  location: "head",
+                  attributes: {
+                    "data-src": Q,
+                    dangerouslySetInnerHTML: M.source
+                  }
+                }) : p.push({
+                  tag: "link",
+                  location: "head",
+                  attributes: {
+                    rel: "stylesheet",
+                    href: Q
+                  }
+                });
+              else {
+                const X = oo.find((K) => B.endsWith(K));
+                X && !u && p.unshift({
+                  tag: "link",
+                  location: "head",
+                  attributes: {
+                    rel: "preload",
+                    href: Q,
+                    as: "font",
+                    type: `font/${X.slice(1)}`,
+                    crossorigin: ""
+                  }
+                });
+              }
+            }
+          const R = await d.generateManifest(
+            this,
+            S,
+            b,
+            {
+              injections: p,
+              platform: { vite: "" }
+            }
+          ), W = mr(R, r);
+          for (const B of Object.values(S))
+            B.type === "chunk" && (B.code = sn(B.code, W));
+          Zi(S);
+        } else T && Vi(S, d.getOptions().manifestInput);
+      }
+    },
+    async writeBundle(m, S) {
+      const C = d.getOptions();
+      if (this.environment.config.consumer === "server") {
+        const I = d.getSys();
+        if (I.env === "node" || I.env === "bun" || I.env === "deno") {
+          const R = Object.keys(S), W = async (B) => {
+            try {
+              const M = I.path.basename(B), Q = I.path.extname(M);
+              if ((M.startsWith("entry.") || M.startsWith("entry_")) && !M.includes("preview") && (Q === ".mjs" || Q === ".cjs")) {
+                const K = I.path.basename(M, Q), te = `${K}.js`, ne = K + Q;
+                if (!R.some((A) => I.path.basename(A) === te)) {
+                  const A = I.path.dirname(B), de = await I.dynamicImport("node:fs"), Z = I.path.join(C.outDir, A);
+                  await de.promises.mkdir(Z, { recursive: !0 }), await de.promises.writeFile(
+                    I.path.join(Z, te),
+                    `export * from "./${ne}";`
+                  );
+                }
+              }
+            } catch (M) {
+              console.error("patchModuleFormat", M);
+            }
+          };
+          await Promise.all(R.map(W));
+        }
+      }
+    },
+    transformIndexHtml() {
+      if (e === "serve")
+        return Ar(d.getOptions(), r);
+    },
+    configureServer(m) {
+      o = m, d.configureServer(m), (t?.devTools?.imageDevTools ?? !0) && m.middlewares.use(Wi(d.getSys(), a, l));
+    },
+    configurePreviewServer(m) {
+      return async () => {
+        const S = d.getSys(), C = d.getPath();
+        await Fr(m.middlewares, c, S, C);
+      };
+    },
+    hotUpdate(m) {
+      d.hotUpdate(this.environment, m);
+      const S = t?.devTools?.hmr ?? !0;
+      if (this.environment.name === "ssr" && m.modules.length)
+        if (S) {
+          const C = /* @__PURE__ */ new Set(), T = (I) => /\.([mc]?[jt]sx?|mdx?)$/.test(I.split("?")[0]);
+          for (const I of m.modules) {
+            const R = I.url.split("?")[0];
+            if (I.type === "js" && T(I.url))
+              C.add(R);
+            else
+              for (const W of I.importers)
+                W.type === "js" && T(W.url) && C.add(W.url.split("?")[0]);
+          }
+          C.size > 0 && o && o.environments.client.hot.send({
+            type: "custom",
+            event: "qwik:hmr",
+            data: { files: [...C], t: m.timestamp }
+          });
+        } else
+          o?.environments.client.hot.send({ type: "full-reload" });
+    },
+    onLog(m, S) {
+      if (S.plugin == "vite-plugin-qwik") {
+        const C = lo[m] || ce.White, T = (S.frame || "").split(`
+`).map(
+          (I) => (I.match(/^\s*\^\s*$/) ? ce.BrightWhite : ce.BrightBlack) + I
+        );
+        return console[m](
+          `${C}%s
+${ce.BrightWhite}%s
+%s${ce.RESET}`,
+          `[${S.plugin}](${m}): ${S.message}
+`,
+          `  ${S?.loc?.file}:${S?.loc?.line}:${S?.loc?.column}
+`,
+          `  ${T.join(`
+  `)}
+`
+        ), !1;
+      }
+    }
+  }, ao()];
+}
+async function ao() {
+  let t, e, n = !1;
+  async function r() {
+    if (n)
+      return !0;
+    try {
+      return t = await import("node:fs").then((w) => w.promises), e = await import("node:path"), n = !0, !0;
+    } catch {
+      return !1;
+    }
+  }
+  const i = /* @__PURE__ */ new Set(), s = [];
+  let l;
+  const a = "@qwik.dev/core", c = "@builder.io/qwik";
+  async function h(w) {
+    const v = /* @__PURE__ */ new Set();
+    let g = w;
+    for (; g; ) {
+      try {
+        const p = e.join(g, "package.json"), d = await t.readFile(p, { encoding: "utf-8" }), b = JSON.parse(d);
+        for (const O of Object.keys(b.dependencies || {}))
+          v.add(O);
+        for (const O of Object.keys(b.devDependencies || {}))
+          v.add(O);
+        for (const O of Object.keys(b.optionalDependencies || {}))
+          v.add(O);
+      } catch {
+      }
+      const u = e.dirname(g);
+      if (u === g)
+        break;
+      g = u;
+    }
+    return [...v];
+  }
+  async function o(w, v) {
+    for (; v; ) {
+      const g = e.join(v, "node_modules", w, "package.json");
+      try {
+        await t.access(g);
+        const p = await t.readFile(g, {
+          encoding: "utf-8"
+        }), d = JSON.parse(p);
+        return !!(d.qwik || d.dependencies?.[a] || d.peerDependencies?.[a] || d.devDependencies?.[a] || d.dependencies?.[c] || d.peerDependencies?.[c] || d.devDependencies?.[c]);
+      } catch {
+      }
+      const u = e.dirname(v);
+      if (u === v)
+        break;
+      v = u;
+    }
+    return !1;
+  }
+  return {
+    name: "checkQwikExternals",
+    enforce: "pre",
+    configResolved: (w) => {
+      l = w.root;
+    },
+    // Attempt to mark the Qwik dependencies as non-optimizeable
+    config: {
+      order: "post",
+      async handler(w) {
+        if (!await r())
+          return;
+        const v = w.root || process.cwd(), g = w.optimizeDeps?.exclude ?? [], u = await h(v);
+        s.length = 0;
+        for (const d of u)
+          await o(d, v) && s.push(d);
+        const p = s.filter((d) => !g.includes(d));
+        return {
+          optimizeDeps: { exclude: p },
+          ssr: { noExternal: p }
+        };
+      }
+    },
+    // qwik deps need to be marked as noExternal per-environment
+    configEnvironment(w, v) {
+      if (s.length === 0)
+        return;
+      const g = v.resolve?.noExternal;
+      if (g === !0)
+        return;
+      let u;
+      return Array.isArray(g) ? u = g : g ? u = [g] : u = [], {
+        resolve: { noExternal: [...u, ...s] }
+      };
+    },
+    // We check all SSR build lookups for external Qwik deps
+    resolveId: {
+      order: "pre",
+      async handler(w, v, g) {
+        if (!await r() || !(this.environment.config.consumer === "server") || /^([./]|node:|[^a-z@])/i.test(w) || i.has(w))
+          return;
+        const p = (w.startsWith("@") ? w.split("/").slice(0, 2).join("/") : w.split("/")[0]).split("?")[0];
+        if (i.has(p))
+          return;
+        i.add(w), i.add(p);
+        let d;
+        try {
+          d = await this.resolve(p, v, { ...g, skipSelf: !0 });
+        } catch {
+          return;
+        }
+        if (d?.external && await o(p, v ? e.dirname(v) : l))
+          throw new Error(
+            `
+==============
+${p} is being treated as an external dependency, but it should be included in the server bundle, because it uses Qwik and it needs to be processed by the optimizer.
+Please add the package to "ssr.noExternal[]" as well as "optimizeDeps.exclude[]" in the Vite config. 
+==============
+`
+          );
+        if (p === w)
+          return d;
+      }
+    }
+  };
+}
+const ce = {
+  Yellow: "\x1B[33m",
+  Cyan: "\x1B[36m",
+  White: "\x1B[37m",
+  BrightBlack: "\x1B[90m",
+  BrightWhite: "\x1B[97m",
+  RESET: "\x1B[0m"
+}, lo = {
+  warn: ce.Yellow,
+  info: ce.Cyan,
+  debug: ce.BrightBlack
+};
+export {
+  co as qwikRollup,
+  uo as qwikVite
+};

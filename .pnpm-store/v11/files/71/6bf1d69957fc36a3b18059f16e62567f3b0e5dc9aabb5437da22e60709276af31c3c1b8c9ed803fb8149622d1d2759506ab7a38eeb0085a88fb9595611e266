@@ -1,0 +1,60 @@
+import { e as ensureSlash } from './pathname.mjs';
+
+const IsQLoader = "@isQLoader";
+const IsQAction = "@isQAction";
+const QLoaderId = "@loaderId";
+const QActionId = "@actionId";
+const LOADER_REGEX = /\/(q-loader-([^.]+)\.([^.]+)\.json)$/;
+const getLoaderName = (loaderId, manifestHash) => `q-loader-${loaderId}.${manifestHash}.json`;
+function recognizeRequest(pathname) {
+  if (pathname.length < 10) {
+    return null;
+  }
+  const loaderMatch = pathname.match(LOADER_REGEX);
+  if (loaderMatch) {
+    return {
+      type: IsQLoader,
+      trimLength: loaderMatch[1].length + 1,
+      data: {
+        loaderId: loaderMatch[2],
+        manifestHash: loaderMatch[3]
+      }
+    };
+  }
+  return null;
+}
+function trimRecognizedInternalPathname(pathname, recognized) {
+  let trimmed = pathname.slice(0, pathname.length - recognized.trimLength) || "/";
+  if (!globalThis.__NO_TRAILING_SLASH__ && !trimmed.endsWith("/")) {
+    trimmed = ensureSlash(trimmed);
+  }
+  return trimmed;
+}
+function trimInternalPathname(pathname) {
+  const recognized = recognizeRequest(pathname);
+  if (recognized) {
+    return trimRecognizedInternalPathname(pathname, recognized);
+  }
+  return pathname;
+}
+function resolveValidInternalFullPathname(loaderPathname, fullPath) {
+  if (!fullPath || !fullPath.startsWith("/") || fullPath.startsWith("//")) {
+    return void 0;
+  }
+  try {
+    const pageUrl = new URL(fullPath, "http://qwik.internal");
+    if (pageUrl.origin !== "http://qwik.internal") {
+      return void 0;
+    }
+    const pagePathname = pageUrl.pathname;
+    if (pagePathname === loaderPathname) {
+      return void 0;
+    }
+    const loaderPrefix = ensureSlash(loaderPathname);
+    return pagePathname.startsWith(loaderPrefix) ? pagePathname : void 0;
+  } catch {
+    return void 0;
+  }
+}
+
+export { IsQLoader as I, LOADER_REGEX as L, QLoaderId as Q, resolveValidInternalFullPathname as a, trimInternalPathname as b, IsQAction as c, QActionId as d, getLoaderName as g, recognizeRequest as r, trimRecognizedInternalPathname as t };

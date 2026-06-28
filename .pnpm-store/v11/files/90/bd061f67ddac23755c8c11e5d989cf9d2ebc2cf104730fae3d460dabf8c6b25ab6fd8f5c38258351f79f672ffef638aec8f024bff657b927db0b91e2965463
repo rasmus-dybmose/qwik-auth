@@ -1,0 +1,21 @@
+/** @packageDocumentation */
+
+import { QRL } from '../core-internal.js';
+
+/** @public */
+export declare const worker$: <T extends WorkerFunction>(qrl: T) => QRL<T>;
+
+/** @public */
+export declare interface WorkerConstructorQRL {
+    <T extends WorkerFunction>(fnQrl: QRL<T>): QRL<T>;
+}
+
+/** @public */
+export declare interface WorkerFunction {
+    (...args: any[]): any;
+}
+
+/** @public */
+export declare const workerQrl: WorkerConstructorQRL;
+
+export { }

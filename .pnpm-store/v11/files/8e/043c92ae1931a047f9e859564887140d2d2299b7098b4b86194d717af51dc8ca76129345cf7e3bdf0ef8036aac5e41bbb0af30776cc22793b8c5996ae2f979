@@ -1,0 +1,126 @@
+import { F as FULLPATH_HEADER, l as loadRoute } from '../../chunks/head.qwik.mjs';
+export { A as AbortMessage, R as RedirectMessage, S as ServerError, _ as _asyncRequestStore } from '../../chunks/head.qwik.mjs';
+import { r as recognizeRequest, t as trimRecognizedInternalPathname, I as IsQLoader, a as resolveValidInternalFullPathname, b as trimInternalPathname } from '../../chunks/request-path.mjs';
+import { r as runQwikRouter, a as resolveRequestHandlers, b as renderQwikMiddleware } from '../../chunks/user-response.mjs';
+export { R as RewriteMessage, c as clearLoaderCache, d as clearSsrCache, g as getErrorHtml, m as mergeHeadersCookies } from '../../chunks/user-response.mjs';
+
+let qwikRouterConfig;
+async function getConfig() {
+  if (!qwikRouterConfig) {
+    qwikRouterConfig = await import('@qwik-router-config');
+  }
+  return qwikRouterConfig;
+}
+function getRequestHandlerPathname(serverRequestEv) {
+  const recognized = recognizeRequest(serverRequestEv.url.pathname);
+  if (!recognized) {
+    return serverRequestEv.url.pathname;
+  }
+  const loaderPathname = trimRecognizedInternalPathname(serverRequestEv.url.pathname, recognized);
+  if (recognized.type !== IsQLoader) {
+    return loaderPathname;
+  }
+  return resolveValidInternalFullPathname(loaderPathname, serverRequestEv.request.headers.get(FULLPATH_HEADER)) ?? loaderPathname;
+}
+async function loadRequestHandlers(qwikRouterConfig2, pathname, method, checkOrigin, renderFn) {
+  const { routes, serverPlugins, cacheModules } = qwikRouterConfig2;
+  const loadedRoute = await loadRoute(routes, cacheModules, pathname);
+  const requestHandlers = resolveRequestHandlers(serverPlugins, loadedRoute, method, checkOrigin, renderQwikMiddleware(renderFn));
+  return {
+    loadedRoute,
+    requestHandlers
+  };
+}
+async function requestHandler(serverRequestEv, opts) {
+  const { render, checkOrigin } = opts;
+  const config = await getConfig();
+  const pathname = getRequestHandlerPathname(serverRequestEv);
+  if (pathname === "/.well-known" || pathname.startsWith("/.well-known/")) {
+    return null;
+  }
+  const { loadedRoute, requestHandlers } = await loadRequestHandlers(config, pathname, serverRequestEv.request.method, checkOrigin ?? true, render);
+  if (config.fallthrough && loadedRoute.$notFound$) {
+    return null;
+  }
+  const rebuildRouteInfo = async (url) => {
+    const cleanPathname = trimInternalPathname(url.pathname);
+    return loadRequestHandlers(config, cleanPathname, serverRequestEv.request.method, checkOrigin ?? true, render);
+  };
+  return runQwikRouter(serverRequestEv, loadedRoute, requestHandlers, rebuildRouteInfo, config.basePathname);
+}
+
+const staticPaths = /* @__PURE__ */ new Set([
+  "__QWIK_ROUTER_STATIC_PATHS_ARRAY__"
+]);
+function isStaticPath(method, url) {
+  if (method.toUpperCase() !== "GET") {
+    return false;
+  }
+  const p = url.pathname;
+  if (p.startsWith("/" + (globalThis.__QWIK_BUILD_DIR__ || "build") + "/")) {
+    return true;
+  }
+  if (p.startsWith("/" + (globalThis.__QWIK_ASSETS_DIR__ || "assets") + "/")) {
+    return true;
+  }
+  return staticPaths.has(p);
+}
+
+class _TextEncoderStream_polyfill {
+  #pendingHighSurrogate = null;
+  #handle = new TextEncoder();
+  #transform = new TransformStream({
+    transform: (chunk, controller) => {
+      chunk = String(chunk);
+      let finalChunk = "";
+      for (let i = 0; i < chunk.length; i++) {
+        const item = chunk[i];
+        const codeUnit = item.charCodeAt(0);
+        if (this.#pendingHighSurrogate !== null) {
+          const highSurrogate = this.#pendingHighSurrogate;
+          this.#pendingHighSurrogate = null;
+          if (56320 <= codeUnit && codeUnit <= 57343) {
+            finalChunk += highSurrogate + item;
+            continue;
+          }
+          finalChunk += "�";
+        }
+        if (55296 <= codeUnit && codeUnit <= 56319) {
+          this.#pendingHighSurrogate = item;
+          continue;
+        }
+        if (56320 <= codeUnit && codeUnit <= 57343) {
+          finalChunk += "�";
+          continue;
+        }
+        finalChunk += item;
+      }
+      if (finalChunk) {
+        controller.enqueue(this.#handle.encode(finalChunk));
+      }
+    },
+    flush: (controller) => {
+      if (this.#pendingHighSurrogate !== null) {
+        controller.enqueue(new Uint8Array([
+          239,
+          191,
+          189
+        ]));
+      }
+    }
+  });
+  get encoding() {
+    return this.#handle.encoding;
+  }
+  get readable() {
+    return this.#transform.readable;
+  }
+  get writable() {
+    return this.#transform.writable;
+  }
+  get [Symbol.toStringTag]() {
+    return "TextEncoderStream";
+  }
+}
+
+export { _TextEncoderStream_polyfill, isStaticPath, requestHandler };

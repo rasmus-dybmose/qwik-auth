@@ -1,0 +1,341 @@
+function q(c = {}) {
+  function o(u) {
+    if (typeof u != "string")
+      throw new TypeError("Path must be a string. Received " + JSON.stringify(u));
+  }
+  function d(u, n) {
+    let e = "", r = 0, i = -1, l = 0, t;
+    for (let s = 0; s <= u.length; ++s) {
+      if (s < u.length)
+        t = u.charCodeAt(s);
+      else {
+        if (t === 47)
+          break;
+        t = 47;
+      }
+      if (t === 47) {
+        if (!(i === s - 1 || l === 1)) if (i !== s - 1 && l === 2) {
+          if (e.length < 2 || r !== 2 || e.charCodeAt(e.length - 1) !== 46 || e.charCodeAt(e.length - 2) !== 46) {
+            if (e.length > 2) {
+              const f = e.lastIndexOf("/");
+              if (f !== e.length - 1) {
+                f === -1 ? (e = "", r = 0) : (e = e.slice(0, f), r = e.length - 1 - e.lastIndexOf("/")), i = s, l = 0;
+                continue;
+              }
+            } else if (e.length === 2 || e.length === 1) {
+              e = "", r = 0, i = s, l = 0;
+              continue;
+            }
+          }
+          n && (e.length > 0 ? e += "/.." : e = "..", r = 2);
+        } else
+          e.length > 0 ? e += "/" + u.slice(i + 1, s) : e = u.slice(i + 1, s), r = s - i - 1;
+        i = s, l = 0;
+      } else t === 46 && l !== -1 ? ++l : l = -1;
+    }
+    return e;
+  }
+  function w(u, n) {
+    const e = n.dir || n.root, r = n.base || (n.name || "") + (n.ext || "");
+    return e ? e === n.root ? e + r : e + u + r : r;
+  }
+  const g = function(...n) {
+    let e = "", r = !1, i;
+    for (let l = n.length - 1; l >= -1 && !r; l--) {
+      let t;
+      l >= 0 ? t = n[l] : (i === void 0 && (c && typeof c.cwd == "function" ? i = c.cwd() : typeof process < "u" && typeof process.cwd == "function" ? i = process.cwd() : i = "/"), t = i), o(t), t.length !== 0 && (e = t + "/" + e, r = t.charCodeAt(0) === 47);
+    }
+    return e = d(e, !r), r ? e.length > 0 ? "/" + e : "/" : e.length > 0 ? e : ".";
+  }, h = function(n) {
+    if (o(n), n.length === 0)
+      return ".";
+    const e = n.charCodeAt(0) === 47, r = n.charCodeAt(n.length - 1) === 47;
+    return n = d(n, !e), n.length === 0 && !e && (n = "."), n.length > 0 && r && (n += "/"), e ? "/" + n : n;
+  }, p = function(n) {
+    return o(n), n.length > 0 && n.charCodeAt(0) === 47;
+  }, A = function(...n) {
+    if (n.length === 0)
+      return ".";
+    let e;
+    for (let r = 0; r < n.length; ++r) {
+      const i = n[r];
+      o(i), i.length > 0 && (e === void 0 ? e = i : e += "/" + i);
+    }
+    return e === void 0 ? "." : h(e);
+  }, v = function(n, e) {
+    if (o(n), o(e), n === e || (n = g(n), e = g(e), n === e))
+      return "";
+    let r = 1;
+    for (; r < n.length && n.charCodeAt(r) === 47; ++r)
+      ;
+    const i = n.length, l = i - r;
+    let t = 1;
+    for (; t < e.length && e.charCodeAt(t) === 47; ++t)
+      ;
+    const f = e.length - t, y = l < f ? l : f;
+    let m = -1, a = 0;
+    for (; a <= y; ++a) {
+      if (a === y) {
+        if (f > y) {
+          if (e.charCodeAt(t + a) === 47)
+            return e.slice(t + a + 1);
+          if (a === 0)
+            return e.slice(t + a);
+        } else l > y && (n.charCodeAt(r + a) === 47 ? m = a : a === 0 && (m = 0));
+        break;
+      }
+      const D = n.charCodeAt(r + a), _ = e.charCodeAt(t + a);
+      if (D !== _)
+        break;
+      D === 47 && (m = a);
+    }
+    let b = "";
+    for (a = r + m + 1; a <= i; ++a)
+      (a === i || n.charCodeAt(a) === 47) && (b.length === 0 ? b += ".." : b += "/..");
+    return b.length > 0 ? b + e.slice(t + m) : (t += m, e.charCodeAt(t) === 47 && ++t, e.slice(t));
+  }, C = function(n) {
+    if (o(n), n.length === 0)
+      return ".";
+    let e = n.charCodeAt(0);
+    const r = e === 47;
+    let i = -1, l = !0;
+    for (let t = n.length - 1; t >= 1; --t)
+      if (e = n.charCodeAt(t), e === 47) {
+        if (!l) {
+          i = t;
+          break;
+        }
+      } else
+        l = !1;
+    return i === -1 ? r ? "/" : "." : r && i === 1 ? "//" : n.slice(0, i);
+  }, k = function(n, e) {
+    if (e !== void 0 && typeof e != "string")
+      throw new TypeError('"ext" argument must be a string');
+    o(n);
+    let r = 0, i = -1, l = !0, t;
+    if (e !== void 0 && e.length > 0 && e.length <= n.length) {
+      if (e.length === n.length && e === n)
+        return "";
+      let s = e.length - 1, f = -1;
+      for (t = n.length - 1; t >= 0; --t) {
+        const y = n.charCodeAt(t);
+        if (y === 47) {
+          if (!l) {
+            r = t + 1;
+            break;
+          }
+        } else
+          f === -1 && (l = !1, f = t + 1), s >= 0 && (y === e.charCodeAt(s) ? --s === -1 && (i = t) : (s = -1, i = f));
+      }
+      return r === i ? i = f : i === -1 && (i = n.length), n.slice(r, i);
+    } else {
+      for (t = n.length - 1; t >= 0; --t)
+        if (n.charCodeAt(t) === 47) {
+          if (!l) {
+            r = t + 1;
+            break;
+          }
+        } else i === -1 && (l = !1, i = t + 1);
+      return i === -1 ? "" : n.slice(r, i);
+    }
+  }, I = function(n) {
+    o(n);
+    let e = -1, r = 0, i = -1, l = !0, t = 0;
+    for (let s = n.length - 1; s >= 0; --s) {
+      const f = n.charCodeAt(s);
+      if (f === 47) {
+        if (!l) {
+          r = s + 1;
+          break;
+        }
+        continue;
+      }
+      i === -1 && (l = !1, i = s + 1), f === 46 ? e === -1 ? e = s : t !== 1 && (t = 1) : e !== -1 && (t = -1);
+    }
+    return e === -1 || i === -1 || // We saw a non-dot character immediately before the dot
+    t === 0 || // The (right-most) trimmed path component is exactly '..'
+    t === 1 && e === i - 1 && e === r + 1 ? "" : n.slice(e, i);
+  }, S = function(n) {
+    if (n === null || typeof n != "object")
+      throw new TypeError(
+        'The "pathObject" argument must be of type Object. Received type ' + typeof n
+      );
+    return w("/", n);
+  }, x = function(n) {
+    o(n);
+    const e = {
+      root: "",
+      dir: "",
+      base: "",
+      ext: "",
+      name: ""
+    };
+    if (n.length === 0)
+      return e;
+    let r = n.charCodeAt(0), i;
+    const l = r === 47;
+    l ? (e.root = "/", i = 1) : i = 0;
+    let t = -1, s = 0, f = -1, y = !0, m = n.length - 1, a = 0;
+    for (; m >= i; --m) {
+      if (r = n.charCodeAt(m), r === 47) {
+        if (!y) {
+          s = m + 1;
+          break;
+        }
+        continue;
+      }
+      f === -1 && (y = !1, f = m + 1), r === 46 ? t === -1 ? t = m : a !== 1 && (a = 1) : t !== -1 && (a = -1);
+    }
+    return t === -1 || f === -1 || // We saw a non-dot character immediately before the dot
+    a === 0 || // The (right-most) trimmed path component is exactly '..'
+    a === 1 && t === f - 1 && t === s + 1 ? f !== -1 && (s === 0 && l ? e.base = e.name = n.slice(1, f) : e.base = e.name = n.slice(s, f)) : (s === 0 && l ? (e.name = n.slice(1, t), e.base = n.slice(1, f)) : (e.name = n.slice(s, t), e.base = n.slice(s, f)), e.ext = n.slice(t, f)), s > 0 ? e.dir = n.slice(0, s - 1) : l && (e.dir = "/"), e;
+  }, E = "/", P = ":";
+  return {
+    relative: v,
+    resolve: g,
+    parse: x,
+    format: S,
+    join: A,
+    isAbsolute: p,
+    basename: k,
+    normalize: h,
+    dirname: C,
+    extname: I,
+    delimiter: P,
+    sep: E,
+    win32: null,
+    posix: {
+      relative: v,
+      resolve: g,
+      parse: x,
+      format: S,
+      join: A,
+      isAbsolute: p,
+      basename: k,
+      normalize: h,
+      dirname: C,
+      extname: I,
+      delimiter: P,
+      sep: E,
+      win32: null,
+      posix: null
+    }
+  };
+}
+const z = {
+  darwin: {
+    arm64: [
+      {
+        platform: "darwin",
+        arch: "arm64",
+        abi: null,
+        platformArchABI: "qwik.darwin-arm64.node"
+      }
+    ]
+  },
+  win32: {
+    x64: [
+      {
+        platform: "win32",
+        arch: "x64",
+        abi: "msvc",
+        platformArchABI: "qwik.win32-x64-msvc.node"
+      }
+    ]
+  },
+  linux: {
+    x64: [
+      {
+        platform: "linux",
+        arch: "x64",
+        abi: "gnu",
+        platformArchABI: "qwik.linux-x64-gnu.node"
+      }
+    ]
+  }
+};
+async function N() {
+  const c = B(), o = {
+    dynamicImport: (d) => {
+      throw new Error(
+        `Qwik Optimizer sys.dynamicImport() not implemented, trying to import: "${d}"`
+      );
+    },
+    strictDynamicImport: (d) => {
+      throw new Error(
+        `Qwik Optimizer sys.strictDynamicImport() not implemented, trying to import: "${d}"`
+      );
+    },
+    path: null,
+    cwd: () => "/",
+    os: "unknown",
+    env: c
+  };
+  if (o.path = q(o), o.strictDynamicImport = o.dynamicImport = (d) => import(d), c !== "webworker" && c !== "browsermain")
+    try {
+      o.path = await o.dynamicImport("node:path"), o.cwd = () => process.cwd(), o.os = process.platform;
+    } catch {
+    }
+  return o;
+}
+async function T(c) {
+  const o = B();
+  if (o === "node" || o === "bun") {
+    const d = z[process.platform];
+    if (d) {
+      const w = d[process.arch];
+      if (w)
+        for (const g of w)
+          try {
+            return (await c.dynamicImport("node:module")).default.createRequire(import.meta.url)(
+              `../bindings/${g.platformArchABI}`
+            );
+          } catch (h) {
+            console.warn(
+              `Unable to load native binding ${g.platformArchABI}. Falling back to wasm build.`,
+              h?.message
+            );
+          }
+    }
+  }
+  if (o === "node" || o === "bun") {
+    const d = await c.dynamicImport("node:url"), w = c.path.dirname(d.fileURLToPath(import.meta.url)), g = c.path.join(w, "..", "bindings", "qwik_wasm_bg.wasm"), h = await c.dynamicImport("../bindings/qwik.wasm.mjs"), A = await (await c.dynamicImport("node:fs")).promises.readFile(g), v = await WebAssembly.compile(A);
+    return await h.default(v), h;
+  } else {
+    const d = await c.dynamicImport("../bindings/qwik.wasm.mjs");
+    return await d.default(), d;
+  }
+}
+const B = () => typeof Deno < "u" ? "deno" : typeof Bun < "u" ? "bun" : typeof process < "u" && typeof global < "u" && process.versions && process.versions.node ? "node" : typeof self < "u" && typeof location < "u" && typeof navigator < "u" && typeof fetch == "function" && typeof WorkerGlobalScope == "function" && typeof self.importScripts == "function" ? "webworker" : typeof window < "u" && typeof document < "u" && typeof location < "u" && typeof navigator < "u" && typeof Window == "function" && typeof fetch == "function" ? "browsermain" : "unknown", M = async (c = {}) => {
+  const o = c?.sys || await N(), d = c?.binding || await T(o);
+  return {
+    async transformModules(g) {
+      return R(d, g);
+    },
+    sys: o
+  };
+}, R = (c, o) => c.transform_modules(L(o)), L = (c) => {
+  const o = {
+    minify: "simplify",
+    sourceMaps: !1,
+    transpileTs: !1,
+    transpileJsx: !1,
+    preserveFilenames: !1,
+    explicitExtensions: !1,
+    mode: "lib",
+    manualChunks: void 0,
+    scope: void 0,
+    regCtxName: void 0,
+    stripEventHandlers: !1,
+    rootDir: void 0,
+    stripExports: void 0,
+    stripCtxName: void 0,
+    isServer: void 0
+  };
+  return Object.entries(c).forEach(([d, w]) => {
+    w != null && (o[d] = w);
+  }), o.entryStrategy = c.entryStrategy?.type ?? "smart", o.manualChunks = c.entryStrategy?.manual ?? void 0, o;
+};
+export {
+  M as createOptimizer
+};

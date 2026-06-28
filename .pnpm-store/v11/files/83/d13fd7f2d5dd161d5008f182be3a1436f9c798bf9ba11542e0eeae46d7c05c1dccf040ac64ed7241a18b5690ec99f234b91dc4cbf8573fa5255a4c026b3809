@@ -1,0 +1,86 @@
+import { existsSync as y, mkdirSync as v } from "node:fs";
+import { readFile as k, writeFile as $ } from "node:fs/promises";
+import { resolve as q, join as B } from "node:path";
+const b = (r, ...a) => {
+  console.warn("\x1B[33m%s\x1B[0m", `qwikInsight()[WARN]: ${r}`, ...a);
+}, I = (r) => {
+  console.log("\x1B[35m%s\x1B[0m", `qwikInsight(): ${r}`);
+};
+async function O(r) {
+  const { publicApiKey: a, baseUrl: _ = "https://insights.qwik.dev", outDir: m = "" } = r;
+  if (!a) {
+    console.warn("qwikInsights: publicApiKey is required, skipping...");
+    return;
+  }
+  let f = !1, g, n, i = null, l = null;
+  const u = `${_}/api/v1/${a}`, p = `${u}/post/`;
+  async function w() {
+    return i || (y(n) ? (I("Reading Qwik Insight data from: " + n), i = JSON.parse(await k(n, "utf-8"))) : null);
+  }
+  return {
+    name: "vite-plugin-qwik-insights",
+    enforce: "pre",
+    // Only activate in production builds
+    apply: "build",
+    async config(e) {
+      return g = q(e.root || ".", m), n = B(g, "q-insights.json"), f = e.mode !== "ssr", {
+        define: {
+          "globalThis.__QI_KEY__": JSON.stringify(a),
+          "globalThis.__QI_URL__": JSON.stringify(p)
+        }
+      };
+    },
+    configResolved: {
+      // we want to register the bundle graph adder last so we overwrite existing routes
+      order: "post",
+      async handler(e) {
+        if (l = e.plugins.find(
+          (t) => t.name === "vite-plugin-qwik"
+        ), !l)
+          throw new Error("Missing vite-plugin-qwik");
+        const c = l.api.getOptions();
+        if (f)
+          try {
+            const t = { manual: {}, prefetch: [] }, o = await (await fetch(`${u}/bundles/strategy/`)).json();
+            Object.assign(t, o), i = t, v(g, { recursive: !0 }), I("Fetched latest Qwik Insight data into: " + n), await $(n, JSON.stringify(t));
+          } catch (t) {
+            b(`Failed to fetch manifest from Insights DB at ${u}/bundles/strategy/`, t), await w();
+          }
+        else
+          await w();
+        i && (c.entryStrategy.manual = {
+          ...i.manual,
+          ...c.entryStrategy.manual
+        }, l.api.registerBundleGraphAdder((t) => {
+          const h = {};
+          if (i)
+            for (let o = 0; o < i.prefetch.length; o++) {
+              const d = i.prefetch[o];
+              if (d.symbols) {
+                let s = d.route;
+                s.startsWith("/") && (s = s.slice(1)), s.endsWith("/") || (s += "/"), h[s] = { ...t.bundles[s], imports: d.symbols };
+              }
+            }
+          return h;
+        }));
+      }
+    },
+    closeBundle: async () => {
+      const e = q(m, "q-manifest.json");
+      if (f && y(e)) {
+        const c = await k(e, "utf-8");
+        try {
+          await fetch(`${p}manifest`, {
+            method: "post",
+            body: c
+          });
+        } catch (t) {
+          b(`Failed to post manifest to Insights DB at ${p}manifest`, t);
+        }
+      }
+    }
+  };
+}
+export {
+  O as qwikInsights
+};
